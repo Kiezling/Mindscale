@@ -1,0 +1,9 @@
+# Git Bash/Claude hooks require LF line endings on Windows.
+*.sh text eol=lf
+
+# Keep ordinary source and documentation text-normalized.
+*.kt text
+*.kts text
+*.md text
+*.json text
+*.toml text

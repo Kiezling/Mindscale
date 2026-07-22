@@ -19,3 +19,8 @@
 *.aab
 *.jks
 *.keystore
+
+# Local agent state and generated telemetry.
+.claude/logs/*
+!.claude/logs/.gitkeep
+.claude/settings.local.json
