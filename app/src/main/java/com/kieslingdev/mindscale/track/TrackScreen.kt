@@ -1,0 +1,508 @@
+package com.kieslingdev.mindscale.track
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.kieslingdev.mindscale.data.Entry
+import com.kieslingdev.mindscale.ui.theme.intensityColor
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.LocalTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.format.DateTimeParseException
+
+/**
+ * Numpad key order/grouping is frozen by Invariant 12: a 3x3 grid of 1-9,
+ * then a visually distinct group of 0 and 10 below it.
+ */
+private val NumpadRows = listOf(
+    listOf(1, 2, 3),
+    listOf(4, 5, 6),
+    listOf(7, 8, 9)
+)
+private val NumpadEdgeKeys = listOf(0, 10)
+
+private val EntryDateTimeFormatter: DateTimeFormatter =
+    DateTimeFormatter.ofPattern("MMM d, yyyy 'at' h:mm a")
+private val DraftDateFormatter: DateTimeFormatter = DateTimeFormatter.ISO_LOCAL_DATE
+private val DraftTimeFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
+
+/**
+ * Collects [TrackViewModel]'s state in a lifecycle-aware way and forwards events;
+ * this is the only stateful entry point. Not yet wired into MainActivity (task 9).
+ */
+@Composable
+fun TrackRoute(
+    viewModel: TrackViewModel,
+    modifier: Modifier = Modifier
+) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    TrackScreen(
+        uiState = uiState,
+        onEvent = viewModel::onEvent,
+        modifier = modifier
+    )
+}
+
+/**
+ * Stateless, previewable Track screen. Drives all UI tests.
+ */
+@Composable
+fun TrackScreen(
+    uiState: TrackUiState,
+    onEvent: (TrackEvent) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(modifier = modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            item {
+                TransientReadoutBanner(uiState.transientReadout)
+            }
+            item {
+                Numpad(
+                    onTap = { value -> onEvent(TrackEvent.KeyTapped(value)) },
+                    onLongPress = { value -> onEvent(TrackEvent.KeyLongPressed(value)) }
+                )
+            }
+            if (uiState.isEmpty) {
+                item { EmptyState() }
+            } else {
+                items(uiState.recentEntries, key = { it.id }) { entry ->
+                    EntryRow(entry = entry, onEvent = onEvent)
+                }
+            }
+        }
+    }
+
+    uiState.backdateDialog?.let { dialog ->
+        BackdateDialog(state = dialog, onEvent = onEvent)
+    }
+    uiState.editDialog?.let { dialog ->
+        EditDialog(state = dialog, onEvent = onEvent)
+    }
+    uiState.noteDialog?.let { dialog ->
+        NoteDialog(state = dialog, onEvent = onEvent)
+    }
+    uiState.pendingDelete?.let { entry ->
+        DeleteConfirmDialog(entry = entry, onEvent = onEvent)
+    }
+}
+
+@Composable
+private fun TransientReadoutBanner(readout: ReadoutState?) {
+    if (readout == null) return
+    Surface(
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Text(
+            text = "${readout.value} · ${readout.band}",
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier
+                .padding(12.dp)
+                .semantics {
+                    contentDescription = "Logged ${readout.value}, ${readout.band}"
+                }
+        )
+    }
+}
+
+@Composable
+private fun Numpad(
+    onTap: (Int) -> Unit,
+    onLongPress: (Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        NumpadRows.forEach { row ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                row.forEach { value ->
+                    NumpadKey(
+                        value = value,
+                        shape = RoundedCornerShape(12.dp),
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        onTap = onTap,
+                        onLongPress = onLongPress,
+                        modifier = Modifier
+                            .weight(1f)
+                            .aspectRatio(1f)
+                    )
+                }
+            }
+        }
+        // 0 and 10 are visually distinct (pill shape, different tone) from the 1-9
+        // grid above, per Invariant 12 and the mockup's grouping decision.
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            NumpadEdgeKeys.forEach { value ->
+                NumpadKey(
+                    value = value,
+                    shape = RoundedCornerShape(50),
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    onTap = onTap,
+                    onLongPress = onLongPress,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(56.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun NumpadKey(
+    value: Int,
+    shape: Shape,
+    containerColor: Color,
+    onTap: (Int) -> Unit,
+    onLongPress: (Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .clip(shape)
+            .background(containerColor)
+            .pointerInput(value) {
+                // detectTapGestures guarantees tap and long-press are mutually
+                // exclusive (Invariant 8), and uses the platform's default
+                // long-press timeout rather than a hand-rolled duration (D-4).
+                detectTapGestures(
+                    onTap = { onTap(value) },
+                    onLongPress = { onLongPress(value) }
+                )
+            }
+            .testTag("numpad_key_$value")
+            .semantics {
+                contentDescription = "Log value $value now. Long-press to backdate."
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = value.toString(),
+            style = MaterialTheme.typography.headlineSmall
+        )
+    }
+}
+
+@Composable
+private fun EmptyState(modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 32.dp)
+            .testTag("track_empty_state"),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = "Nothing recorded yet",
+            style = MaterialTheme.typography.titleMedium
+        )
+        Spacer(modifier = Modifier.width(8.dp).height(8.dp))
+        Text(
+            text = "A well day costs nothing and needs no log. Come back whenever " +
+                "there's something worth tracking.",
+            style = MaterialTheme.typography.bodyMedium,
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
+@Composable
+private fun EntryRow(
+    entry: Entry,
+    onEvent: (TrackEvent) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val isDark = isSystemInDarkTheme()
+    val color = intensityColor(entry.value, isDark)
+    val bandText = band(entry.value)
+    val formatted = remember(entry.ts) {
+        java.time.Instant.ofEpochMilli(entry.ts)
+            .atZone(ZoneId.systemDefault())
+            .format(EntryDateTimeFormatter)
+    }
+    val onColor = if (color.luminance() > 0.5f) Color.Black else Color.White
+
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .semantics(mergeDescendants = true) {
+                contentDescription = "${entry.value}, $bandText, logged $formatted"
+            },
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(CircleShape)
+                .background(color),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(text = entry.value.toString(), color = onColor)
+        }
+        Spacer(modifier = Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = formatted, style = MaterialTheme.typography.bodyMedium)
+            Text(text = bandText, style = MaterialTheme.typography.labelSmall)
+            val note = entry.note
+            if (!note.isNullOrBlank()) {
+                Text(
+                    text = note,
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+        TextButton(
+            onClick = { onEvent(TrackEvent.EditRequested(entry)) },
+            modifier = Modifier.semantics {
+                contentDescription = "Edit entry with value ${entry.value}"
+            }
+        ) { Text("Edit") }
+        TextButton(
+            onClick = { onEvent(TrackEvent.NoteRequested(entry)) },
+            modifier = Modifier.semantics {
+                contentDescription = "Edit note for entry with value ${entry.value}"
+            }
+        ) { Text("Note") }
+        TextButton(
+            onClick = { onEvent(TrackEvent.DeleteRequested(entry)) },
+            modifier = Modifier.semantics {
+                contentDescription = "Delete entry with value ${entry.value}"
+            }
+        ) { Text("Delete") }
+    }
+}
+
+/** Parses [dateText]/[timeText] into epoch millis, or null if either is not yet valid. */
+private fun tryParseTimestamp(dateText: String, timeText: String, zone: ZoneId): Long? =
+    try {
+        val date = LocalDate.parse(dateText, DraftDateFormatter)
+        val time = LocalTime.parse(timeText, DraftTimeFormatter)
+        LocalDateTime.of(date, time).atZone(zone).toInstant().toEpochMilli()
+    } catch (e: DateTimeParseException) {
+        null
+    }
+
+/**
+ * Shared timestamp-edit dialog body for the backdate and edit flows. Draft date/time
+ * text lives in `rememberSaveable` at this composable layer (not in the ViewModel)
+ * because it is transient, possibly-invalid-mid-typing text tied to this dialog's
+ * lifetime; it survives rotation. A simple ISO date + 24h time text field is used
+ * rather than Material3's DatePicker/TimePicker for a faster, equally correct
+ * implementation (documented implementer choice, spec leaves this open).
+ */
+@Composable
+private fun TimestampEditDialog(
+    title: String,
+    value: Int,
+    timestampMillis: Long,
+    error: String?,
+    onValueChanged: ((Int) -> Unit)?,
+    onTimestampChanged: (Long) -> Unit,
+    onSave: () -> Unit,
+    onCancel: () -> Unit
+) {
+    val zone = remember { ZoneId.systemDefault() }
+    var dateText by rememberSaveable {
+        mutableStateOf(
+            java.time.Instant.ofEpochMilli(timestampMillis).atZone(zone).format(DraftDateFormatter)
+        )
+    }
+    var timeText by rememberSaveable {
+        mutableStateOf(
+            java.time.Instant.ofEpochMilli(timestampMillis).atZone(zone).format(DraftTimeFormatter)
+        )
+    }
+
+    AlertDialog(
+        onDismissRequest = onCancel,
+        title = { Text(title) },
+        text = {
+            Column {
+                if (onValueChanged != null) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        TextButton(
+                            onClick = { if (value > 0) onValueChanged(value - 1) },
+                            modifier = Modifier.semantics { contentDescription = "Decrease value" }
+                        ) { Text("-") }
+                        Text(
+                            text = "Value: $value",
+                            modifier = Modifier
+                                .width(96.dp)
+                                .padding(horizontal = 8.dp)
+                        )
+                        TextButton(
+                            onClick = { if (value < 10) onValueChanged(value + 1) },
+                            modifier = Modifier.semantics { contentDescription = "Increase value" }
+                        ) { Text("+") }
+                    }
+                } else {
+                    Text(text = "Value: $value")
+                }
+                OutlinedTextField(
+                    value = dateText,
+                    onValueChange = { newText ->
+                        dateText = newText
+                        tryParseTimestamp(newText, timeText, zone)?.let(onTimestampChanged)
+                    },
+                    label = { Text("Date (yyyy-MM-dd)") }
+                )
+                OutlinedTextField(
+                    value = timeText,
+                    onValueChange = { newText ->
+                        timeText = newText
+                        tryParseTimestamp(dateText, newText, zone)?.let(onTimestampChanged)
+                    },
+                    label = { Text("Time (HH:mm)") }
+                )
+                if (error != null) {
+                    Text(text = error, color = MaterialTheme.colorScheme.error)
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onSave, enabled = error == null) { Text("Save") }
+        },
+        dismissButton = {
+            TextButton(onClick = onCancel) { Text("Cancel") }
+        }
+    )
+}
+
+@Composable
+private fun BackdateDialog(state: BackdateDialogState, onEvent: (TrackEvent) -> Unit) {
+    TimestampEditDialog(
+        title = "Backdate entry",
+        value = state.value,
+        timestampMillis = state.timestampMillis,
+        error = state.error,
+        onValueChanged = null,
+        onTimestampChanged = { onEvent(TrackEvent.BackdateTimestampChanged(it)) },
+        onSave = { onEvent(TrackEvent.BackdateSaveConfirmed) },
+        onCancel = { onEvent(TrackEvent.BackdateCancelled) }
+    )
+}
+
+@Composable
+private fun EditDialog(state: EditEntryState, onEvent: (TrackEvent) -> Unit) {
+    TimestampEditDialog(
+        title = "Edit entry",
+        value = state.value,
+        timestampMillis = state.timestampMillis,
+        error = state.error,
+        onValueChanged = { onEvent(TrackEvent.EditValueChanged(it)) },
+        onTimestampChanged = { onEvent(TrackEvent.EditTimestampChanged(it)) },
+        onSave = { onEvent(TrackEvent.EditSaveConfirmed) },
+        onCancel = { onEvent(TrackEvent.EditCancelled) }
+    )
+}
+
+@Composable
+private fun NoteDialog(state: NoteEditState, onEvent: (TrackEvent) -> Unit) {
+    // Mirrors TimestampEditDialog's rememberSaveable pattern: the ViewModel's
+    // StateFlow alone does not survive true process death (no SavedStateHandle
+    // wiring), so in-progress note text is buffered here at the Composable
+    // layer, seeded from the ViewModel's state and kept in sync via
+    // NoteTextChanged, so it survives rotation and process death alike.
+    var text by rememberSaveable(state.entryId) { mutableStateOf(state.text) }
+
+    AlertDialog(
+        onDismissRequest = { onEvent(TrackEvent.NoteCancelled) },
+        title = { Text("Edit note") },
+        text = {
+            OutlinedTextField(
+                value = text,
+                onValueChange = { newText ->
+                    text = newText
+                    onEvent(TrackEvent.NoteTextChanged(newText))
+                },
+                label = { Text("Note") }
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = { onEvent(TrackEvent.NoteSaveConfirmed) }) { Text("Save") }
+        },
+        dismissButton = {
+            TextButton(onClick = { onEvent(TrackEvent.NoteCancelled) }) { Text("Cancel") }
+        }
+    )
+}
+
+@Composable
+private fun DeleteConfirmDialog(entry: Entry, onEvent: (TrackEvent) -> Unit) {
+    AlertDialog(
+        onDismissRequest = { onEvent(TrackEvent.DeleteCancelled) },
+        title = { Text("Delete entry?") },
+        text = {
+            Text(
+                "This permanently deletes the entry logged with value ${entry.value}. " +
+                    "This cannot be undone."
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = { onEvent(TrackEvent.DeleteConfirmed) }) { Text("Delete") }
+        },
+        dismissButton = {
+            TextButton(onClick = { onEvent(TrackEvent.DeleteCancelled) }) { Text("Cancel") }
+        }
+    )
+}
