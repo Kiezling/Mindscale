@@ -6,6 +6,8 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -20,6 +22,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -46,6 +49,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kieslingdev.mindscale.data.Entry
+import com.kieslingdev.mindscale.data.EntryKind
 import com.kieslingdev.mindscale.ui.theme.intensityColor
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -72,7 +76,7 @@ private val DraftTimeFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern(
 
 /**
  * Collects [TrackViewModel]'s state in a lifecycle-aware way and forwards events;
- * this is the only stateful entry point. Not yet wired into MainActivity (task 9).
+ * this is the only stateful entry point.
  */
 @Composable
 fun TrackRoute(
@@ -99,18 +103,57 @@ fun TrackScreen(
     Box(modifier = modifier.fillMaxSize()) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
+            contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             item {
-                TransientReadoutBanner(uiState.transientReadout)
+                ToastBanner(uiState.toast)
             }
-            item {
-                Numpad(
-                    onTap = { value -> onEvent(TrackEvent.KeyTapped(value)) },
-                    onLongPress = { value -> onEvent(TrackEvent.KeyLongPressed(value)) }
-                )
+
+            // Invariant 21: paused hides the entire capture surface (numpad, help,
+            // onset-chip prompt, Sleep/Wake, marker, check-in) but never the history
+            // below (Recent list / empty state), which renders unconditionally further
+            // down regardless of isPaused.
+            if (uiState.isPaused) {
+                item {
+                    PausedBanner(onEvent = onEvent)
+                }
+            } else {
+                item {
+                    TransientReadoutBanner(uiState.transientReadout)
+                }
+                item {
+                    HelpToggle(helpOpen = uiState.helpOpen, onEvent = onEvent)
+                }
+                if (uiState.helpOpen) {
+                    item { HelpCard() }
+                }
+                item {
+                    Numpad(
+                        onTap = { value -> onEvent(TrackEvent.KeyTapped(value)) },
+                        onLongPress = { value -> onEvent(TrackEvent.KeyLongPressed(value)) }
+                    )
+                }
+                if (uiState.onsetChipPrompt != null) {
+                    item {
+                        OnsetChipCard(prompt = uiState.onsetChipPrompt, onEvent = onEvent)
+                    }
+                }
+                if (uiState.sleepOn) {
+                    item {
+                        SleepWakeRow(uiState = uiState, onEvent = onEvent)
+                    }
+                }
+                item {
+                    MarkerSection(uiState = uiState, onEvent = onEvent)
+                }
+                if (uiState.showCheckin) {
+                    item {
+                        CheckinBanner(onEvent = onEvent)
+                    }
+                }
             }
+
             if (uiState.isEmpty) {
                 item { EmptyState() }
             } else {
@@ -132,6 +175,256 @@ fun TrackScreen(
     }
     uiState.pendingDelete?.let { entry ->
         DeleteConfirmDialog(entry = entry, onEvent = onEvent)
+    }
+}
+
+@Composable
+private fun ToastBanner(toast: String?) {
+    if (toast == null) return
+    Surface(
+        color = MaterialTheme.colorScheme.inverseSurface,
+        shape = RoundedCornerShape(999.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("toast_banner")
+    ) {
+        Text(
+            text = toast,
+            color = MaterialTheme.colorScheme.inverseOnSurface,
+            style = MaterialTheme.typography.labelLarge,
+            textAlign = TextAlign.Center,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 10.dp, horizontal = 16.dp)
+        )
+    }
+}
+
+@Composable
+private fun PausedBanner(onEvent: (TrackEvent) -> Unit, modifier: Modifier = Modifier) {
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        shape = RoundedCornerShape(14.dp),
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag("paused_banner")
+    ) {
+        Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text(text = "Tracking paused", style = MaterialTheme.typography.labelSmall)
+            Text(
+                text = "Your data is still here and still yours. Nothing is being recorded until you start again.",
+                style = MaterialTheme.typography.bodyMedium
+            )
+            TextButton(
+                onClick = { onEvent(TrackEvent.ResumeTracking) },
+                modifier = Modifier
+                    .testTag("resume_tracking_button")
+                    .semantics { contentDescription = "Start tracking again" }
+            ) { Text("Start again") }
+        }
+    }
+}
+
+@Composable
+private fun HelpToggle(helpOpen: Boolean, onEvent: (TrackEvent) -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.End
+    ) {
+        TextButton(
+            onClick = { onEvent(TrackEvent.ToggleHelp) },
+            modifier = Modifier
+                .testTag("help_toggle_button")
+                .semantics {
+                    contentDescription =
+                        if (helpOpen) "Hide what the numbers mean" else "Show what the numbers mean"
+                }
+        ) { Text("?") }
+    }
+}
+
+@Composable
+private fun HelpCard(modifier: Modifier = Modifier) {
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        shape = RoundedCornerShape(14.dp),
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag("help_card")
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                text = "0 means it isn't happening right now. 1–3 you notice it. 4–6 it's changing what " +
+                    "you do. 7–10 it's most of what's happening.",
+                style = MaterialTheme.typography.bodySmall
+            )
+            Text(
+                text = "The numbers only have to mean the same thing to you each time. That's what makes " +
+                    "the chart readable months later.",
+                style = MaterialTheme.typography.bodySmall
+            )
+            Text(
+                text = "Log when it starts, when it clearly changes, and when it stops. Nothing recorded " +
+                    "means nothing was happening.",
+                style = MaterialTheme.typography.bodySmall
+            )
+        }
+    }
+}
+
+@Composable
+private fun OnsetChipCard(
+    prompt: OnsetChipPromptState,
+    onEvent: (TrackEvent) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        shape = RoundedCornerShape(16.dp),
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag("onset_chip_card")
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(text = "What was happening?", style = MaterialTheme.typography.labelSmall)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                DEFAULT_ONSET_CHIPS.forEach { chip ->
+                    val selected = chip in prompt.selected
+                    FilterChip(
+                        selected = selected,
+                        onClick = { onEvent(TrackEvent.OnsetChipToggled(chip)) },
+                        label = { Text(chip) },
+                        modifier = Modifier
+                            .testTag("onset_chip_$chip")
+                            .semantics {
+                                contentDescription = if (selected) "$chip, selected" else "$chip, not selected"
+                            }
+                    )
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+                TextButton(
+                    onClick = { onEvent(TrackEvent.OnsetChipsSubmitted) },
+                    modifier = Modifier.testTag("onset_chips_submit")
+                ) { Text("Submit") }
+                TextButton(
+                    onClick = { onEvent(TrackEvent.OnsetChipsSkipped) },
+                    modifier = Modifier.testTag("onset_chips_skip")
+                ) { Text("Skip") }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SleepWakeRow(uiState: TrackUiState, onEvent: (TrackEvent) -> Unit) {
+    val armed = uiState.armedCapture
+    val openInterval = uiState.openSleepInterval
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        val sleepDescription = when {
+            armed == EntryKind.SLEEP -> "Sleep armed. Tap a number to log falling asleep."
+            openInterval != null -> "Asleep since ${formatClockTime(openInterval.startTs)}"
+            else -> "Mark falling asleep. Then tap how you felt."
+        }
+        TextButton(
+            onClick = { onEvent(TrackEvent.ArmSleep) },
+            modifier = Modifier
+                .weight(1f)
+                .testTag("sleep_button")
+                .semantics { contentDescription = sleepDescription }
+        ) { Text("Sleep") }
+
+        val wakeDescription = when {
+            armed == EntryKind.WAKE -> "Wake armed. Tap a number to log waking up."
+            openInterval == null -> "Wake. Disabled: tap Sleep first, nothing is currently open."
+            else -> "Mark waking up. Then tap how you feel."
+        }
+        TextButton(
+            onClick = { onEvent(TrackEvent.ArmWake) },
+            modifier = Modifier
+                .weight(1f)
+                .testTag("wake_button")
+                .semantics { contentDescription = wakeDescription }
+        ) { Text("Wake") }
+    }
+}
+
+@Composable
+private fun MarkerSection(uiState: TrackUiState, onEvent: (TrackEvent) -> Unit) {
+    // rememberSaveable buffers the text field across Compose state restoration. The
+    // ViewModel also mirrors markerOpen/markerDraft into SavedStateHandle so the marker
+    // UI itself is recreated open with the same draft after true process recreation.
+    // Keyed on markerOpen so each reopen starts from the ViewModel's freshly-reset "".
+    var draftText by rememberSaveable(uiState.markerOpen) { mutableStateOf(uiState.markerDraft) }
+
+    Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+            TextButton(
+                onClick = { onEvent(TrackEvent.MarkerToggled) },
+                modifier = Modifier
+                    .testTag("marker_toggle")
+                    .semantics {
+                        contentDescription =
+                            if (uiState.markerOpen) "Close event marker input" else "Mark an event"
+                    }
+            ) { Text(if (uiState.markerOpen) "Event" else "Mark an event") }
+        }
+        if (uiState.markerOpen) {
+            OutlinedTextField(
+                value = draftText,
+                onValueChange = { newText ->
+                    draftText = newText
+                    onEvent(TrackEvent.MarkerDraftChanged(newText))
+                },
+                label = { Text("Dose change, started therapy, travel…") },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("marker_input")
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+                TextButton(
+                    onClick = { onEvent(TrackEvent.MarkerSaveConfirmed) },
+                    modifier = Modifier.testTag("marker_save")
+                ) { Text("Save") }
+                TextButton(
+                    onClick = { onEvent(TrackEvent.MarkerCancelled) },
+                    modifier = Modifier.testTag("marker_cancel")
+                ) { Text("Cancel") }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CheckinBanner(onEvent: (TrackEvent) -> Unit) {
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        shape = RoundedCornerShape(14.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("checkin_banner")
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text(text = "A question, once in a while", style = MaterialTheme.typography.labelSmall)
+            Text(
+                text = "Is keeping this record still useful to you? For some people, watching symptoms " +
+                    "closely makes them louder. If that's happening, stopping is a reasonable thing to do.",
+                style = MaterialTheme.typography.bodyMedium
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+                TextButton(
+                    onClick = { onEvent(TrackEvent.CheckinStillUseful) },
+                    modifier = Modifier.testTag("checkin_still_useful")
+                ) { Text("Still useful") }
+                TextButton(
+                    onClick = { onEvent(TrackEvent.CheckinPauseRequested) },
+                    modifier = Modifier.testTag("checkin_pause")
+                ) { Text("Pause tracking") }
+            }
+        }
     }
 }
 
@@ -264,6 +557,16 @@ private fun EmptyState(modifier: Modifier = Modifier) {
     }
 }
 
+/** [entry.value] == 0 or a non-null [entry.kind] renders a text badge (Invariant, UI-ACCESSIBILITY). */
+private fun entryKindBadge(entry: Entry): String? {
+    if (entry.value != 0 && entry.kind == null) return null
+    return when (entry.kind) {
+        EntryKind.SLEEP -> "asleep"
+        EntryKind.WAKE -> "awake"
+        null -> "ended"
+    }
+}
+
 @Composable
 private fun EntryRow(
     entry: Entry,
@@ -279,56 +582,77 @@ private fun EntryRow(
             .format(EntryDateTimeFormatter)
     }
     val onColor = if (color.luminance() > 0.5f) Color.Black else Color.White
+    val badge = entryKindBadge(entry)
 
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .semantics(mergeDescendants = true) {
-                contentDescription = "${entry.value}, $bandText, logged $formatted"
-            },
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
+    Column(modifier = modifier.fillMaxWidth()) {
+        Row(
             modifier = Modifier
-                .size(40.dp)
-                .clip(CircleShape)
-                .background(color),
-            contentAlignment = Alignment.Center
+                .fillMaxWidth()
+                .semantics(mergeDescendants = true) {
+                    contentDescription = buildString {
+                        append("${entry.value}, $bandText, logged $formatted")
+                        if (badge != null) append(", $badge")
+                        if (entry.chips.isNotEmpty()) append(", ${entry.chips.joinToString(", ")}")
+                    }
+                },
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(text = entry.value.toString(), color = onColor)
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(color),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(text = entry.value.toString(), color = onColor)
+            }
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(text = formatted, style = MaterialTheme.typography.bodyMedium)
+                Text(text = bandText, style = MaterialTheme.typography.labelSmall)
+                if (badge != null) {
+                    Text(
+                        text = badge,
+                        style = MaterialTheme.typography.labelSmall,
+                        modifier = Modifier.testTag("entry_badge_${entry.id}")
+                    )
+                }
+                if (entry.chips.isNotEmpty()) {
+                    Text(
+                        text = entry.chips.joinToString(" · "),
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.testTag("entry_chips_${entry.id}")
+                    )
+                }
+                val note = entry.note
+                if (!note.isNullOrBlank()) {
+                    Text(
+                        text = note,
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+            TextButton(
+                onClick = { onEvent(TrackEvent.EditRequested(entry)) },
+                modifier = Modifier.semantics {
+                    contentDescription = "Edit entry with value ${entry.value}"
+                }
+            ) { Text("Edit") }
+            TextButton(
+                onClick = { onEvent(TrackEvent.NoteRequested(entry)) },
+                modifier = Modifier.semantics {
+                    contentDescription = "Edit note for entry with value ${entry.value}"
+                }
+            ) { Text("Note") }
+            TextButton(
+                onClick = { onEvent(TrackEvent.DeleteRequested(entry)) },
+                modifier = Modifier.semantics {
+                    contentDescription = "Delete entry with value ${entry.value}"
+                }
+            ) { Text("Delete") }
         }
-        Spacer(modifier = Modifier.width(12.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(text = formatted, style = MaterialTheme.typography.bodyMedium)
-            Text(text = bandText, style = MaterialTheme.typography.labelSmall)
-            val note = entry.note
-            if (!note.isNullOrBlank()) {
-                Text(
-                    text = note,
-                    style = MaterialTheme.typography.bodySmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-        }
-        TextButton(
-            onClick = { onEvent(TrackEvent.EditRequested(entry)) },
-            modifier = Modifier.semantics {
-                contentDescription = "Edit entry with value ${entry.value}"
-            }
-        ) { Text("Edit") }
-        TextButton(
-            onClick = { onEvent(TrackEvent.NoteRequested(entry)) },
-            modifier = Modifier.semantics {
-                contentDescription = "Edit note for entry with value ${entry.value}"
-            }
-        ) { Text("Note") }
-        TextButton(
-            onClick = { onEvent(TrackEvent.DeleteRequested(entry)) },
-            modifier = Modifier.semantics {
-                contentDescription = "Delete entry with value ${entry.value}"
-            }
-        ) { Text("Delete") }
     }
 }
 
@@ -342,6 +666,11 @@ private fun tryParseTimestamp(dateText: String, timeText: String, zone: ZoneId):
         null
     }
 
+private val ClockTimeFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("h:mm a")
+
+private fun formatClockTime(epochMillis: Long): String =
+    java.time.Instant.ofEpochMilli(epochMillis).atZone(ZoneId.systemDefault()).format(ClockTimeFormatter)
+
 /**
  * Shared timestamp-edit dialog body for the backdate and edit flows. Draft date/time
  * text lives in `rememberSaveable` at this composable layer (not in the ViewModel)
@@ -349,6 +678,9 @@ private fun tryParseTimestamp(dateText: String, timeText: String, zone: ZoneId):
  * lifetime; it survives rotation. A simple ISO date + 24h time text field is used
  * rather than Material3's DatePicker/TimePicker for a faster, equally correct
  * implementation (documented implementer choice, spec leaves this open).
+ *
+ * [chips]/[onChipToggled] are non-null only for the Edit flow (Phase 2) - Backdate
+ * creates a new entry with no pre-existing chips to edit.
  */
 @Composable
 private fun TimestampEditDialog(
@@ -359,7 +691,9 @@ private fun TimestampEditDialog(
     onValueChanged: ((Int) -> Unit)?,
     onTimestampChanged: (Long) -> Unit,
     onSave: () -> Unit,
-    onCancel: () -> Unit
+    onCancel: () -> Unit,
+    chips: Set<String>? = null,
+    onChipToggled: ((String) -> Unit)? = null
 ) {
     val zone = remember { ZoneId.systemDefault() }
     var dateText by rememberSaveable {
@@ -414,6 +748,29 @@ private fun TimestampEditDialog(
                     },
                     label = { Text("Time (HH:mm)") }
                 )
+                if (chips != null && onChipToggled != null) {
+                    Text(
+                        text = "What was happening?",
+                        style = MaterialTheme.typography.labelSmall,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        DEFAULT_ONSET_CHIPS.forEach { chip ->
+                            val selected = chip in chips
+                            FilterChip(
+                                selected = selected,
+                                onClick = { onChipToggled(chip) },
+                                label = { Text(chip) },
+                                modifier = Modifier
+                                    .testTag("edit_chip_$chip")
+                                    .semantics {
+                                        contentDescription =
+                                            if (selected) "$chip, selected" else "$chip, not selected"
+                                    }
+                            )
+                        }
+                    }
+                }
                 if (error != null) {
                     Text(text = error, color = MaterialTheme.colorScheme.error)
                 }
@@ -452,7 +809,9 @@ private fun EditDialog(state: EditEntryState, onEvent: (TrackEvent) -> Unit) {
         onValueChanged = { onEvent(TrackEvent.EditValueChanged(it)) },
         onTimestampChanged = { onEvent(TrackEvent.EditTimestampChanged(it)) },
         onSave = { onEvent(TrackEvent.EditSaveConfirmed) },
-        onCancel = { onEvent(TrackEvent.EditCancelled) }
+        onCancel = { onEvent(TrackEvent.EditCancelled) },
+        chips = state.chips,
+        onChipToggled = { onEvent(TrackEvent.EditChipToggled(it)) }
     )
 }
 

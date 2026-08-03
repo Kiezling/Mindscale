@@ -18,6 +18,7 @@ class FakeEntryDao : EntryDao {
     val insertCalls = mutableListOf<Entry>()
     val updateCalls = mutableListOf<Entry>()
     val deleteCalls = mutableListOf<Entry>()
+    val updateChipsCalls = mutableListOf<Pair<Long, List<String>>>()
 
     override suspend fun insert(entry: Entry): Long {
         val id = nextId++
@@ -44,4 +45,14 @@ class FakeEntryDao : EntryDao {
         }
 
     override fun observeCount(): Flow<Int> = entriesFlow.map { it.size }
+
+    override suspend fun mostRecentAtOrBefore(ts: Long): Entry? =
+        entriesFlow.value
+            .filter { it.ts <= ts }
+            .maxWithOrNull(compareBy<Entry> { it.ts }.thenBy { it.id })
+
+    override suspend fun updateChips(entryId: Long, chips: List<String>) {
+        updateChipsCalls += entryId to chips
+        entriesFlow.value = entriesFlow.value.map { if (it.id == entryId) it.copy(chips = chips) else it }
+    }
 }

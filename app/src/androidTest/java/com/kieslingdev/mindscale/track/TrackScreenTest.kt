@@ -6,6 +6,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.longClick
+import com.kieslingdev.mindscale.data.Entry
 import com.kieslingdev.mindscale.ui.theme.MindScaleTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -82,5 +83,160 @@ class TrackScreenTest {
 
         composeTestRule.onNodeWithTag("track_empty_state").assertExists()
         composeTestRule.onNodeWithText("Nothing recorded yet").assertExists()
+    }
+
+    // -----------------------------------------------------------------
+    // Phase 2
+    // -----------------------------------------------------------------
+
+    @Test
+    fun pausedState_rendersPausedBanner_andHidesTheCaptureSurface_butKeepsRecentEntries() {
+        val entry = Entry(id = 1L, ts = 1_000L, value = 4)
+        setContent(
+            uiState = TrackUiState(
+                isPaused = true,
+                recentEntries = listOf(entry),
+                isEmpty = false,
+                sleepOn = true,
+                showCheckin = true
+            )
+        )
+
+        composeTestRule.onNodeWithTag("paused_banner").assertExists()
+        composeTestRule.onNodeWithTag("resume_tracking_button").assertExists()
+        composeTestRule.onNodeWithTag("numpad_key_7").assertDoesNotExist()
+        composeTestRule.onNodeWithTag("help_toggle_button").assertDoesNotExist()
+        composeTestRule.onNodeWithTag("sleep_button").assertDoesNotExist()
+        composeTestRule.onNodeWithTag("wake_button").assertDoesNotExist()
+        composeTestRule.onNodeWithTag("marker_toggle").assertDoesNotExist()
+        composeTestRule.onNodeWithTag("checkin_banner").assertDoesNotExist()
+        // History remains visible while paused (band(4) == "moderate", see Band.kt).
+        composeTestRule.onNodeWithText("moderate").assertExists()
+    }
+
+    @Test
+    fun resumeTrackingButton_invokesResumeTrackingEvent() {
+        val events = mutableListOf<TrackEvent>()
+        setContent(uiState = TrackUiState(isPaused = true), onEvent = { events += it })
+
+        composeTestRule.onNodeWithTag("resume_tracking_button").performClick()
+
+        assertEquals(1, events.count { it == TrackEvent.ResumeTracking })
+    }
+
+    @Test
+    fun checkinBanner_rendersBothActions_andInvokesTheCorrectEvents() {
+        val events = mutableListOf<TrackEvent>()
+        setContent(uiState = TrackUiState(showCheckin = true), onEvent = { events += it })
+
+        composeTestRule.onNodeWithTag("checkin_banner").assertExists()
+        composeTestRule.onNodeWithTag("checkin_still_useful").performClick()
+        composeTestRule.onNodeWithTag("checkin_pause").performClick()
+
+        assertEquals(1, events.count { it == TrackEvent.CheckinStillUseful })
+        assertEquals(1, events.count { it == TrackEvent.CheckinPauseRequested })
+    }
+
+    @Test
+    fun helpToggleButton_invokesToggleHelp_andCardIsHiddenWhenHelpOpenIsFalse() {
+        val events = mutableListOf<TrackEvent>()
+        setContent(uiState = TrackUiState(helpOpen = false), onEvent = { events += it })
+
+        composeTestRule.onNodeWithTag("help_card").assertDoesNotExist()
+        composeTestRule.onNodeWithTag("help_toggle_button").performClick()
+
+        assertEquals(1, events.count { it == TrackEvent.ToggleHelp })
+    }
+
+    @Test
+    fun helpCard_rendersTheFrozenCopy_whenHelpOpenIsTrue() {
+        setContent(uiState = TrackUiState(helpOpen = true))
+
+        composeTestRule.onNodeWithTag("help_card").assertExists()
+        composeTestRule.onNodeWithText(
+            "0 means it isn't happening right now. 1–3 you notice it. 4–6 it's changing what " +
+                "you do. 7–10 it's most of what's happening.",
+            substring = true
+        ).assertExists()
+    }
+
+    @Test
+    fun sleepButton_invokesArmSleep_andWakeButton_invokesArmWake() {
+        val events = mutableListOf<TrackEvent>()
+        setContent(uiState = TrackUiState(sleepOn = true), onEvent = { events += it })
+
+        composeTestRule.onNodeWithTag("sleep_button").performClick()
+        composeTestRule.onNodeWithTag("wake_button").performClick()
+
+        assertEquals(1, events.count { it == TrackEvent.ArmSleep })
+        assertEquals(1, events.count { it == TrackEvent.ArmWake })
+    }
+
+    @Test
+    fun onsetChipPrompt_rendersChipsAndSubmitSkip_andTogglingInvokesOnsetChipToggled() {
+        val events = mutableListOf<TrackEvent>()
+        setContent(
+            uiState = TrackUiState(onsetChipPrompt = OnsetChipPromptState(entryId = 1L)),
+            onEvent = { events += it }
+        )
+
+        composeTestRule.onNodeWithTag("onset_chip_card").assertExists()
+        composeTestRule.onNodeWithTag("onset_chip_flat").performClick()
+        composeTestRule.onNodeWithTag("onset_chips_submit").assertExists()
+        composeTestRule.onNodeWithTag("onset_chips_skip").assertExists()
+
+        assertEquals(1, events.count { it == TrackEvent.OnsetChipToggled("flat") })
+    }
+
+    @Test
+    fun markerToggleButton_invokesMarkerToggled_andInputIsHiddenWhenMarkerOpenIsFalse() {
+        val events = mutableListOf<TrackEvent>()
+        setContent(uiState = TrackUiState(markerOpen = false), onEvent = { events += it })
+
+        composeTestRule.onNodeWithTag("marker_input").assertDoesNotExist()
+        composeTestRule.onNodeWithTag("marker_toggle").performClick()
+
+        assertEquals(1, events.count { it == TrackEvent.MarkerToggled })
+    }
+
+    @Test
+    fun markerInput_rendersAndSaveCancelInvokeCorrectEvents_whenMarkerOpenIsTrue() {
+        val events = mutableListOf<TrackEvent>()
+        setContent(uiState = TrackUiState(markerOpen = true), onEvent = { events += it })
+
+        composeTestRule.onNodeWithTag("marker_input").assertExists()
+        composeTestRule.onNodeWithTag("marker_save").performClick()
+        composeTestRule.onNodeWithTag("marker_cancel").performClick()
+
+        assertEquals(1, events.count { it == TrackEvent.MarkerSaveConfirmed })
+        assertEquals(1, events.count { it == TrackEvent.MarkerCancelled })
+    }
+
+    @Test
+    fun entryRow_rendersKindBadgeAndChipsAsText_notColorAlone() {
+        val entry = Entry(
+            id = 1L,
+            ts = 1_000L,
+            value = 6,
+            kind = com.kieslingdev.mindscale.data.EntryKind.SLEEP,
+            chips = listOf("flat", "wired")
+        )
+        setContent(uiState = TrackUiState(recentEntries = listOf(entry), isEmpty = false))
+
+        // The row uses semantics(mergeDescendants = true) so screen readers announce it
+        // as one combined description (existing Phase 1 pattern) - that merges these
+        // child nodes out of the default tree, so assert against the unmerged tree.
+        composeTestRule.onNodeWithTag("entry_badge_1", useUnmergedTree = true).assertExists()
+        composeTestRule.onNodeWithText("asleep", useUnmergedTree = true).assertExists()
+        composeTestRule.onNodeWithTag("entry_chips_1", useUnmergedTree = true).assertExists()
+        composeTestRule.onNodeWithText("flat · wired", useUnmergedTree = true).assertExists()
+    }
+
+    @Test
+    fun toastBanner_rendersWhenToastIsPresent() {
+        setContent(uiState = TrackUiState(toast = "Event marked"))
+
+        composeTestRule.onNodeWithTag("toast_banner").assertExists()
+        composeTestRule.onNodeWithText("Event marked").assertExists()
     }
 }

@@ -1,6 +1,8 @@
 package com.kieslingdev.mindscale.track
 
 import com.kieslingdev.mindscale.data.Entry
+import com.kieslingdev.mindscale.data.EntryKind
+import com.kieslingdev.mindscale.data.SleepInterval
 
 data class TrackUiState(
     val recentEntries: List<Entry> = emptyList(),
@@ -9,23 +11,40 @@ data class TrackUiState(
     val backdateDialog: BackdateDialogState? = null,
     val editDialog: EditEntryState? = null,
     val noteDialog: NoteEditState? = null,
-    val pendingDelete: Entry? = null
+    val pendingDelete: Entry? = null,
+    // -- Phase 2 --
+    val helpOpen: Boolean = false,
+    val onsetChipPrompt: OnsetChipPromptState? = null,
+    val sleepOn: Boolean = true,
+    val armedCapture: EntryKind? = null,
+    val openSleepInterval: SleepInterval? = null,
+    val markerOpen: Boolean = false,
+    val markerDraft: String = "",
+    val isPaused: Boolean = false,
+    val showCheckin: Boolean = false,
+    val toast: String? = null
 )
 
 data class ReadoutState(val value: Int, val band: String, val expiresAtMillis: Long)
 data class BackdateDialogState(val value: Int, val timestampMillis: Long, val error: String? = null)
 
+data class OnsetChipPromptState(val entryId: Long, val selected: Set<String> = emptySet())
+
 /**
  * [originalEntry] is the full [Entry] captured at dialog-open time (from
  * [TrackEvent.EditRequested]). Save always derives the persisted row from this
- * captured snapshot (id/chips/note) plus the edited [value]/[timestampMillis] -
+ * captured snapshot (id/note) plus the edited [value]/[timestampMillis]/[chips] -
  * it never depends on the entry still being present in `recentEntries`'
  * top-10 window, which can change (e.g. a new insert) while the dialog is open.
+ *
+ * [chips] is seeded from [originalEntry].chips at dialog-open time (Phase 2) and is
+ * independently editable via [TrackEvent.EditChipToggled] before save.
  */
 data class EditEntryState(
     val originalEntry: Entry,
     val value: Int,
     val timestampMillis: Long,
+    val chips: Set<String> = emptySet(),
     val error: String? = null
 ) {
     val entryId: Long get() = originalEntry.id

@@ -21,4 +21,20 @@ sealed interface TrackEvent {
     data object DeleteConfirmed : TrackEvent
     data object DeleteCancelled : TrackEvent
     data object ReadoutDismissed : TrackEvent
+    // -- Phase 2 --
+    data class EditChipToggled(val chip: String) : TrackEvent
+    data object ToggleHelp : TrackEvent
+    data object ArmSleep : TrackEvent
+    data object ArmWake : TrackEvent
+    data class OnsetChipToggled(val chip: String) : TrackEvent
+    data object OnsetChipsSubmitted : TrackEvent
+    data object OnsetChipsSkipped : TrackEvent
+    data object MarkerToggled : TrackEvent
+    data class MarkerDraftChanged(val text: String) : TrackEvent
+    data object MarkerSaveConfirmed : TrackEvent
+    data object MarkerCancelled : TrackEvent
+    data object CheckinStillUseful : TrackEvent
+    data object CheckinPauseRequested : TrackEvent
+    data object ResumeTracking : TrackEvent
+    data object ToastDismissed : TrackEvent
 }

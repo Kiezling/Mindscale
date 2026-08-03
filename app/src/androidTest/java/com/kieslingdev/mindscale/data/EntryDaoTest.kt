@@ -101,4 +101,62 @@ class EntryDaoTest {
         dao.delete(remaining)
         assertEquals(0, dao.observeCount().first())
     }
+
+    @Test
+    fun mostRecentAtOrBefore_returnsNull_whenNoEntryQualifies() = runBlocking {
+        dao.insert(Entry(ts = 5_000L, value = 3))
+
+        assertEquals(null, dao.mostRecentAtOrBefore(1_000L))
+    }
+
+    @Test
+    fun mostRecentAtOrBefore_returnsTheSingleQualifyingEntry() = runBlocking {
+        val id = dao.insert(Entry(ts = 1_000L, value = 5))
+
+        val result = dao.mostRecentAtOrBefore(1_000L)
+
+        assertEquals(id, result!!.id)
+    }
+
+    @Test
+    fun mostRecentAtOrBefore_breaksSameTsTiesByHigherId() = runBlocking {
+        dao.insert(Entry(ts = 1_000L, value = 1))
+        val secondId = dao.insert(Entry(ts = 1_000L, value = 2))
+
+        val result = dao.mostRecentAtOrBefore(1_000L)
+
+        assertEquals(secondId, result!!.id)
+    }
+
+    /**
+     * D-3 / Invariant 15 of SPEC-track-phase2-completeness.md: onset detection must be
+     * relative to the capture's own timestamp, not to whatever is newest in the whole
+     * table. A backdated capture between two existing entries must see only the entry
+     * that precedes it in time, never one that follows it — even though that later entry
+     * is the chronologically newest row overall.
+     */
+    @Test
+    fun mostRecentAtOrBefore_ignoresEntriesWithLaterTs_evenWhenTheyAreNewestOverall() = runBlocking {
+        val t1Id = dao.insert(Entry(ts = 1_000L, value = 5))
+        dao.insert(Entry(ts = 3_000L, value = 0)) // T3: chronologically newest, but after T2
+        val t2 = 2_000L // backdated capture between T1 and T3
+
+        val result = dao.mostRecentAtOrBefore(t2)
+
+        assertEquals(t1Id, result!!.id)
+        assertEquals(5, result.value)
+    }
+
+    @Test
+    fun updateChips_patchesOnlyTheChipsColumn_leavingOtherFieldsUntouched() = runBlocking {
+        val id = dao.insert(Entry(ts = 1_000L, value = 6, note = "unrelated note"))
+
+        dao.updateChips(id, listOf("flat", "wired"))
+
+        val row = dao.observeRecent(limit = 10).first().single { it.id == id }
+        assertEquals(listOf("flat", "wired"), row.chips)
+        assertEquals(1_000L, row.ts)
+        assertEquals(6, row.value)
+        assertEquals("unrelated note", row.note)
+    }
 }
