@@ -36,3 +36,10 @@ Read the headings at session start and the full entry only when it overlaps the 
 - What failed: `cmd.exe /d /s /c "gradlew.bat <task>"` was rewritten by MSYS, opened a command prompt, and returned success without running Gradle. This produced a false-positive oracle log entry during validation.
 - Decision/workaround: invoke Windows switches with double slashes from Git Bash: `cmd.exe //d //s //c "gradlew.bat <task>"`. Remove any false log entry before rerunning.
 - Status: resolved and regression-tested; do not normalize the double slashes back to single slashes.
+
+## 2026-08-03 — `NoDefaultCurrentDirectoryInExePath=1` breaks bare `gradlew.bat` from cmd.exe
+
+- Scope: `.claude/hooks/oracle.sh` on this machine (a headless/background Claude session, not launched via the Android Studio plugin).
+- What failed: `cmd.exe //d //s //c "gradlew.bat test"` failed with "'gradlew.bat' is not recognized as an internal or external command, operable program or batch file." even though `cmd.exe`'s working directory was confirmed correct (`cd` and `dir gradlew.bat` both succeeded from the same cmd.exe invocation). Root cause: this machine has the Windows env var `NoDefaultCurrentDirectoryInExePath=1` set, which disables cmd.exe's normal fallback of searching the current directory for a bare command name not found on `PATH`. This blocked a `git commit` via the `gatekeeper.sh`/`oracle.sh` hook chain, even though `test`/`lint`/`assembleDebug` had all just passed moments earlier when invoked directly (with an explicit `.\` prefix) from Git Bash.
+- Decision/workaround: `oracle.sh`'s `run_gradle()` now invokes `.\gradlew.bat` (explicit relative path) instead of the bare `gradlew.bat`, which resolves regardless of `NoDefaultCurrentDirectoryInExePath`.
+- Status: resolved and regression-tested (`bash .claude/hooks/oracle.sh` run standalone, confirmed `PASS test lint assembleDebug` logged). Do not revert the leading `.\` back to a bare filename.

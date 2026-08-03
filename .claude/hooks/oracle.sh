@@ -23,7 +23,10 @@ run_gradle() {
   # Double-slash cmd.exe switches prevent Git Bash/MSYS from rewriting /c as
   # a filesystem path. A single-slash /c can open an interactive prompt and
   # falsely return success without running Gradle.
-  cmd.exe //d //s //c "gradlew.bat $task" || fail "$label"
+  # The leading ".\" is required: on machines with NoDefaultCurrentDirectoryInExePath=1
+  # set, cmd.exe does not search the current directory for a bare "gradlew.bat",
+  # and fails with "not recognized" even though the file is right there.
+  cmd.exe //d //s //c ".\\gradlew.bat $task" || fail "$label"
 }
 
 run_gradle "unit-tests" "test"
