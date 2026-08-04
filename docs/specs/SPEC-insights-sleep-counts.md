@@ -1,6 +1,6 @@
 # MindScale Phase 10 — Insights descriptive sleep counts
 
-Status: FROZEN — APPROVED
+Status: IMPLEMENTED — VERIFIED LOCALLY
 
 Owner: Codex
 
@@ -233,21 +233,38 @@ Install and launch the debug APK on `MindScale_API_36`. Inspect no-completed/ope
 
 ## Machine-checkable acceptance criteria
 
-- [ ] SPEC: this complete spec and D-1 through D-10 are frozen in a documentation-only commit before application-code edits.
-- [ ] SOURCE: `SleepCounts` consumes the existing normalized sleep spans inside the same `deriveInsights` snapshot; no DAO, second Flow, UI classifier, or cache is added.
-- [ ] COHORT: tests prove lower-inclusive/upper-exclusive Wake attribution, full cross-boundary duration, all six ranges, `now`, and current-zone range changes.
-- [ ] CLASSIFICATION: tests prove exact elapsed `<=3h` nap and `>3h` night partitioning, DST invariance, normalization, and exact duration summaries.
-- [ ] INCOMPLETE: open/future-ending/overlapping incomplete spans are excluded and honestly disclosed; scheduled re-derivation makes them eligible only after a real end is in the analysis past.
-- [ ] SAMPLE/GRAMMAR: zero gets exact refusal; one or more gets direct counts without a higher threshold; denominator/readout/caveat grammar is deterministic and non-inferential; no post-wake comparison exists.
-- [ ] UI: heading, refusal/denominator, two fixed-order native cells, count/boundary labels, selection, live readout, incomplete disclosure, and caveat match the frozen behavior.
-- [ ] ACCESSIBILITY: cells are coherent at-least-48-dp buttons with exact semantics and non-color selection; parent vertical scroll, keyboard/D-pad/TalkBack, light/dark, rotation, and 150% font remain usable.
-- [ ] STATE: primitive category selection restores independently, clears on range/zero eligibility, rejects invalid state, and refreshes from the latest snapshot.
-- [ ] CONCURRENCY/FAILURE: the existing single Flow, off-main cancellable derivation, atomic snapshot, invalidation, stale snapshot, and Retry contracts remain unchanged and tested.
-- [ ] PRIVACY/PERSISTENCE: no Entry/Marker private content appears; Room/schema/JSON remain version 4 and CSV/backup/permissions/dependencies/toolchain/navigation/DI remain unchanged.
-- [ ] REGRESSION: all Phase 1–9 behavior and prior Insights selections remain green.
-- [ ] ORACLES: JVM tests, lint, assembleDebug, intended-device identity, connected tests, installed-app walkthrough, and `git diff --check` pass.
-- [ ] REVIEW: one critical-path review covers normalization/cohort boundaries, DST/zone, incomplete data, arithmetic/grammar, accessibility, restoration, concurrency, privacy, persistence compatibility, and rollback; every blocking finding is resolved.
+- [x] SPEC: this complete spec and D-1 through D-10 are frozen in a documentation-only commit before application-code edits.
+- [x] SOURCE: `SleepCounts` consumes the existing normalized sleep spans inside the same `deriveInsights` snapshot; no DAO, second Flow, UI classifier, or cache is added.
+- [x] COHORT: tests prove lower-inclusive/upper-exclusive Wake attribution, full cross-boundary duration, all six ranges, `now`, and current-zone range changes.
+- [x] CLASSIFICATION: tests prove exact elapsed `<=3h` nap and `>3h` night partitioning, DST invariance, normalization, and exact duration summaries.
+- [x] INCOMPLETE: open/future-ending/overlapping incomplete spans are excluded and honestly disclosed; scheduled re-derivation makes them eligible only after a real end is in the analysis past.
+- [x] SAMPLE/GRAMMAR: zero gets exact refusal; one or more gets direct counts without a higher threshold; denominator/readout/caveat grammar is deterministic and non-inferential; no post-wake comparison exists.
+- [x] UI: heading, refusal/denominator, two fixed-order native cells, count/boundary labels, selection, live readout, incomplete disclosure, and caveat match the frozen behavior.
+- [x] ACCESSIBILITY: cells are coherent at-least-48-dp buttons with exact semantics and non-color selection; parent vertical scroll, keyboard/D-pad/TalkBack, light/dark, rotation, and 150% font remain usable.
+- [x] STATE: primitive category selection restores independently, clears on range/zero eligibility, rejects invalid state, and refreshes from the latest snapshot.
+- [x] CONCURRENCY/FAILURE: the existing single Flow, off-main cancellable derivation, atomic snapshot, invalidation, stale snapshot, and Retry contracts remain unchanged and tested.
+- [x] PRIVACY/PERSISTENCE: no Entry/Marker private content appears; Room/schema/JSON remain version 4 and CSV/backup/permissions/dependencies/toolchain/navigation/DI remain unchanged.
+- [x] REGRESSION: all Phase 1–9 behavior and prior Insights selections remain green.
+- [x] ORACLES: JVM tests, lint, assembleDebug, intended-device identity, connected tests, installed-app walkthrough, and `git diff --check` pass.
+- [x] REVIEW: one critical-path review covers normalization/cohort boundaries, DST/zone, incomplete data, arithmetic/grammar, accessibility, restoration, concurrency, privacy, persistence compatibility, and rollback; every blocking finding is resolved.
 - [ ] PUBLICATION: spec/state/backlog/decision evidence is current; branch is intentionally committed/pushed, PR is ready and mergeable at the verified head, merge succeeds, and local/tracking/live `main` synchronize with the final phase-boundary commit.
+
+## Verification evidence
+
+- Frozen documentation commit: `e6afe3280acccb1fd0849b26b5fac5b9e4699980` (`Freeze Phase 10 sleep counts spec`), before application-code edits.
+- Verified implementation commit: `945300d0bad66be21de33b9494a19d393cf40aba` (`Implement Phase 10 sleep counts`).
+- `test`: 168/168 JVM tests passed; 0 failures, errors, or skips across 12 suites.
+- `lint`: passed with 0 errors and the existing 22 warnings.
+- `assembleDebug`: passed.
+- `adb devices -l`: intended `MindScale_API_36` API 36 emulator connected as `emulator-5554`.
+- Focused Room/Insights connected run: 27/27 passed after final copy and zero-category coverage.
+- `connectedDebugAndroidTest`: 100/100 passed; 0 failures or skips.
+- `git diff --check`: passed with only configured LF-to-CRLF notices.
+- Installed-app inspection used disposable local test fixtures and verified the exact no-completed/open refusal, a four-hour night, an exact-three-hour nap, the completed denominator, incomplete disclosure, both selections/readouts, redundant two-dp selection outline, vertical reachability, light/dark, 12/24-hour behavior, 150% font, rotation/configuration recreation, and selection restoration. Native UI hierarchy inspection exposed exact Night/Nap content descriptions, click targets substantially above 48 dp, selected-state coverage, visible live readout copy, and the incomplete disclosure.
+- Emulator font, theme, rotation, and time format were restored to `1.0`, `no`, automatic portrait, and `12-hour`. The temporary manual seed source and test package were removed; only disposable target-app fixture data remains on the emulator.
+- Critical-path review covered normalized/cohort boundaries, exact-three-hour and Wake boundaries, DST/current-zone behavior, incomplete/future-ending intervals, median/copy grammar, accessibility, restoration/invalidation, single-snapshot concurrency, privacy, unchanged version-4 persistence, and rollback. It corrected one inaccurate phrase for a future recorded Wake (`unavailable` became `missing or later than now`); no blocking finding remains.
+- Practical DST and current-zone reprojection were not manually induced; pure tests cover both spring/fall elapsed duration and current-zone cohort movement. Actual TalkBack speech was not listened to; exact Compose semantics/activation/live-region tests and device UI-hierarchy inspection cover the accessibility contract.
+- No plausible reusable failed implementation path was introduced, so `FAILED_PATHS.md` was not changed. One unquoted PowerShell Gradle filter and one temporary JUnit return-type inference error failed before product tests ran and were corrected immediately.
 
 ## Rollout and safe rollback
 
