@@ -1,6 +1,6 @@
 # MindScale Phase 9 — Insights onset-time counts
 
-Status: FROZEN — APPROVED
+Status: IMPLEMENTED — VERIFIED LOCALLY
 
 Owner: Codex
 
@@ -310,21 +310,35 @@ Install and launch the debug app on `MindScale_API_36`. Manually inspect sparse 
 ## Machine-checkable acceptance criteria
 
 - [x] SPEC/APPROVAL: this complete spec and D-1 through D-10 are approved and frozen before the first application-code edit; Git history proves the documentation-only approval commit precedes implementation.
-- [ ] BOUNDARY: Phase 9 adds only `Time of day it started`; descriptive sleep, Report, import, Safety, breathing, and inferential analysis remain absent.
-- [ ] SOURCE: `InsightsSnapshot.onsetTimeCounts` derives only from existing Phase 5 episodes, first Entry, selected range, `now`, and zone in the same pure derivation; no parallel classifier or UI-side counting exists.
-- [ ] RANGE/TIME: tests prove half-open onset eligibility, all six ranges, 24 exact local-hour buckets, midnight, current-zone reprojection, DST overlap/gap, and covered-local-day arithmetic.
-- [ ] SAMPLE: tests prove the fixed six-onset threshold, exact 0–5 refusal arithmetic/copy, and no chart/window sentence below threshold.
-- [ ] WINDOW: tests prove all 24 wrapping four-hour windows, exact four-bucket membership, maximum selection, earliest-hour tie-break, and honest 12/24-hour boundary copy.
-- [ ] GRAMMAR: denominator, selected readout, window sentence, and displacement/current-zone caveat match approved deterministic text and contain no positive inference, causal, predictive, correlation, significance, diagnostic, or dominant-time claim.
-- [ ] UI: exactly 24 native Compose hour cells render in fixed order with visible count/label, relative geometry, selection, denominator, sentence, readout, and caveat; no chart dependency/WebView/bitmap exists.
-- [ ] ACCESSIBILITY: each cell is a coherent at-least-48-dp selectable node with exact count/boundary semantics; live readout, keyboard/D-pad/TalkBack, horizontal reachability, vertical-scroll ownership, non-color encoding, light/dark, rotation, and 150% font pass focused tests/manual review.
-- [ ] STATE: primitive selected hour restores independently through `SavedStateHandle`, clears on range/ineligibility, rejects invalid values, and refreshes safely on source/hold/time/zone changes.
-- [ ] CONCURRENCY: the existing single Room/settings Flow, cancellable off-main immutable derivation, invalidation, and Retry remain the only data path; snapshots publish whole and internally consistent.
-- [ ] PERSISTENCE/PRIVACY: Room/schema/JSON remain version 4, CSV/backup rules/permissions remain unchanged, no note/marker text is exposed, and no durable derived state or architecture dependency is added.
-- [ ] REGRESSION: all Phase 1–8 JVM and connected behavior remains green, including transactional onset classification and prior Insights views/selections.
-- [ ] ORACLES: wrapper `test`, `lint`, `assembleDebug`, intended-device identity, `connectedDebugAndroidTest`, installed-app walkthrough, and `git diff --check` pass.
-- [ ] DOCUMENTATION: spec status/evidence, `PROJECT_STATE.md`, `docs/specs/BACKLOG.md`, `docs/DECISIONS.md`, and any genuinely reusable `FAILED_PATHS.md` finding are updated without duplicating active work.
-- [ ] REVIEW: one critical-path review covers source/range attribution, local-time and zone semantics, DST, hold/sleep interaction, window arithmetic, grammar, accessibility, restoration, concurrency, persistence, privacy, and rollback; every blocking finding is resolved before publication.
+- [x] BOUNDARY: Phase 9 adds only `Time of day it started`; descriptive sleep, Report, import, Safety, breathing, and inferential analysis remain absent.
+- [x] SOURCE: `InsightsSnapshot.onsetTimeCounts` derives only from existing Phase 5 episodes, first Entry, selected range, `now`, and zone in the same pure derivation; no parallel classifier or UI-side counting exists.
+- [x] RANGE/TIME: tests prove half-open onset eligibility, all six ranges, 24 exact local-hour buckets, midnight, current-zone reprojection, DST overlap/gap, and covered-local-day arithmetic.
+- [x] SAMPLE: tests prove the fixed six-onset threshold, exact 0–5 refusal arithmetic/copy, and no chart/window sentence below threshold.
+- [x] WINDOW: tests prove all 24 wrapping four-hour windows, exact four-bucket membership, maximum selection, earliest-hour tie-break, and honest 12/24-hour boundary copy.
+- [x] GRAMMAR: denominator, selected readout, window sentence, and displacement/current-zone caveat match approved deterministic text and contain no positive inference, causal, predictive, correlation, significance, diagnostic, or dominant-time claim.
+- [x] UI: exactly 24 native Compose hour cells render in fixed order with visible count/label, relative geometry, selection, denominator, sentence, readout, and caveat; no chart dependency/WebView/bitmap exists.
+- [x] ACCESSIBILITY: each cell is a coherent at-least-48-dp selectable node with exact count/boundary semantics; live readout, keyboard/D-pad/TalkBack, horizontal reachability, vertical-scroll ownership, non-color encoding, light/dark, rotation, and 150% font pass focused tests/manual review.
+- [x] STATE: primitive selected hour restores independently through `SavedStateHandle`, clears on range/ineligibility, rejects invalid values, and refreshes safely on source/hold/time/zone changes.
+- [x] CONCURRENCY: the existing single Room/settings Flow, cancellable off-main immutable derivation, invalidation, and Retry remain the only data path; snapshots publish whole and internally consistent.
+- [x] PERSISTENCE/PRIVACY: Room/schema/JSON remain version 4, CSV/backup rules/permissions remain unchanged, no note/marker text is exposed, and no durable derived state or architecture dependency is added.
+- [x] REGRESSION: all Phase 1–8 JVM and connected behavior remains green, including transactional onset classification and prior Insights views/selections.
+- [x] ORACLES: wrapper `test`, `lint`, `assembleDebug`, intended-device identity, `connectedDebugAndroidTest`, installed-app walkthrough, and `git diff --check` pass.
+- [x] DOCUMENTATION: spec status/evidence, `PROJECT_STATE.md`, `docs/specs/BACKLOG.md`, `docs/DECISIONS.md`, and any genuinely reusable `FAILED_PATHS.md` finding are updated without duplicating active work.
+- [x] REVIEW: one critical-path review covers source/range attribution, local-time and zone semantics, DST, hold/sleep interaction, window arithmetic, grammar, accessibility, restoration, concurrency, persistence, privacy, and rollback; every blocking finding is resolved before publication.
+
+## Verification evidence
+
+- Frozen documentation commit: `1846598` (`Freeze Phase 9 onset-time counts spec`), before application-code edits.
+- Implementation commit: `338a4fe` (`Implement Phase 9 onset-time counts`).
+- `test`: 158/158 JVM tests passed; 0 failures, errors, or skips across 12 suites.
+- `lint`: passed with 0 errors and the existing 22 warnings.
+- `assembleDebug`: passed.
+- `adb devices -l`: intended `MindScale_API_36` API 36 emulator connected as `emulator-5554`.
+- `connectedDebugAndroidTest`: 95/95 tests passed; 0 failures, errors, or skips. Focused Insights/DAO coverage passed 22/22 before the full run.
+- `git diff --check`: passed; only configured LF-to-CRLF notices were emitted.
+- Installed-app inspection verified the exact one-start refusal, the six-start eligible denominator and four-hour sentence, 24 accessible/selectable cells, zero-count selection/live readout, horizontal reachability and selection through hour 23, parent vertical scrolling, light/dark rendering, 150% font scaling, and landscape scrolling. Emulator font, theme, and rotation settings were restored to their starting values.
+- Critical review found no blocking issue after checking source/range attribution, current-zone and DST rules, hold/sleep reuse, four-hour arithmetic/ties, deterministic grammar, selection restoration, accessibility, one-snapshot concurrency, privacy, unchanged version-4 persistence, and rollback safety.
+- No reusable failed implementation path was introduced, so `FAILED_PATHS.md` was not changed. Publication was the next action when this evidence was recorded.
 
 ## Task decomposition after approval
 
