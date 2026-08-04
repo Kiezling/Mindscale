@@ -1,12 +1,12 @@
 # MindScale Phase 8 — Insights onset-gap histogram
 
-Status: FROZEN — APPROVED
+Status: IMPLEMENTED — VERIFIED LOCALLY
 
 Owner: Codex
 
 Date: 2026-08-04
 
-Last verified commit: `86bd313e47515bd81eded5e03796195a3b389bff`
+Last verified commit: `d2d546686d6ced87e98eea5c2e73ed66ee41138e`
 
 Approval: On 2026-08-04, the user reiterated full project ownership and explicitly authorized all decisions, implementation, commits, pushes, and PRs without further approval. This satisfies the Phase 8 approval gate; D-1 through D-10 are frozen before application-code edits.
 
@@ -313,21 +313,30 @@ Manual verification on the intended API 36 emulator covers global empty, zero-to
 ## Machine-checkable acceptance criteria
 
 - [x] SPEC/APPROVAL: this complete spec and D-1 through D-10 are approved and frozen before the first application-code edit; Git history/diff proves the approval-gated ordering. — APPROVED 2026-08-04
-- [ ] BOUNDARY: Phase 8 adds only `Days between onsets`; onset-time, sleep comparison, report, import, safety, breathing, and all inferential analysis remain absent.
-- [ ] SOURCE: `InsightsSnapshot.onsetGapHistogram` is derived from the existing Phase 5 `BuiltModel.episodes` in the same pure derivation; no parallel onset classifier or UI-side derivation exists.
-- [ ] RANGE: tests prove both onset endpoints are inside `[rangeStart, now)`, carried-in onsets are excluded, exact-start is included, exact-now/future is excluded, and all six existing ranges drive the result.
-- [ ] SAMPLE: tests prove the fixed six-onset/five-gap threshold, exact refusal arithmetic for 0–5 onsets, and no bars below threshold.
-- [ ] BUCKETS: tests prove all ten frozen lower-inclusive/upper-exclusive boundaries, fractional values, DST elapsed-time behavior, `14+d` extremes, and `sum(counts) == gapCount`.
-- [ ] GRAMMAR: eligible denominator, selected readout, caveat, and sparse copy match approved deterministic strings; no positive inference, causal, predictive, correlation, significance, or periodicity claim is rendered.
-- [ ] UI: exactly ten native Compose bucket cells render in fixed order with visible count/label, relative geometry, selection, denominator, readout, and caveat; no chart dependency/WebView/bitmap exists.
-- [ ] ACCESSIBILITY: each bucket is a coherent at-least-48-dp selectable node with exact count/boundary semantics; live readout, keyboard/D-pad/TalkBack, horizontal reachability, vertical-scroll ownership, non-color encoding, light/dark, rotation, and 150% font pass focused tests/manual review.
-- [ ] STATE: primitive bucket selection restores independently through `SavedStateHandle`, clears on range/ineligibility, and safely refreshes on source/hold/time/zone changes.
-- [ ] CONCURRENCY: the existing single Room source/settings combine and serialized off-main immutable derivation remain the only data path; snapshots publish as whole internally consistent values in collection order and Retry still restarts a terminal collection.
-- [ ] PERSISTENCE: Room/schema stay version 4, JSON stays format 4, CSV/backup rules stay unchanged, and no permission, durable histogram state, migration, or destructive behavior is introduced.
-- [ ] REGRESSION: all Phase 1–7 JVM and connected behavior remains green, including transactional onset classification and current Insights raster/chart behavior.
-- [ ] ORACLES: wrapper `test`, `lint`, `assembleDebug`, intended-device identity, `connectedDebugAndroidTest`, installed-app launch/walkthrough, and `git diff --check` pass.
-- [ ] DOCUMENTATION: spec status/evidence, `PROJECT_STATE.md`, `docs/specs/BACKLOG.md`, and `docs/DECISIONS.md` are updated exactly as required below without duplicating active work.
-- [ ] REVIEW: one critical-path review covers range attribution, onset identity, hold/sleep interaction, boundary arithmetic, sparse refusal, grammar, accessibility, state restoration, concurrency, and unchanged persistence; every blocking finding is resolved before publication.
+- [x] BOUNDARY: Phase 8 adds only `Days between onsets`; onset-time, sleep comparison, report, import, safety, breathing, and all inferential analysis remain absent.
+- [x] SOURCE: `InsightsSnapshot.onsetGapHistogram` is derived from the existing Phase 5 `BuiltModel.episodes` in the same pure derivation; no parallel onset classifier or UI-side derivation exists.
+- [x] RANGE: tests prove both onset endpoints are inside `[rangeStart, now)`, carried-in onsets are excluded, exact-start is included, exact-now/future is excluded, and all six existing ranges drive the result.
+- [x] SAMPLE: tests prove the fixed six-onset/five-gap threshold, exact refusal arithmetic for 0–5 onsets, and no bars below threshold.
+- [x] BUCKETS: tests prove all ten frozen lower-inclusive/upper-exclusive boundaries, fractional values, DST elapsed-time behavior, `14+d` extremes, and `sum(counts) == gapCount`.
+- [x] GRAMMAR: eligible denominator, selected readout, caveat, and sparse copy match approved deterministic strings; no positive inference, causal, predictive, correlation, significance, or periodicity claim is rendered.
+- [x] UI: exactly ten native Compose bucket cells render in fixed order with visible count/label, relative geometry, selection, denominator, readout, and caveat; no chart dependency/WebView/bitmap exists.
+- [x] ACCESSIBILITY: each bucket is a coherent at-least-48-dp selectable node with exact count/boundary semantics; live readout, keyboard/D-pad/TalkBack, horizontal reachability, vertical-scroll ownership, non-color encoding, light/dark, rotation, and 150% font pass focused tests/manual review.
+- [x] STATE: primitive bucket selection restores independently through `SavedStateHandle`, clears on range/ineligibility, and safely refreshes on source/hold/time/zone changes.
+- [x] CONCURRENCY: the existing single Room source/settings combine and serialized off-main immutable derivation remain the only data path; snapshots publish as whole internally consistent values in collection order and Retry still restarts a terminal collection.
+- [x] PERSISTENCE: Room/schema stay version 4, JSON stays format 4, CSV/backup rules stay unchanged, and no permission, durable histogram state, migration, or destructive behavior is introduced.
+- [x] REGRESSION: all Phase 1–7 JVM and connected behavior remains green, including transactional onset classification and current Insights raster/chart behavior.
+- [x] ORACLES: wrapper `test`, `lint`, `assembleDebug`, intended-device identity, `connectedDebugAndroidTest`, installed-app launch/walkthrough, and `git diff --check` pass.
+- [x] DOCUMENTATION: spec status/evidence, `PROJECT_STATE.md`, `docs/specs/BACKLOG.md`, and `docs/DECISIONS.md` are updated exactly as required below without duplicating active work.
+- [x] REVIEW: one critical-path review covers range attribution, onset identity, hold/sleep interaction, boundary arithmetic, sparse refusal, grammar, accessibility, state restoration, concurrency, and unchanged persistence; every blocking finding is resolved before publication.
+
+Verification evidence, 2026-08-04:
+
+- Implementation commit `d2d546686d6ced87e98eea5c2e73ed66ee41138e` follows the separately committed/frozen approval state `8dd2915943b29c6ca690b4c5566fabc85e87fd7e`.
+- `test`: 147/147 JVM tests passed with 0 failures, errors, or skips.
+- `lint`: passed with 0 errors and the existing 22 warnings; `assembleDebug` passed.
+- `connectedDebugAndroidTest`: 91/91 tests passed on `emulator-5554`, `MindScale_API_36` (API 36), with 0 failures or skips.
+- Installed-app inspection verified exact denominator/readout/caveat copy, visible count/label geometry, selection, vertical placement, horizontal reachability through `14+d`, non-color encoding, light/dark rendering, and 150% font scaling. Emulator night mode and font scale were restored to `no` and `1.0`.
+- `git diff --check` passed. The production diff is confined to the existing Insights model/engine/ViewModel/Compose files; no Room schema, JSON/CSV, backup, manifest, permission, dependency, toolchain, WebView, JavaScript, account, server, analytics, or background-work file changed.
 
 ## Task decomposition after approval
 
