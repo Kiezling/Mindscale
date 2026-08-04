@@ -9,10 +9,7 @@ data class TrackUiState(
     val recentEntries: List<Entry> = emptyList(),
     val isEmpty: Boolean = true,
     val transientReadout: ReadoutState? = null,
-    val backdateDialog: BackdateDialogState? = null,
-    val editDialog: EditEntryState? = null,
-    val noteDialog: NoteEditState? = null,
-    val pendingDelete: Entry? = null,
+    val activeModal: TrackModalState? = null,
     // -- Phase 2 --
     val helpOpen: Boolean = false,
     val onsetChipPrompt: OnsetChipPromptState? = null,
@@ -34,35 +31,66 @@ data class ReadoutState(
     val expiresAtMillis: Long,
     val anchor: String = ""
 )
-data class BackdateDialogState(val value: Int, val timestampMillis: Long, val error: String? = null)
 
 data class OnsetChipPromptState(val entryId: Long, val selected: Set<String> = emptySet())
 
-/**
- * [originalEntry] is the full [Entry] captured at dialog-open time (from
- * [TrackEvent.EditRequested]). Save always derives the persisted row from this
- * captured snapshot (id/note) plus the edited [value]/[timestampMillis]/[chips] -
- * it never depends on the entry still being present in `recentEntries`'
- * top-10 window, which can change (e.g. a new insert) while the dialog is open.
- *
- * [chips] is seeded from [originalEntry].chips at dialog-open time (Phase 2) and is
- * independently editable via [TrackEvent.EditChipToggled] before save.
- */
-data class EditEntryState(
-    val originalEntry: Entry,
-    val value: Int,
-    val timestampMillis: Long,
-    val chips: Set<String> = emptySet(),
-    val error: String? = null
-) {
-    val entryId: Long get() = originalEntry.id
+sealed interface TrackModalState {
+    data class Backdate(
+        val draft: BackdateDraft,
+        val timestampError: String? = null,
+        val isSaving: Boolean = false,
+        val mutationError: String? = null
+    ) : TrackModalState
+
+    data class Edit(
+        val draft: EditEntryDraft,
+        val validation: RecordValidation = RecordValidation.Checking,
+        val timestampError: String? = null,
+        val isSaving: Boolean = false,
+        val mutationError: String? = null
+    ) : TrackModalState
+
+    data class Note(
+        val draft: NoteEntryDraft,
+        val validation: RecordValidation = RecordValidation.Checking,
+        val isSaving: Boolean = false,
+        val mutationError: String? = null
+    ) : TrackModalState
+
+    data class Delete(
+        val entry: Entry,
+        val isSaving: Boolean = false,
+        val mutationError: String? = null
+    ) : TrackModalState
 }
 
-/**
- * [originalEntry] is the full [Entry] captured at dialog-open time (from
- * [TrackEvent.NoteRequested]); see [EditEntryState] for why saves must not
- * depend on a fresh `recentEntries` lookup.
- */
-data class NoteEditState(val originalEntry: Entry, val text: String) {
-    val entryId: Long get() = originalEntry.id
+data class BackdateDraft(
+    val value: Int,
+    val dateText: String,
+    val timeText: String,
+    val captureKind: EntryKind?
+)
+
+data class EditEntryDraft(
+    val entryId: Long,
+    val baselineTimestampMillis: Long,
+    val baselineValue: Int,
+    val baselineChips: List<String>,
+    val value: Int,
+    val dateText: String,
+    val timeText: String,
+    val chips: List<String>
+)
+
+data class NoteEntryDraft(
+    val entryId: Long,
+    val baselineText: String,
+    val text: String
+)
+
+sealed interface RecordValidation {
+    data object Checking : RecordValidation
+    data object Current : RecordValidation
+    data object Conflicting : RecordValidation
+    data object ReadFailed : RecordValidation
 }

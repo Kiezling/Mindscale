@@ -18,8 +18,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
@@ -28,6 +30,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -36,12 +39,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -53,12 +60,8 @@ import com.kieslingdev.mindscale.data.HourFormat
 import com.kieslingdev.mindscale.settings.SettingsFocus
 import com.kieslingdev.mindscale.settings.vocabularyForEntry
 import com.kieslingdev.mindscale.ui.theme.intensityColor
-import java.time.LocalDate
-import java.time.LocalDateTime
-import java.time.LocalTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import java.time.format.DateTimeParseException
 
 /**
  * Numpad key order/grouping is frozen by Invariant 12: a 3x3 grid of 1-9,
@@ -75,8 +78,6 @@ private val EntryDateTimeTwelveHourFormatter: DateTimeFormatter =
     DateTimeFormatter.ofPattern("MMM d, yyyy 'at' h:mm a")
 private val EntryDateTimeTwentyFourHourFormatter: DateTimeFormatter =
     DateTimeFormatter.ofPattern("MMM d, yyyy 'at' HH:mm")
-private val DraftDateFormatter: DateTimeFormatter = DateTimeFormatter.ISO_LOCAL_DATE
-private val DraftTimeFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
 
 /**
  * Collects [TrackViewModel]'s state in a lifecycle-aware way and forwards events;
@@ -191,21 +192,16 @@ fun TrackScreen(
         }
     }
 
-    uiState.backdateDialog?.let { dialog ->
-        BackdateDialog(state = dialog, onEvent = onEvent)
-    }
-    uiState.editDialog?.let { dialog ->
-        EditDialog(
-            state = dialog,
-            vocabulary = vocabularyForEntry(uiState.settings, dialog.chips),
+    when (val modal = uiState.activeModal) {
+        is TrackModalState.Backdate -> BackdateDialog(modal = modal, onEvent = onEvent)
+        is TrackModalState.Edit -> EditDialog(
+            modal = modal,
+            vocabulary = vocabularyForEntry(uiState.settings, modal.draft.chips.toSet()),
             onEvent = onEvent
         )
-    }
-    uiState.noteDialog?.let { dialog ->
-        NoteDialog(state = dialog, onEvent = onEvent)
-    }
-    uiState.pendingDelete?.let { entry ->
-        DeleteConfirmDialog(entry = entry, onEvent = onEvent)
+        is TrackModalState.Note -> NoteDialog(modal = modal, onEvent = onEvent)
+        is TrackModalState.Delete -> DeleteConfirmDialog(modal = modal, onEvent = onEvent)
+        null -> Unit
     }
 }
 
@@ -726,16 +722,6 @@ private fun EntryRow(
     }
 }
 
-/** Parses [dateText]/[timeText] into epoch millis, or null if either is not yet valid. */
-private fun tryParseTimestamp(dateText: String, timeText: String, zone: ZoneId): Long? =
-    try {
-        val date = LocalDate.parse(dateText, DraftDateFormatter)
-        val time = LocalTime.parse(timeText, DraftTimeFormatter)
-        LocalDateTime.of(date, time).atZone(zone).toInstant().toEpochMilli()
-    } catch (e: DateTimeParseException) {
-        null
-    }
-
 private val ClockTimeTwelveHourFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("h:mm a")
 private val ClockTimeTwentyFourHourFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
 
@@ -745,52 +731,39 @@ private fun formatClockTime(epochMillis: Long, hourFormat: HourFormat): String =
         else ClockTimeTwelveHourFormatter
     )
 
-/**
- * Shared timestamp-edit dialog body for the backdate and edit flows. Draft date/time
- * text lives in `rememberSaveable` at this composable layer (not in the ViewModel)
- * because it is transient, possibly-invalid-mid-typing text tied to this dialog's
- * lifetime; it survives rotation. A simple ISO date + 24h time text field is used
- * rather than Material3's DatePicker/TimePicker for a faster, equally correct
- * implementation (documented implementer choice, spec leaves this open).
- *
- * [chips]/[onChipToggled] are non-null only for the Edit flow (Phase 2) - Backdate
- * creates a new entry with no pre-existing chips to edit.
- */
 @Composable
 private fun TimestampEditDialog(
     title: String,
     value: Int,
-    timestampMillis: Long,
-    error: String?,
+    dateText: String,
+    timeText: String,
+    timestampError: String?,
+    statusMessage: String?,
+    isSaving: Boolean,
+    canSave: Boolean,
+    saveLabel: String,
     onValueChanged: ((Int) -> Unit)?,
-    onTimestampChanged: (Long) -> Unit,
+    onDateTextChanged: (String) -> Unit,
+    onTimeTextChanged: (String) -> Unit,
     onSave: () -> Unit,
     onCancel: () -> Unit,
-    chips: Set<String>? = null,
+    chips: List<String>? = null,
     onChipToggled: ((String) -> Unit)? = null,
-    vocabulary: List<String> = DEFAULT_ONSET_CHIPS
+    vocabulary: List<String> = DEFAULT_ONSET_CHIPS,
+    onRetryValidation: (() -> Unit)? = null
 ) {
-    val zone = remember { ZoneId.systemDefault() }
-    var dateText by rememberSaveable {
-        mutableStateOf(
-            java.time.Instant.ofEpochMilli(timestampMillis).atZone(zone).format(DraftDateFormatter)
-        )
-    }
-    var timeText by rememberSaveable {
-        mutableStateOf(
-            java.time.Instant.ofEpochMilli(timestampMillis).atZone(zone).format(DraftTimeFormatter)
-        )
-    }
-
+    val focusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) { focusRequester.requestFocus() }
     AlertDialog(
-        onDismissRequest = onCancel,
+        onDismissRequest = { if (!isSaving) onCancel() },
         title = { Text(title) },
         text = {
-            Column {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                 if (onValueChanged != null) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         TextButton(
                             onClick = { if (value > 0) onValueChanged(value - 1) },
+                            enabled = !isSaving,
                             modifier = Modifier.semantics { contentDescription = "Decrease value" }
                         ) { Text("-") }
                         Text(
@@ -801,6 +774,7 @@ private fun TimestampEditDialog(
                         )
                         TextButton(
                             onClick = { if (value < 10) onValueChanged(value + 1) },
+                            enabled = !isSaving,
                             modifier = Modifier.semantics { contentDescription = "Increase value" }
                         ) { Text("+") }
                     }
@@ -809,19 +783,21 @@ private fun TimestampEditDialog(
                 }
                 OutlinedTextField(
                     value = dateText,
-                    onValueChange = { newText ->
-                        dateText = newText
-                        tryParseTimestamp(newText, timeText, zone)?.let(onTimestampChanged)
-                    },
-                    label = { Text("Date (yyyy-MM-dd)") }
+                    onValueChange = onDateTextChanged,
+                    enabled = !isSaving,
+                    singleLine = true,
+                    label = { Text("Date (yyyy-MM-dd)") },
+                    modifier = Modifier
+                        .testTag("track_dialog_date")
+                        .focusRequester(focusRequester)
                 )
                 OutlinedTextField(
                     value = timeText,
-                    onValueChange = { newText ->
-                        timeText = newText
-                        tryParseTimestamp(dateText, newText, zone)?.let(onTimestampChanged)
-                    },
-                    label = { Text("Time (HH:mm)") }
+                    onValueChange = onTimeTextChanged,
+                    enabled = !isSaving,
+                    singleLine = true,
+                    label = { Text("Time (HH:mm)") },
+                    modifier = Modifier.testTag("track_dialog_time")
                 )
                 if (chips != null && onChipToggled != null) {
                     Text(
@@ -835,6 +811,7 @@ private fun TimestampEditDialog(
                             FilterChip(
                                 selected = selected,
                                 onClick = { onChipToggled(chip) },
+                                enabled = !isSaving,
                                 label = { Text(chip) },
                                 modifier = Modifier
                                     .testTag("edit_chip_$chip")
@@ -846,29 +823,55 @@ private fun TimestampEditDialog(
                         }
                     }
                 }
-                if (error != null) {
-                    Text(text = error, color = MaterialTheme.colorScheme.error)
+                if (timestampError != null) {
+                    Text(
+                        text = timestampError,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }
+                    )
+                }
+                if (statusMessage != null) {
+                    Text(
+                        text = statusMessage,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }
+                    )
+                }
+                if (onRetryValidation != null) {
+                    TextButton(onClick = onRetryValidation, enabled = !isSaving) { Text("Retry") }
+                }
+                if (isSaving) {
+                    Text(
+                        "Saving",
+                        modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }
+                    )
                 }
             }
         },
         confirmButton = {
-            TextButton(onClick = onSave, enabled = error == null) { Text("Save") }
+            TextButton(onClick = onSave, enabled = canSave && !isSaving) { Text(saveLabel) }
         },
         dismissButton = {
-            TextButton(onClick = onCancel) { Text("Cancel") }
+            TextButton(onClick = onCancel, enabled = !isSaving) { Text("Cancel") }
         }
     )
 }
 
 @Composable
-private fun BackdateDialog(state: BackdateDialogState, onEvent: (TrackEvent) -> Unit) {
+private fun BackdateDialog(modal: TrackModalState.Backdate, onEvent: (TrackEvent) -> Unit) {
     TimestampEditDialog(
         title = "Backdate entry",
-        value = state.value,
-        timestampMillis = state.timestampMillis,
-        error = state.error,
+        value = modal.draft.value,
+        dateText = modal.draft.dateText,
+        timeText = modal.draft.timeText,
+        timestampError = modal.timestampError,
+        statusMessage = modal.mutationError,
+        isSaving = modal.isSaving,
+        canSave = modal.timestampError == null,
+        saveLabel = "Save",
         onValueChanged = null,
-        onTimestampChanged = { onEvent(TrackEvent.BackdateTimestampChanged(it)) },
+        onDateTextChanged = { onEvent(TrackEvent.BackdateDateTextChanged(it)) },
+        onTimeTextChanged = { onEvent(TrackEvent.BackdateTimeTextChanged(it)) },
         onSave = { onEvent(TrackEvent.BackdateSaveConfirmed) },
         onCancel = { onEvent(TrackEvent.BackdateCancelled) }
     )
@@ -876,72 +879,142 @@ private fun BackdateDialog(state: BackdateDialogState, onEvent: (TrackEvent) -> 
 
 @Composable
 private fun EditDialog(
-    state: EditEntryState,
+    modal: TrackModalState.Edit,
     vocabulary: List<String>,
     onEvent: (TrackEvent) -> Unit
 ) {
+    val conflict = modal.validation == RecordValidation.Conflicting
+    val checking = modal.validation == RecordValidation.Checking
+    val readFailed = modal.validation == RecordValidation.ReadFailed
+    val conflictMessage = if (conflict) {
+        "This rating changed elsewhere. Saving will replace its current value, time, and chips. " +
+            "Cancel and reopen to use the latest record."
+    } else null
+    val status = listOfNotNull(conflictMessage, modal.mutationError).joinToString("\n").ifEmpty { null }
     TimestampEditDialog(
         title = "Edit entry",
-        value = state.value,
-        timestampMillis = state.timestampMillis,
-        error = state.error,
+        value = modal.draft.value,
+        dateText = modal.draft.dateText,
+        timeText = modal.draft.timeText,
+        timestampError = modal.timestampError,
+        statusMessage = if (checking) "Checking record" else status,
+        isSaving = modal.isSaving,
+        canSave = modal.timestampError == null && !checking && !readFailed,
+        saveLabel = if (conflict) "Save my changes" else "Save",
         onValueChanged = { onEvent(TrackEvent.EditValueChanged(it)) },
-        onTimestampChanged = { onEvent(TrackEvent.EditTimestampChanged(it)) },
+        onDateTextChanged = { onEvent(TrackEvent.EditDateTextChanged(it)) },
+        onTimeTextChanged = { onEvent(TrackEvent.EditTimeTextChanged(it)) },
         onSave = { onEvent(TrackEvent.EditSaveConfirmed) },
         onCancel = { onEvent(TrackEvent.EditCancelled) },
-        chips = state.chips,
+        chips = modal.draft.chips,
         onChipToggled = { onEvent(TrackEvent.EditChipToggled(it)) },
-        vocabulary = vocabulary
+        vocabulary = vocabulary,
+        onRetryValidation = if (readFailed) {
+            { onEvent(TrackEvent.DialogValidationRetry) }
+        } else null
     )
 }
 
 @Composable
-private fun NoteDialog(state: NoteEditState, onEvent: (TrackEvent) -> Unit) {
-    // Mirrors TimestampEditDialog's rememberSaveable pattern: the ViewModel's
-    // StateFlow alone does not survive true process death (no SavedStateHandle
-    // wiring), so in-progress note text is buffered here at the Composable
-    // layer, seeded from the ViewModel's state and kept in sync via
-    // NoteTextChanged, so it survives rotation and process death alike.
-    var text by rememberSaveable(state.entryId) { mutableStateOf(state.text) }
-
+private fun NoteDialog(modal: TrackModalState.Note, onEvent: (TrackEvent) -> Unit) {
+    val conflict = modal.validation == RecordValidation.Conflicting
+    val checking = modal.validation == RecordValidation.Checking
+    val readFailed = modal.validation == RecordValidation.ReadFailed
+    val conflictMessage = if (conflict) {
+        "This note changed elsewhere. Saving will replace the current note. " +
+            "Cancel and reopen to use the latest note."
+    } else null
+    val status = listOfNotNull(conflictMessage, modal.mutationError).joinToString("\n").ifEmpty { null }
+    val focusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) { focusRequester.requestFocus() }
     AlertDialog(
-        onDismissRequest = { onEvent(TrackEvent.NoteCancelled) },
+        onDismissRequest = { if (!modal.isSaving) onEvent(TrackEvent.NoteCancelled) },
         title = { Text("Edit note") },
         text = {
-            OutlinedTextField(
-                value = text,
-                onValueChange = { newText ->
-                    text = newText
-                    onEvent(TrackEvent.NoteTextChanged(newText))
-                },
-                label = { Text("Note") }
-            )
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                OutlinedTextField(
+                    value = modal.draft.text,
+                    onValueChange = { onEvent(TrackEvent.NoteTextChanged(it)) },
+                    enabled = !modal.isSaving,
+                    label = { Text("Note") },
+                    modifier = Modifier
+                        .testTag("track_note_text")
+                        .focusRequester(focusRequester)
+                )
+                if (checking) Text("Checking record")
+                if (status != null) {
+                    Text(
+                        status,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }
+                    )
+                }
+                if (readFailed) {
+                    TextButton(
+                        onClick = { onEvent(TrackEvent.DialogValidationRetry) },
+                        enabled = !modal.isSaving
+                    ) { Text("Retry") }
+                }
+                if (modal.isSaving) {
+                    Text(
+                        "Saving",
+                        modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }
+                    )
+                }
+            }
         },
         confirmButton = {
-            TextButton(onClick = { onEvent(TrackEvent.NoteSaveConfirmed) }) { Text("Save") }
+            TextButton(
+                onClick = { onEvent(TrackEvent.NoteSaveConfirmed) },
+                enabled = !modal.isSaving && !checking && !readFailed
+            ) { Text(if (conflict) "Save my changes" else "Save") }
         },
         dismissButton = {
-            TextButton(onClick = { onEvent(TrackEvent.NoteCancelled) }) { Text("Cancel") }
+            TextButton(
+                onClick = { onEvent(TrackEvent.NoteCancelled) },
+                enabled = !modal.isSaving
+            ) { Text("Cancel") }
         }
     )
 }
 
 @Composable
-private fun DeleteConfirmDialog(entry: Entry, onEvent: (TrackEvent) -> Unit) {
+private fun DeleteConfirmDialog(modal: TrackModalState.Delete, onEvent: (TrackEvent) -> Unit) {
     AlertDialog(
-        onDismissRequest = { onEvent(TrackEvent.DeleteCancelled) },
+        onDismissRequest = { if (!modal.isSaving) onEvent(TrackEvent.DeleteCancelled) },
         title = { Text("Delete entry?") },
         text = {
-            Text(
-                "This permanently deletes the entry logged with value ${entry.value}. " +
-                    "This cannot be undone."
-            )
+            Column {
+                Text(
+                    "This permanently deletes the entry logged with value ${modal.entry.value}. " +
+                        "This cannot be undone."
+                )
+                if (modal.mutationError != null) {
+                    Text(
+                        modal.mutationError,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }
+                    )
+                }
+                if (modal.isSaving) {
+                    Text(
+                        "Saving",
+                        modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }
+                    )
+                }
+            }
         },
         confirmButton = {
-            TextButton(onClick = { onEvent(TrackEvent.DeleteConfirmed) }) { Text("Delete") }
+            TextButton(
+                onClick = { onEvent(TrackEvent.DeleteConfirmed) },
+                enabled = !modal.isSaving
+            ) { Text("Delete") }
         },
         dismissButton = {
-            TextButton(onClick = { onEvent(TrackEvent.DeleteCancelled) }) { Text("Cancel") }
+            TextButton(
+                onClick = { onEvent(TrackEvent.DeleteCancelled) },
+                enabled = !modal.isSaving
+            ) { Text("Cancel") }
         }
     )
 }

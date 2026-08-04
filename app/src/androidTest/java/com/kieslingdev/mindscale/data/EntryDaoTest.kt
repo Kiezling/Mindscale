@@ -103,6 +103,24 @@ class EntryDaoTest {
     }
 
     @Test
+    fun observeById_resolvesOutsideRecentWindow_andReflectsTargetedMutationAndDelete() = runBlocking {
+        val targetId = dao.insert(Entry(ts = 0L, value = 3, note = "draft target"))
+        repeat(10) { index -> dao.insert(Entry(ts = 1_000L + index, value = 1)) }
+
+        assertTrue(dao.observeRecent(10).first().none { it.id == targetId })
+        assertEquals(3, dao.observeById(targetId).first()!!.value)
+
+        assertEquals(1, dao.updateEditableFields(targetId, 500L, 8, listOf("wired")))
+        val updated = dao.observeById(targetId).first()!!
+        assertEquals(8, updated.value)
+        assertEquals(listOf("wired"), updated.chips)
+
+        assertEquals(1, dao.deleteById(targetId))
+        assertEquals(null, dao.observeById(targetId).first())
+        assertEquals(null, dao.observeById(99_999L).first())
+    }
+
+    @Test
     fun mostRecentAtOrBefore_returnsNull_whenNoEntryQualifies() = runBlocking {
         dao.insert(Entry(ts = 5_000L, value = 3))
 

@@ -8,9 +8,13 @@ Build MindScale as a native Android application using Kotlin, Jetpack Compose, M
 
 The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716ca7343`: `SPEC.md` is the rationale and `MindScale v2.dc.html` is the visual/behavioral reference for Track, Full Log, Insights, Report, Safety card, Profile, and Settings. A local exported handoff is available at `C:\Users\mckie\Downloads\MindScale-handoff\mindscale\project\`; its `MindScale v2.dc.html` is the primary implementation reference. Repository specs under `docs/specs/` govern native implementation after human approval.
 
-## Current phase: Phases 5-6 merged; Phase 7 specification pending
+## Current phase: Phase 7 Track dialog restoration implemented and verified locally
 
-- Branch: `main`; local `main` and `origin/main` are synchronized at `fee0caf6dd1da2a3ecb9e04da1bab454ca009836`
+- Branch: `agent/phase7-track-dialog-restoration`, created from synchronized `main` at `372d1d3d91f7308ad35b8824c996bce641b0ce57`
+- Local `main`, its tracking ref, and live `origin/main` were verified at `372d1d3d91f7308ad35b8824c996bce641b0ce57` before the branch was created
+- Phase 7 spec: `docs/specs/SPEC-track-dialog-restoration.md` — `IMPLEMENTED — VERIFIED LOCALLY`; D-1 through D-10 frozen on 2026-08-04
+- Phase 7 implementation commit: `8d8d1a401d1d4a193985f8377c3ff9db09a3ec3c`
+- Phase 7 draft PR #4: `https://github.com/Kiezling/Mindscale/pull/4`, targeting `main`
 - Phase 4 final branch head: `93fac65711e8e3eeb72cf6f1406d386f0386e9da`
 - Phase 4 PR #1: merged into `main` as `c177db20ae5cf7c6ef41dd526b1cb70a5d19baa5` on 2026-08-03 local time (`2026-08-04T03:37:50Z`)
 - Phase 5 spec: `docs/specs/SPEC-insights-foundation.md` — `IMPLEMENTED — VERIFIED LOCALLY`; D-1 through D-10 frozen
@@ -23,7 +27,7 @@ The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716c
 - Phase 2 spec: `docs/specs/SPEC-track-phase2-completeness.md` — `IMPLEMENTED`
 - Phase 3 spec: `docs/specs/SPEC-full-log.md` — `IMPLEMENTED` on 2026-08-03
 - Phase 4 spec: `docs/specs/SPEC-settings-data-control.md` — `IMPLEMENTED` on 2026-08-03/04; D-1 through D-9 remain frozen
-- Current worktree: synchronized `main` at `fee0caf6dd1da2a3ecb9e04da1bab454ca009836`; only this handoff update plus the pre-existing untracked `.agents/` and `.codex/` tooling directories are outside the merge commit
+- Phase 7 publication scope: the implementation, focused unit/instrumented/UI tests, and governing documentation on `agent/phase7-track-dialog-restoration`. The pre-existing untracked `.agents/` and `.codex/` tooling directories remain excluded.
 
 ## Environment
 
@@ -100,7 +104,7 @@ The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716c
 
 ## Active blocker
 
-No active blocker. Phases 5 and 6 are merged into `main`. The next implementation requires a new bounded specification and decision gate.
+No active blocker. Phase 7 is implemented, fully verified locally, and authorized for commit, push, and pull-request review.
 
 ## Known decisions
 
@@ -114,11 +118,31 @@ No active blocker. Phases 5 and 6 are merged into `main`. The next implementatio
 
 ## Next tasks
 
-1. Draft a bounded Phase 7 specification for true process recreation of Track's open backdate/edit/note dialogs and their drafts.
-2. Preserve Room schema 4, backup format 4, and every Phase 5/6 engine invariant.
-3. Obtain approval for the Phase 7 specification before changing application code, then create a fresh feature branch from updated `main`.
+1. Review and merge the Phase 7 pull request; do not include `.agents/` or `.codex/`.
+2. Synchronize local `main` with the Phase 7 merge before creating the next feature branch.
+3. Draft and approve the next bounded Insights specification from the remaining backlog; the likely Phase 8 candidate is an onset-gap histogram, but its sample refusal, bucket semantics, descriptive grammar, accessibility, and no-inference boundaries must be reconciled before implementation.
 
 ## Last verification
+
+Phase 7 final local verification completed 2026-08-04 from `S:\Android\AndroidProjects\MindScale` on `agent/phase7-track-dialog-restoration`, based on synchronized `main` commit `372d1d3d91f7308ad35b8824c996bce641b0ce57`:
+
+- `test`: 136/136 JVM tests passed; focused Track ViewModel suite: 61/61.
+- `lint`: passed with 0 errors and 22 existing warnings.
+- `assembleDebug`: passed.
+- `adb devices -l`: `emulator-5554`, `MindScale_API_36` (API 36).
+- `connectedDebugAndroidTest`: 88/88 passed with 0 failures/errors/skips. Coverage includes Backdate/Edit/Note Activity recreation, primitive Bundle restoration into a new owner/ViewModelStore, Room id observation outside recent ten, stale/conflict/failure paths, large-font/live-region UI, and all Phase 1–6 regressions.
+- Manual installed-app process walkthrough proved all three exact drafts survive true background `am kill` reconstruction through Recents with a changed PID: Backdate `2026-0`/`1`, Edit `2026-0`/`2`, and multiline Note `Phase7 manual\nrestored`.
+- Visual inspection on the API 36 emulator confirmed dialog labels, validation, focus, scrolling, and reachable actions with the IME open. Font scale remained `1.0`, night mode `no`, and automatic rotation enabled after the walkthrough.
+- `git diff --check` passed with only Windows line-ending notices. No schema, backup/CSV, manifest/permission, dependency, or toolchain file changed.
+- Two connected-test-only issues were corrected during verification: asynchronous row/dialog sequencing in the compound navigation test and teardown ordering in the saved-state Room harness. Neither involved a production behavior change or merits a `FAILED_PATHS.md` entry.
+
+Phase 7 starting-state verification completed 2026-08-04 before documentation edits:
+
+- `git status --short --branch` showed synchronized `main` with only the expected untracked `.agents/` and `.codex/` directories.
+- `HEAD`, local `main`, local `origin/main`, and live `git ls-remote origin refs/heads/main` all resolved to `372d1d3d91f7308ad35b8824c996bce641b0ce57`.
+- Merge commit `fee0caf6dd1da2a3ecb9e04da1bab454ca009836` is an ancestor of `372d1d3d91f7308ad35b8824c996bce641b0ce57`.
+- Branch `agent/phase7-track-dialog-restoration` was created from that exact head. No Gradle oracle was rerun because this approval-gated step changes documentation only.
+- Documentation checks passed: `git diff --check`, a trailing-whitespace scan of the untracked draft spec, and a required-section check. Application/test-source diff remained empty.
 
 Phase 6 final local verification completed 2026-08-04 from `S:\Android\AndroidProjects\MindScale` for implementation commit `53f9d54ea79f56b2d069297f4d6a4b8923aeae23`, based on Phase 5 publication head `c8a7bdb17a12aba58dba59927ffc81506d5b42dc`:
 
@@ -203,7 +227,7 @@ Results:
 
 ## Known coverage gaps and backlog
 
-- Phase 1 backdate/edit/note dialog-open state still needs a dedicated true process-recreation correction; see `docs/specs/BACKLOG.md`.
+- Phase 1 backdate/edit/note dialog-open restoration is implemented and verified by Phase 7; see `docs/specs/SPEC-track-dialog-restoration.md`.
 - JSON/CSV import remains deferred; Phase 4 exports are one-way until a separately approved validation/merge/rollback spec exists.
 - The time-weighted/hold episode model and Phase 2 onset reconciliation are implemented and verified by `docs/specs/SPEC-insights-foundation.md`.
 - Gold/ink theming is implemented; approved typography assets remain a future design decision.

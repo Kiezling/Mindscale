@@ -7,8 +7,10 @@ import com.kieslingdev.mindscale.data.EpisodeSourceDao
 import com.kieslingdev.mindscale.data.HoldDuration
 import com.kieslingdev.mindscale.data.SleepInterval
 import com.kieslingdev.mindscale.data.TrackSettings
+import java.time.ZoneId
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -62,11 +64,16 @@ class TrackViewModelTest {
             settingsDao,
             savedStateHandle = savedStateHandle,
             nowProvider = now,
-            episodeSourceDao = episodeSourceDao
+            episodeSourceDao = episodeSourceDao,
+            zoneProvider = { ZoneId.of("UTC") }
         )
         dispatcher.scheduler.runCurrent()
         return Fixture(vm, entryDao, sleepDao, markerDao, settingsDao)
     }
+
+    private fun copiedHandle(handle: SavedStateHandle): SavedStateHandle = SavedStateHandle(
+        handle.keys().associateWith { key -> handle.get<Any?>(key) }
+    )
 
     // ---------------------------------------------------------------------
     // Phase 1 (unchanged behavior)
@@ -123,10 +130,11 @@ class TrackViewModelTest {
         dispatcher.scheduler.runCurrent()
 
         assertEquals(0, dao.insertCalls.size)
-        val dialog = viewModel.uiState.value.backdateDialog
+        val dialog = viewModel.uiState.value.activeModal as? TrackModalState.Backdate
         assertNotNull(dialog)
-        assertEquals(6, dialog!!.value)
-        assertEquals(fixedNow, dialog.timestampMillis)
+        assertEquals(6, dialog!!.draft.value)
+        assertEquals("1970-01-01", dialog.draft.dateText)
+        assertEquals("00:00", dialog.draft.timeText)
     }
 
     @Test
@@ -134,14 +142,14 @@ class TrackViewModelTest {
         val (viewModel, dao) = viewModel()
 
         viewModel.onEvent(TrackEvent.KeyLongPressed(4))
-        viewModel.onEvent(TrackEvent.BackdateTimestampChanged(fixedNow - 5_000))
+        viewModel.onEvent(TrackEvent.BackdateTimestampChanged(0L))
         viewModel.onEvent(TrackEvent.BackdateSaveConfirmed)
         dispatcher.scheduler.runCurrent()
 
         assertEquals(1, dao.insertCalls.size)
-        assertEquals(fixedNow - 5_000, dao.insertCalls[0].ts)
+        assertEquals(0L, dao.insertCalls[0].ts)
         assertEquals(4, dao.insertCalls[0].value)
-        assertNull(viewModel.uiState.value.backdateDialog)
+        assertNull(viewModel.uiState.value.activeModal)
     }
 
     @Test
@@ -153,7 +161,7 @@ class TrackViewModelTest {
         dispatcher.scheduler.runCurrent()
 
         assertEquals(0, dao.insertCalls.size)
-        assertNull(viewModel.uiState.value.backdateDialog)
+        assertNull(viewModel.uiState.value.activeModal)
     }
 
     @Test
@@ -161,16 +169,16 @@ class TrackViewModelTest {
         val (viewModel, dao) = viewModel()
 
         viewModel.onEvent(TrackEvent.KeyLongPressed(4))
-        viewModel.onEvent(TrackEvent.BackdateTimestampChanged(fixedNow + 1))
+        viewModel.onEvent(TrackEvent.BackdateTimestampChanged(fixedNow + 60_000))
 
-        val dialog = viewModel.uiState.value.backdateDialog
-        assertNotNull(dialog!!.error)
+        val dialog = viewModel.uiState.value.activeModal as TrackModalState.Backdate
+        assertNotNull(dialog.timestampError)
 
         viewModel.onEvent(TrackEvent.BackdateSaveConfirmed)
         dispatcher.scheduler.runCurrent()
 
         assertEquals(0, dao.insertCalls.size)
-        assertNotNull(viewModel.uiState.value.backdateDialog)
+        assertTrue(viewModel.uiState.value.activeModal is TrackModalState.Backdate)
     }
 
     @Test
@@ -181,16 +189,16 @@ class TrackViewModelTest {
         val entry = viewModel.uiState.value.recentEntries.single { it.id == entryId }
 
         viewModel.onEvent(TrackEvent.EditRequested(entry))
-        viewModel.onEvent(TrackEvent.EditTimestampChanged(fixedNow + 1))
+        viewModel.onEvent(TrackEvent.EditTimestampChanged(fixedNow + 60_000))
 
-        val dialog = viewModel.uiState.value.editDialog
-        assertNotNull(dialog!!.error)
+        val dialog = viewModel.uiState.value.activeModal as TrackModalState.Edit
+        assertNotNull(dialog.timestampError)
 
         viewModel.onEvent(TrackEvent.EditSaveConfirmed)
         dispatcher.scheduler.runCurrent()
 
         assertEquals(0, dao.updateCalls.size)
-        assertNotNull(viewModel.uiState.value.editDialog)
+        assertTrue(viewModel.uiState.value.activeModal is TrackModalState.Edit)
     }
 
     @Test
@@ -202,7 +210,7 @@ class TrackViewModelTest {
 
         viewModel.onEvent(TrackEvent.EditRequested(entry))
         viewModel.onEvent(TrackEvent.EditValueChanged(9))
-        viewModel.onEvent(TrackEvent.EditTimestampChanged(fixedNow - 100))
+        viewModel.onEvent(TrackEvent.EditTimestampChanged(0L))
         viewModel.onEvent(TrackEvent.EditSaveConfirmed)
         dispatcher.scheduler.runCurrent()
 
@@ -210,9 +218,9 @@ class TrackViewModelTest {
         val updated = dao.updateCalls.single()
         assertEquals(entryId, updated.id)
         assertEquals(9, updated.value)
-        assertEquals(fixedNow - 100, updated.ts)
+        assertEquals(0L, updated.ts)
         assertEquals("existing note", updated.note)
-        assertNull(viewModel.uiState.value.editDialog)
+        assertNull(viewModel.uiState.value.activeModal)
     }
 
     @Test
@@ -231,14 +239,14 @@ class TrackViewModelTest {
         // even though the entry is no longer present in recentEntries.
         viewModel.onEvent(TrackEvent.EditRequested(originalEntry))
         viewModel.onEvent(TrackEvent.EditValueChanged(8))
-        viewModel.onEvent(TrackEvent.EditTimestampChanged(fixedNow - 50))
+        viewModel.onEvent(TrackEvent.EditTimestampChanged(0L))
         viewModel.onEvent(TrackEvent.EditSaveConfirmed)
         dispatcher.scheduler.runCurrent()
 
         val updated = dao.updateCalls.single()
         assertEquals(entryId, updated.id)
         assertEquals(8, updated.value)
-        assertEquals(fixedNow - 50, updated.ts)
+        assertEquals(0L, updated.ts)
         assertEquals("old note", updated.note)
         assertEquals(listOf("chip-a"), updated.chips)
     }
@@ -255,7 +263,7 @@ class TrackViewModelTest {
         dispatcher.scheduler.runCurrent()
 
         assertEquals(0, dao.updateCalls.size)
-        assertNull(viewModel.uiState.value.editDialog)
+        assertNull(viewModel.uiState.value.activeModal)
     }
 
     @Test
@@ -266,7 +274,10 @@ class TrackViewModelTest {
         val entry = viewModel.uiState.value.recentEntries.single { it.id == entryId }
 
         viewModel.onEvent(TrackEvent.NoteRequested(entry))
-        assertEquals(entryId, viewModel.uiState.value.noteDialog!!.entryId)
+        assertEquals(
+            entryId,
+            (viewModel.uiState.value.activeModal as TrackModalState.Note).draft.entryId
+        )
 
         viewModel.onEvent(TrackEvent.NoteTextChanged("feeling okay"))
         viewModel.onEvent(TrackEvent.NoteSaveConfirmed)
@@ -274,14 +285,14 @@ class TrackViewModelTest {
 
         assertEquals(1, dao.updateCalls.size)
         assertEquals("feeling okay", dao.updateCalls.single().note)
-        assertNull(viewModel.uiState.value.noteDialog)
+        assertNull(viewModel.uiState.value.activeModal)
 
         viewModel.onEvent(TrackEvent.NoteRequested(entry))
         viewModel.onEvent(TrackEvent.NoteCancelled)
         dispatcher.scheduler.runCurrent()
 
         assertEquals(1, dao.updateCalls.size)
-        assertNull(viewModel.uiState.value.noteDialog)
+        assertNull(viewModel.uiState.value.activeModal)
     }
 
     @Test
@@ -319,7 +330,7 @@ class TrackViewModelTest {
 
         viewModel.onEvent(TrackEvent.DeleteRequested(entry))
 
-        assertEquals(entry, viewModel.uiState.value.pendingDelete)
+        assertEquals(entry, (viewModel.uiState.value.activeModal as TrackModalState.Delete).entry)
         assertEquals(0, dao.deleteCalls.size)
     }
 
@@ -333,7 +344,7 @@ class TrackViewModelTest {
         viewModel.onEvent(TrackEvent.DeleteRequested(entry))
         viewModel.onEvent(TrackEvent.DeleteCancelled)
 
-        assertNull(viewModel.uiState.value.pendingDelete)
+        assertNull(viewModel.uiState.value.activeModal)
         assertEquals(0, dao.deleteCalls.size)
     }
 
@@ -350,7 +361,7 @@ class TrackViewModelTest {
 
         assertEquals(1, dao.deleteCalls.size)
         assertEquals(entry, dao.deleteCalls.single())
-        assertNull(viewModel.uiState.value.pendingDelete)
+        assertNull(viewModel.uiState.value.activeModal)
     }
 
     @Test
@@ -465,16 +476,20 @@ class TrackViewModelTest {
     fun `BackdateSaveConfirmed onset detection ignores entries with a later timestamp`() = runTest {
         val settingsDao = FakeTrackSettingsDao(TrackSettings(askChips = true))
         val entryDao = FakeEntryDao()
-        entryDao.insert(Entry(ts = 1_000L, value = 5)) // T1: nonzero
-        entryDao.insert(Entry(ts = 3_000L, value = 0)) // T3: newest overall, but after T2
-        val (viewModel, dao) = viewModel(entryDao = entryDao, settingsDao = settingsDao)
+        entryDao.insert(Entry(ts = 60_000L, value = 5)) // T1: nonzero
+        entryDao.insert(Entry(ts = 180_000L, value = 0)) // T3: newest overall, but after T2
+        val (viewModel, dao) = viewModel(
+            entryDao = entryDao,
+            settingsDao = settingsDao,
+            now = { 300_000L }
+        )
 
         viewModel.onEvent(TrackEvent.KeyLongPressed(6))
-        viewModel.onEvent(TrackEvent.BackdateTimestampChanged(2_000L)) // T2, between T1 and T3
+        viewModel.onEvent(TrackEvent.BackdateTimestampChanged(120_000L)) // T2, between T1 and T3
         viewModel.onEvent(TrackEvent.BackdateSaveConfirmed)
         dispatcher.scheduler.runCurrent()
 
-        val backdated = dao.insertCalls.single { it.ts == 2_000L }
+        val backdated = dao.insertCalls.single { it.ts == 120_000L }
         // Not an onset (T1's value=5 precedes it) despite T3 (value=0) existing later.
         assertNull(viewModel.uiState.value.onsetChipPrompt.takeIf { it?.entryId == backdated.id })
     }
@@ -855,15 +870,388 @@ class TrackViewModelTest {
         val entry = viewModel.uiState.value.recentEntries.single { it.id == entryId }
 
         viewModel.onEvent(TrackEvent.EditRequested(entry))
-        assertEquals(setOf("flat"), viewModel.uiState.value.editDialog!!.chips)
+        assertEquals(
+            listOf("flat"),
+            (viewModel.uiState.value.activeModal as TrackModalState.Edit).draft.chips
+        )
 
         viewModel.onEvent(TrackEvent.EditChipToggled("wired"))
         viewModel.onEvent(TrackEvent.EditChipToggled("flat"))
-        assertEquals(setOf("wired"), viewModel.uiState.value.editDialog!!.chips)
+        assertEquals(
+            listOf("wired"),
+            (viewModel.uiState.value.activeModal as TrackModalState.Edit).draft.chips
+        )
 
         viewModel.onEvent(TrackEvent.EditSaveConfirmed)
         dispatcher.scheduler.runCurrent()
 
         assertEquals(listOf("wired"), dao.updateCalls.single().chips)
+    }
+
+    // ---------------------------------------------------------------------
+    // Phase 7: true dialog restoration and mutation cleanup
+    // ---------------------------------------------------------------------
+
+    @Test
+    fun `backdate raw draft and armed capture restore in a new ViewModel`() = runTest {
+        val handle = SavedStateHandle()
+        val first = viewModel(savedStateHandle = handle).viewModel
+
+        first.onEvent(TrackEvent.ArmSleep)
+        dispatcher.scheduler.runCurrent()
+        first.onEvent(TrackEvent.KeyLongPressed(7))
+        first.onEvent(TrackEvent.BackdateDateTextChanged("1970-0"))
+        first.onEvent(TrackEvent.BackdateTimeTextChanged("0"))
+
+        val restoredHandle = copiedHandle(handle)
+        val restored = viewModel(savedStateHandle = restoredHandle).viewModel
+        val modal = restored.uiState.value.activeModal as TrackModalState.Backdate
+
+        assertEquals(7, modal.draft.value)
+        assertEquals("1970-0", modal.draft.dateText)
+        assertEquals("0", modal.draft.timeText)
+        assertEquals(EntryKind.SLEEP, modal.draft.captureKind)
+        assertEquals(EntryKind.SLEEP, restored.uiState.value.armedCapture)
+        assertNotNull(modal.timestampError)
+
+        restored.onEvent(TrackEvent.BackdateCancelled)
+        assertNull(restored.uiState.value.activeModal)
+        assertEquals(EntryKind.SLEEP, restored.uiState.value.armedCapture)
+        assertNull(
+            viewModel(savedStateHandle = copiedHandle(restoredHandle)).viewModel.uiState.value.activeModal
+        )
+    }
+
+    @Test
+    fun `edit id baseline raw text value and ordered chips restore outside recent ten`() = runTest {
+        val handle = SavedStateHandle()
+        val dao = FakeEntryDao()
+        val id = dao.insert(Entry(ts = 0L, value = 4, chips = listOf("flat"), note = "kept"))
+        val first = viewModel(entryDao = dao, savedStateHandle = handle).viewModel
+        val entry = first.uiState.value.recentEntries.single { it.id == id }
+
+        first.onEvent(TrackEvent.EditRequested(entry))
+        first.onEvent(TrackEvent.EditValueChanged(8))
+        first.onEvent(TrackEvent.EditDateTextChanged("1970-0"))
+        first.onEvent(TrackEvent.EditChipToggled("wired"))
+        repeat(10) { index -> dao.insert(Entry(ts = 60_000L + index, value = 1)) }
+        dispatcher.scheduler.runCurrent()
+        assertTrue(first.uiState.value.recentEntries.none { it.id == id })
+
+        val restored = viewModel(
+            entryDao = dao,
+            savedStateHandle = copiedHandle(handle)
+        ).viewModel
+        val modal = restored.uiState.value.activeModal as TrackModalState.Edit
+
+        assertEquals(id, modal.draft.entryId)
+        assertEquals(0L, modal.draft.baselineTimestampMillis)
+        assertEquals(4, modal.draft.baselineValue)
+        assertEquals(listOf("flat"), modal.draft.baselineChips)
+        assertEquals(8, modal.draft.value)
+        assertEquals("1970-0", modal.draft.dateText)
+        assertEquals(listOf("flat", "wired"), modal.draft.chips)
+        assertEquals(RecordValidation.Current, modal.validation)
+    }
+
+    @Test
+    fun `note whitespace and newlines restore exactly in a new ViewModel`() = runTest {
+        val handle = SavedStateHandle()
+        val dao = FakeEntryDao()
+        val id = dao.insert(Entry(ts = 0L, value = 2, note = "old"))
+        val first = viewModel(entryDao = dao, savedStateHandle = handle).viewModel
+        val entry = first.uiState.value.recentEntries.single { it.id == id }
+        val draft = "  first line\nsecond line  "
+
+        first.onEvent(TrackEvent.NoteRequested(entry))
+        first.onEvent(TrackEvent.NoteTextChanged(draft))
+
+        val restored = viewModel(
+            entryDao = dao,
+            savedStateHandle = copiedHandle(handle)
+        ).viewModel
+        val modal = restored.uiState.value.activeModal as TrackModalState.Note
+
+        assertEquals(id, modal.draft.entryId)
+        assertEquals("old", modal.draft.baselineText)
+        assertEquals(draft, modal.draft.text)
+        assertEquals(RecordValidation.Current, modal.validation)
+    }
+
+    @Test
+    fun `malformed partial saved dialog clears safely and reports restoration failure`() = runTest {
+        val handle = SavedStateHandle(
+            mapOf(
+                "track.dialog.version" to 1,
+                "track.dialog.kind" to "EDIT",
+                "track.dialog.edit.entryId" to 9L
+            )
+        )
+
+        val restored = viewModel(savedStateHandle = handle).viewModel
+
+        assertNull(restored.uiState.value.activeModal)
+        assertEquals("The unfinished dialog could not be restored.", restored.uiState.value.toast)
+        assertTrue(handle.keys().none { it.startsWith("track.dialog.") })
+    }
+
+    @Test
+    fun `unknown wrong-type and invalid-chip saved dialog variants clear the namespace`() = runTest {
+        val variants = listOf(
+            SavedStateHandle(mapOf("track.dialog.version" to 2, "track.dialog.kind" to "NOTE")),
+            SavedStateHandle(mapOf("track.dialog.future" to "unknown")),
+            SavedStateHandle(
+                mapOf(
+                    "track.dialog.version" to 1,
+                    "track.dialog.kind" to "NOTE",
+                    "track.dialog.note.entryId" to 9,
+                    "track.dialog.note.baselineText" to "old",
+                    "track.dialog.note.text" to "draft"
+                )
+            ),
+            SavedStateHandle(
+                mapOf(
+                    "track.dialog.version" to 1,
+                    "track.dialog.kind" to "EDIT",
+                    "track.dialog.edit.entryId" to 9L,
+                    "track.dialog.edit.baselineTimestamp" to 0L,
+                    "track.dialog.edit.baselineValue" to 4,
+                    "track.dialog.edit.baselineChips" to arrayListOf("flat", "flat"),
+                    "track.dialog.edit.value" to 4,
+                    "track.dialog.edit.dateText" to "1970-01-01",
+                    "track.dialog.edit.timeText" to "00:00",
+                    "track.dialog.edit.chips" to arrayListOf("flat")
+                )
+            )
+        )
+
+        variants.forEach { handle ->
+            val restored = viewModel(savedStateHandle = handle).viewModel
+            assertNull(restored.uiState.value.activeModal)
+            assertEquals("The unfinished dialog could not be restored.", restored.uiState.value.toast)
+            assertTrue(handle.keys().none { it.startsWith("track.dialog.") })
+        }
+    }
+
+    @Test
+    fun `saved dialog envelope contains only supported primitive string and string-list values`() = runTest {
+        val handle = SavedStateHandle()
+        val dao = FakeEntryDao()
+        dao.insert(Entry(ts = 0L, value = 4, chips = listOf("flat")))
+        val vm = viewModel(entryDao = dao, savedStateHandle = handle).viewModel
+
+        vm.onEvent(TrackEvent.EditRequested(vm.uiState.value.recentEntries.single()))
+        vm.onEvent(TrackEvent.EditChipToggled("wired"))
+
+        val dialogValues = handle.keys()
+            .filter { it.startsWith("track.dialog.") }
+            .associateWith { key -> handle.get<Any?>(key) }
+        assertEquals(1, dialogValues["track.dialog.version"])
+        assertEquals("EDIT", dialogValues["track.dialog.kind"])
+        assertTrue(dialogValues.isNotEmpty())
+        dialogValues.values.forEach { value ->
+            assertTrue(
+                "Unsupported saved value type: ${value?.javaClass}",
+                value is Int || value is Long || value is String ||
+                    value is ArrayList<*> && value.all { it is String }
+            )
+            assertFalse(value is Entry)
+        }
+    }
+
+    @Test
+    fun `restored target deletion closes safely even when it is outside recent ten`() = runTest {
+        val handle = SavedStateHandle()
+        val dao = FakeEntryDao()
+        val id = dao.insert(Entry(ts = 0L, value = 2))
+        val first = viewModel(entryDao = dao, savedStateHandle = handle).viewModel
+        first.onEvent(TrackEvent.NoteRequested(first.uiState.value.recentEntries.single()))
+
+        val restored = viewModel(entryDao = dao, savedStateHandle = copiedHandle(handle)).viewModel
+        dao.deleteById(id)
+        dispatcher.scheduler.runCurrent()
+
+        assertNull(restored.uiState.value.activeModal)
+        assertEquals("That record no longer exists", restored.uiState.value.toast)
+    }
+
+    @Test
+    fun `edit same-field conflict retains draft while unrelated note change does not conflict`() = runTest {
+        val dao = FakeEntryDao()
+        val id = dao.insert(Entry(ts = 0L, value = 4, chips = listOf("flat"), note = "old"))
+        val vm = viewModel(entryDao = dao).viewModel
+        val entry = vm.uiState.value.recentEntries.single()
+
+        vm.onEvent(TrackEvent.EditRequested(entry))
+        vm.onEvent(TrackEvent.EditValueChanged(8))
+        dao.updateNote(id, "other note")
+        dispatcher.scheduler.runCurrent()
+        assertEquals(
+            RecordValidation.Current,
+            (vm.uiState.value.activeModal as TrackModalState.Edit).validation
+        )
+
+        dao.updateEditableFields(id, 0L, 6, listOf("wired"))
+        dispatcher.scheduler.runCurrent()
+        val conflict = vm.uiState.value.activeModal as TrackModalState.Edit
+        assertEquals(RecordValidation.Conflicting, conflict.validation)
+        assertEquals(8, conflict.draft.value)
+        assertEquals(listOf("flat"), conflict.draft.chips)
+    }
+
+    @Test
+    fun `note same-field conflict retains exact draft`() = runTest {
+        val dao = FakeEntryDao()
+        val id = dao.insert(Entry(ts = 0L, value = 4, note = "old"))
+        val vm = viewModel(entryDao = dao).viewModel
+
+        vm.onEvent(TrackEvent.NoteRequested(vm.uiState.value.recentEntries.single()))
+        vm.onEvent(TrackEvent.NoteTextChanged("my draft"))
+        dao.updateNote(id, "changed elsewhere")
+        dispatcher.scheduler.runCurrent()
+
+        val conflict = vm.uiState.value.activeModal as TrackModalState.Note
+        assertEquals(RecordValidation.Conflicting, conflict.validation)
+        assertEquals("my draft", conflict.draft.text)
+    }
+
+    @Test
+    fun `edit and note mutation exceptions retain retryable drafts`() = runTest {
+        val dao = FakeEntryDao()
+        dao.insert(Entry(ts = 0L, value = 4, note = "old"))
+        val vm = viewModel(entryDao = dao).viewModel
+        val entry = vm.uiState.value.recentEntries.single()
+
+        vm.onEvent(TrackEvent.EditRequested(entry))
+        vm.onEvent(TrackEvent.EditValueChanged(7))
+        dao.updateEditableFieldsError = IllegalStateException("disk")
+        vm.onEvent(TrackEvent.EditSaveConfirmed)
+        dispatcher.scheduler.runCurrent()
+        val edit = vm.uiState.value.activeModal as TrackModalState.Edit
+        assertEquals(7, edit.draft.value)
+        assertEquals("Could not update that rating. Please try again.", edit.mutationError)
+        assertFalse(edit.isSaving)
+
+        dao.updateEditableFieldsError = null
+        vm.onEvent(TrackEvent.EditCancelled)
+        vm.onEvent(TrackEvent.NoteRequested(entry))
+        vm.onEvent(TrackEvent.NoteTextChanged("retry me"))
+        dao.updateNoteError = IllegalStateException("disk")
+        vm.onEvent(TrackEvent.NoteSaveConfirmed)
+        dispatcher.scheduler.runCurrent()
+        val note = vm.uiState.value.activeModal as TrackModalState.Note
+        assertEquals("retry me", note.draft.text)
+        assertEquals("Could not save that note. Please try again.", note.mutationError)
+        assertFalse(note.isSaving)
+    }
+
+    @Test
+    fun `delete exception retains confirmation and new modal requests are ignored`() = runTest {
+        val dao = FakeEntryDao()
+        dao.insert(Entry(ts = 0L, value = 4))
+        val vm = viewModel(entryDao = dao).viewModel
+        val entry = vm.uiState.value.recentEntries.single()
+
+        vm.onEvent(TrackEvent.DeleteRequested(entry))
+        vm.onEvent(TrackEvent.KeyLongPressed(8))
+        assertTrue(vm.uiState.value.activeModal is TrackModalState.Delete)
+
+        dao.deleteByIdError = IllegalStateException("disk")
+        vm.onEvent(TrackEvent.DeleteConfirmed)
+        dispatcher.scheduler.runCurrent()
+
+        val delete = vm.uiState.value.activeModal as TrackModalState.Delete
+        assertEquals("Could not delete that record. Please try again.", delete.mutationError)
+        assertFalse(delete.isSaving)
+    }
+
+    @Test
+    fun `backdate insert failure retains exact draft and armed side effect failure cannot duplicate entry`() = runTest {
+        val dao = FakeEntryDao()
+        val sleepDao = FakeSleepDao()
+        val vm = viewModel(entryDao = dao, sleepDao = sleepDao).viewModel
+
+        vm.onEvent(TrackEvent.KeyLongPressed(6))
+        vm.onEvent(TrackEvent.BackdateDateTextChanged("1970-01-01"))
+        vm.onEvent(TrackEvent.BackdateTimeTextChanged("00:00"))
+        dao.insertError = IllegalStateException("disk")
+        vm.onEvent(TrackEvent.BackdateSaveConfirmed)
+        dispatcher.scheduler.runCurrent()
+
+        val failed = vm.uiState.value.activeModal as TrackModalState.Backdate
+        assertEquals("1970-01-01", failed.draft.dateText)
+        assertEquals("00:00", failed.draft.timeText)
+        assertEquals("Could not save that entry. Please try again.", failed.mutationError)
+        assertFalse(failed.isSaving)
+        assertTrue(dao.insertCalls.isEmpty())
+
+        dao.insertError = null
+        vm.onEvent(TrackEvent.BackdateCancelled)
+        vm.onEvent(TrackEvent.ArmSleep)
+        dispatcher.scheduler.runCurrent()
+        vm.onEvent(TrackEvent.KeyLongPressed(6))
+        vm.onEvent(TrackEvent.BackdateTimestampChanged(0L))
+        sleepDao.insertError = IllegalStateException("sleep disk")
+        vm.onEvent(TrackEvent.BackdateSaveConfirmed)
+        dispatcher.scheduler.runCurrent()
+
+        assertNull(vm.uiState.value.activeModal)
+        assertNull(vm.uiState.value.armedCapture)
+        assertEquals(1, dao.insertCalls.size)
+        assertEquals("Your rating was saved, but sleep tracking could not be updated.", vm.uiState.value.toast)
+    }
+
+    @Test
+    fun `record validation failure retains draft and retry resolves current row`() = runTest {
+        val dao = FakeEntryDao()
+        dao.insert(Entry(ts = 0L, value = 4, note = "old"))
+        dao.observeByIdError = IllegalStateException("read")
+        val vm = viewModel(entryDao = dao).viewModel
+
+        vm.onEvent(TrackEvent.NoteRequested(vm.uiState.value.recentEntries.single()))
+        dispatcher.scheduler.runCurrent()
+        val failed = vm.uiState.value.activeModal as TrackModalState.Note
+        assertEquals(RecordValidation.ReadFailed, failed.validation)
+        assertEquals("Could not check that record. Please try again.", failed.mutationError)
+
+        dao.observeByIdError = null
+        vm.onEvent(TrackEvent.DialogValidationRetry)
+        dispatcher.scheduler.runCurrent()
+
+        val resolved = vm.uiState.value.activeModal as TrackModalState.Note
+        assertEquals(RecordValidation.Current, resolved.validation)
+        assertNull(resolved.mutationError)
+    }
+
+    @Test
+    fun `double save launches one targeted mutation and zero-row results clear as stale`() = runTest {
+        val dao = FakeEntryDao()
+        dao.insert(Entry(ts = 0L, value = 4, note = "old"))
+        val vm = viewModel(entryDao = dao).viewModel
+        val entry = vm.uiState.value.recentEntries.single()
+
+        vm.onEvent(TrackEvent.EditRequested(entry))
+        vm.onEvent(TrackEvent.EditValueChanged(7))
+        vm.onEvent(TrackEvent.EditSaveConfirmed)
+        vm.onEvent(TrackEvent.EditSaveConfirmed)
+        dispatcher.scheduler.runCurrent()
+        assertEquals(listOf(entry.id), dao.updateEditableFieldsCalls)
+        assertNull(vm.uiState.value.activeModal)
+
+        val refreshed = dao.observeRecent(10).first().single()
+        vm.onEvent(TrackEvent.NoteRequested(refreshed))
+        dao.updateNoteResult = 0
+        vm.onEvent(TrackEvent.NoteSaveConfirmed)
+        dispatcher.scheduler.runCurrent()
+        assertNull(vm.uiState.value.activeModal)
+        assertEquals("That record no longer exists", vm.uiState.value.toast)
+
+        dao.updateNoteResult = null
+        vm.onEvent(TrackEvent.DeleteRequested(refreshed))
+        dao.deleteByIdResult = 0
+        vm.onEvent(TrackEvent.DeleteConfirmed)
+        dispatcher.scheduler.runCurrent()
+        assertNull(vm.uiState.value.activeModal)
+        assertEquals("That record no longer exists", vm.uiState.value.toast)
     }
 }

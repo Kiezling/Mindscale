@@ -43,3 +43,10 @@ Record stable decisions that should survive chat resets and model/provider chang
 - Decision: add one native step-only entry chart to Insights using the Phase 5 hold/sleep derivation, with normalized sleep gaps/bands, marker event lines, persistent touch/TalkBack readout, and existing note-preview privacy. Extend the unified DAO projection for Entry note and Marker text, but keep Room/backup at version 4 and add no chart mode, ramp, cache, library, or inference. See `docs/specs/SPEC-insights-entry-chart.md`, D-1 through D-8.
 - Reason: supplies the next product-defined descriptive view without allowing the handoff's smoothed-line prototype to contradict the measurement model or create a second derivation path.
 - Supersedes: none; narrows the deferred step-chart portion of Phase 5 D-1/D-4.
+
+## D-007 — Phase 7 Track dialog restoration
+
+- Date: 2026-08-04
+- Decision: restore Track Backdate/Edit/Note as one versioned, primitive `SavedStateHandle` dialog envelope; revalidate Entry ids reactively from Room, retain and warn on same-field conflicts, keep targeted affected-row-count mutations, and clear drafts only on cancel, success, or definitive stale outcomes. Delete joins the live mutually exclusive modal model but is not restored. Room/schema/backup/export/dependencies remain version 4/unchanged. See `docs/specs/SPEC-track-dialog-restoration.md`, D-1 through D-10.
+- Reason: Compose-only field buffers cannot restore when a rebuilt `TrackViewModel` forgets the owning dialog, and full Room entities or stale snapshots do not belong in saved instance state.
+- Supersedes: Phase 1's overbroad claim that its Compose-only dialog buffers covered low-memory process death; preserves Phase 2's marker restoration precedent and Phase 3's targeted mutation contracts.

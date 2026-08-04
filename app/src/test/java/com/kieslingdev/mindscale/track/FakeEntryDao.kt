@@ -25,8 +25,14 @@ class FakeEntryDao : EntryDao {
     var updateEditableFieldsError: Throwable? = null
     var updateNoteError: Throwable? = null
     var deleteByIdError: Throwable? = null
+    var observeByIdError: Throwable? = null
+    var insertError: Throwable? = null
+    var updateEditableFieldsResult: Int? = null
+    var updateNoteResult: Int? = null
+    var deleteByIdResult: Int? = null
 
     override suspend fun insert(entry: Entry): Long {
+        insertError?.let { throw it }
         val id = nextId++
         val stored = entry.copy(id = id)
         insertCalls += stored
@@ -52,6 +58,11 @@ class FakeEntryDao : EntryDao {
 
     override fun observeCount(): Flow<Int> = entriesFlow.map { it.size }
 
+    override fun observeById(id: Long): Flow<Entry?> = entriesFlow.map { entries ->
+        observeByIdError?.let { throw it }
+        entries.firstOrNull { it.id == id }
+    }
+
     override fun observeBetween(fromTs: Long?, toTsExclusive: Long?): Flow<List<Entry>> =
         entriesFlow.map { list ->
             list.filter { (fromTs == null || it.ts >= fromTs) && (toTsExclusive == null || it.ts < toTsExclusive) }
@@ -76,6 +87,7 @@ class FakeEntryDao : EntryDao {
     ): Int {
         updateEditableFieldsCalls += id
         updateEditableFieldsError?.let { throw it }
+        updateEditableFieldsResult?.let { return it }
         val original = entriesFlow.value.firstOrNull { it.id == id } ?: return 0
         val updated = original.copy(ts = ts, value = value, chips = chips)
         updateCalls += updated
@@ -86,6 +98,7 @@ class FakeEntryDao : EntryDao {
     override suspend fun updateNote(id: Long, note: String?): Int {
         updateNoteCalls += id
         updateNoteError?.let { throw it }
+        updateNoteResult?.let { return it }
         val original = entriesFlow.value.firstOrNull { it.id == id } ?: return 0
         val updated = original.copy(note = note)
         updateCalls += updated
@@ -96,6 +109,7 @@ class FakeEntryDao : EntryDao {
     override suspend fun deleteById(id: Long): Int {
         deleteByIdCalls += id
         deleteByIdError?.let { throw it }
+        deleteByIdResult?.let { return it }
         val original = entriesFlow.value.firstOrNull { it.id == id } ?: return 0
         deleteCalls += original
         entriesFlow.value = entriesFlow.value.filterNot { it.id == id }
