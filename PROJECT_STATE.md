@@ -8,7 +8,7 @@ Build MindScale as a native Android application using Kotlin, Jetpack Compose, M
 
 The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716ca7343`: `SPEC.md` is the rationale and `MindScale v2.dc.html` is the visual/behavioral reference for Track, Full Log, Insights, Report, Safety card, Profile, and Settings. A local exported handoff is available at `C:\Users\mckie\Downloads\MindScale-handoff\mindscale\project\`; its `MindScale v2.dc.html` is the primary implementation reference. Repository specs under `docs/specs/` govern native implementation after human approval.
 
-## Current phase: Phase 10 Insights descriptive sleep counts — implemented and verified locally
+## Current phase: Phase 10 Insights descriptive sleep counts merged and complete
 
 - Phase 10 branch: `agent/phase10-insights-sleep-counts`, created from synchronized `main` at `652096b9cb61cdb5ff004ed352ce0f5a54d62e95`
 - Starting synchronization: `HEAD`, local `main`, local `origin/main`, and live GitHub `refs/heads/main` all resolved to `652096b9cb61cdb5ff004ed352ce0f5a54d62e95` before branching
@@ -19,8 +19,11 @@ The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716c
 - Room/schema/JSON version 4, CSV, backup, permissions, dependencies, toolchain, navigation, DI, privacy, and local-only architecture remain frozen
 - Frozen documentation commit: `e6afe3280acccb1fd0849b26b5fac5b9e4699980`
 - Verified implementation commit: `945300d0bad66be21de33b9494a19d393cf40aba`
+- Verification-state commit: `e7e1e117df5b75564b533140654af1b0c47f451b`
+- Phase 10 PR #7 was opened as draft, marked ready, verified mergeable at the exact verification-state head, and merged into `main` as `03bad992726bd336e43b0d5f17c064a07bb2bb57` on 2026-08-04
+- Local `main` and `origin/main` fast-forwarded to the merge commit before this requested phase-boundary documentation commit
 - Local verification: 168/168 JVM tests, lint with 0 errors/22 existing warnings, debug assembly, focused 27/27 connected tests, full 100/100 connected tests, installed-app manual inspection, critical review, and `git diff --check` passed
-- Exact next action: commit verification-state documentation, push the branch, open/ready/merge the PR at the verified head, synchronize `main`, and add the phase-boundary documentation commit
+- Exact next action after the phase boundary: leave the remaining Report/Profile, import/restore, Safety, and breathing backlog unstarted until a separately scoped task is assigned
 
 ### Phase 9 publication checkpoint
 
@@ -162,7 +165,7 @@ The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716c
 
 ## Active blocker
 
-No active blocker. Phase 10 is implemented and verified locally; publication is pending.
+No active blocker. Phase 10 is merged and complete.
 
 ## Known decisions
 
@@ -176,12 +179,19 @@ No active blocker. Phase 10 is implemented and verified locally; publication is 
 
 ## Next tasks
 
-1. Commit the Phase 10 verification-state documentation on `agent/phase10-insights-sleep-counts`.
-2. Push the branch, open the draft PR with complete evidence, mark it ready, verify exact-head mergeability, and merge.
-3. Fast-forward local `main`, add/push the phase-boundary documentation commit, and verify local/tracking/live `main` match.
-4. Keep Report/Profile, import/restore, Safety, and breathing work in `docs/specs/BACKLOG.md`; continue excluding `.agents/` and `.codex/`.
+1. Keep clinician Report/Profile, import/restore, Safety, and breathing work unstarted in `docs/specs/BACKLOG.md` until separately assigned and specified.
+2. Continue excluding `.agents/` and `.codex/` from product/documentation commits.
 
 ## Last verification
+
+Phase 10 publication checkpoint completed 2026-08-04:
+
+- Pushed `agent/phase10-insights-sleep-counts` through verification-state commit `e7e1e117df5b75564b533140654af1b0c47f451b`.
+- GitHub PR #7 was opened as draft, marked ready, and confirmed mergeable at that exact head.
+- PR #7 merged into `main` as `03bad992726bd336e43b0d5f17c064a07bb2bb57`.
+- Local `main` fast-forwarded from `652096b9cb61cdb5ff004ed352ce0f5a54d62e95` to `03bad992726bd336e43b0d5f17c064a07bb2bb57`; local `origin/main` matched before this phase-boundary documentation commit.
+- No Android oracle was rerun for the GitHub merge or documentation-only checkpoint because the application/test tree is the exact verified PR head plus GitHub's merge commit.
+- Expected untracked `.agents/` and `.codex/` remain excluded; no other local change was present before this documentation update.
 
 Phase 10 final local verification completed 2026-08-04 for implementation commit `945300d0bad66be21de33b9494a19d393cf40aba` on `agent/phase10-insights-sleep-counts`:
 

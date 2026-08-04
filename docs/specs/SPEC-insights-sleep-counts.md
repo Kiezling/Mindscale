@@ -247,7 +247,7 @@ Install and launch the debug APK on `MindScale_API_36`. Inspect no-completed/ope
 - [x] REGRESSION: all Phase 1–9 behavior and prior Insights selections remain green.
 - [x] ORACLES: JVM tests, lint, assembleDebug, intended-device identity, connected tests, installed-app walkthrough, and `git diff --check` pass.
 - [x] REVIEW: one critical-path review covers normalization/cohort boundaries, DST/zone, incomplete data, arithmetic/grammar, accessibility, restoration, concurrency, privacy, persistence compatibility, and rollback; every blocking finding is resolved.
-- [ ] PUBLICATION: spec/state/backlog/decision evidence is current; branch is intentionally committed/pushed, PR is ready and mergeable at the verified head, merge succeeds, and local/tracking/live `main` synchronize with the final phase-boundary commit.
+- [x] PUBLICATION: spec/state/backlog/decision evidence is current; branch is intentionally committed/pushed, PR is ready and mergeable at the verified head, merge succeeds, and local/tracking/live `main` synchronize with the final phase-boundary commit.
 
 ## Verification evidence
 
@@ -265,6 +265,7 @@ Install and launch the debug APK on `MindScale_API_36`. Inspect no-completed/ope
 - Critical-path review covered normalized/cohort boundaries, exact-three-hour and Wake boundaries, DST/current-zone behavior, incomplete/future-ending intervals, median/copy grammar, accessibility, restoration/invalidation, single-snapshot concurrency, privacy, unchanged version-4 persistence, and rollback. It corrected one inaccurate phrase for a future recorded Wake (`unavailable` became `missing or later than now`); no blocking finding remains.
 - Practical DST and current-zone reprojection were not manually induced; pure tests cover both spring/fall elapsed duration and current-zone cohort movement. Actual TalkBack speech was not listened to; exact Compose semantics/activation/live-region tests and device UI-hierarchy inspection cover the accessibility contract.
 - No plausible reusable failed implementation path was introduced, so `FAILED_PATHS.md` was not changed. One unquoted PowerShell Gradle filter and one temporary JUnit return-type inference error failed before product tests ran and were corrected immediately.
+- Verification-state commit `e7e1e117df5b75564b533140654af1b0c47f451b` was pushed on `agent/phase10-insights-sleep-counts`. GitHub PR #7 was opened as draft, marked ready, verified mergeable at that exact head, and merged into `main` as `03bad992726bd336e43b0d5f17c064a07bb2bb57` on 2026-08-04. Local `main` fast-forwarded to the merge before this requested phase-boundary documentation commit.
 
 ## Rollout and safe rollback
 
