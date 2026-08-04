@@ -13,6 +13,8 @@ The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716c
 - Branch: `agent/phase7-track-dialog-restoration`, created from synchronized `main` at `372d1d3d91f7308ad35b8824c996bce641b0ce57`
 - Local `main`, its tracking ref, and live `origin/main` were verified at `372d1d3d91f7308ad35b8824c996bce641b0ce57` before the branch was created
 - Phase 7 spec: `docs/specs/SPEC-track-dialog-restoration.md` — `IMPLEMENTED — VERIFIED LOCALLY`; D-1 through D-10 frozen on 2026-08-04
+- Phase 7 implementation commit: `8d8d1a401d1d4a193985f8377c3ff9db09a3ec3c`
+- Phase 7 draft PR #4: `https://github.com/Kiezling/Mindscale/pull/4`, targeting `main`
 - Phase 4 final branch head: `93fac65711e8e3eeb72cf6f1406d386f0386e9da`
 - Phase 4 PR #1: merged into `main` as `c177db20ae5cf7c6ef41dd526b1cb70a5d19baa5` on 2026-08-03 local time (`2026-08-04T03:37:50Z`)
 - Phase 5 spec: `docs/specs/SPEC-insights-foundation.md` — `IMPLEMENTED — VERIFIED LOCALLY`; D-1 through D-10 frozen
