@@ -2,6 +2,13 @@ package com.kieslingdev.mindscale.insights
 
 import java.time.LocalDate
 
+const val MIN_ONSET_COUNT = 6
+
+const val ONSET_GAP_CAVEAT =
+    "Starts are assembled from your ratings using the current waking-hour limit. " +
+        "Each gap is elapsed time from one start in this range to the next. " +
+        "The bars do not identify a cycle, cause, or prediction."
+
 enum class InsightRange(val shortLabel: String, val spokenLabel: String) {
     ONE_DAY("1D", "1 day"),
     THREE_DAYS("3D", "3 days"),
@@ -119,6 +126,50 @@ data class InsightSummary(
     val peak: Int?
 )
 
+data class OnsetGapBucket(
+    val index: Int,
+    val lowerBoundMillisInclusive: Long,
+    val upperBoundMillisExclusive: Long?,
+    val visibleLabel: String,
+    val spokenBoundary: String,
+    val count: Int
+)
+
+data class OnsetGapHistogram(
+    val eligibleOnsetCount: Int,
+    val gapCount: Int,
+    val minimumOnsetCount: Int = MIN_ONSET_COUNT,
+    val buckets: List<OnsetGapBucket>
+) {
+    val isEligible: Boolean
+        get() = eligibleOnsetCount >= minimumOnsetCount
+}
+
+fun onsetGapRefusalText(histogram: OnsetGapHistogram): String {
+    val needed = (histogram.minimumOnsetCount - histogram.eligibleOnsetCount).coerceAtLeast(0)
+    val startWord = if (needed == 1) "start" else "starts"
+    val gapWord = if (histogram.gapCount == 1) "gap" else "gaps"
+    val prefix = "Needs $needed more recorded $startWord in this range before this chart is shown."
+    return if (histogram.eligibleOnsetCount <= 1) {
+        "$prefix There are ${histogram.gapCount} onset-to-onset $gapWord to count."
+    } else {
+        "$prefix These starts make ${histogram.gapCount} onset-to-onset $gapWord."
+    }
+}
+
+fun onsetGapDenominator(histogram: OnsetGapHistogram): String {
+    val gapWord = if (histogram.gapCount == 1) "gap" else "gaps"
+    val startWord = if (histogram.eligibleOnsetCount == 1) "start" else "starts"
+    return "${histogram.gapCount} onset-to-onset $gapWord from " +
+        "${histogram.eligibleOnsetCount} recorded $startWord in this range."
+}
+
+fun onsetGapBucketReadout(histogram: OnsetGapHistogram, bucketIndex: Int): String? {
+    val bucket = histogram.buckets.getOrNull(bucketIndex) ?: return null
+    val gapWord = if (histogram.gapCount == 1) "gap" else "gaps"
+    return "${bucket.count} of ${histogram.gapCount} onset-to-onset $gapWord were ${bucket.spokenBoundary}."
+}
+
 data class InsightsSnapshot(
     val rangeStartMillis: Long,
     val nowMillis: Long,
@@ -129,6 +180,7 @@ data class InsightsSnapshot(
     val recentEpisodes: List<DerivedEpisode>,
     val rasterDays: List<RasterDay>,
     val entryChart: EntryChart,
+    val onsetGapHistogram: OnsetGapHistogram,
     val nextInvalidationMillis: Long?
 ) {
     fun rasterStateAt(instantMillis: Long): Pair<RasterState, Int?> {

@@ -1,6 +1,7 @@
 package com.kieslingdev.mindscale.insights
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -42,10 +43,12 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
@@ -78,6 +81,7 @@ fun InsightsRoute(viewModel: InsightsViewModel, modifier: Modifier = Modifier) {
         onNextRating = { viewModel.moveChartRating(1) },
         onPreviousEvent = { viewModel.moveChartMarker(-1) },
         onNextEvent = { viewModel.moveChartMarker(1) },
+        onSelectOnsetGapBucket = viewModel::selectOnsetGapBucket,
         onRetry = viewModel::retry,
         modifier = modifier
     )
@@ -99,6 +103,7 @@ fun InsightsScreen(
     onNextRating: () -> Boolean,
     onPreviousEvent: () -> Boolean,
     onNextEvent: () -> Boolean,
+    onSelectOnsetGapBucket: (Int) -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
     zoneId: ZoneId = ZoneId.systemDefault()
@@ -247,7 +252,123 @@ fun InsightsScreen(
                     EpisodeRow(snapshot.recentEpisodes[index], uiState.hourFormat, zoneId)
                 }
             }
+            item(key = "onset_gap_histogram") {
+                OnsetGapSection(
+                    histogram = snapshot.onsetGapHistogram,
+                    selectedBucketIndex = uiState.selectedOnsetGapBucketIndex,
+                    onSelectBucket = onSelectOnsetGapBucket
+                )
+            }
         }
+    }
+}
+
+@Composable
+private fun OnsetGapSection(
+    histogram: OnsetGapHistogram,
+    selectedBucketIndex: Int?,
+    onSelectBucket: (Int) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("Days between onsets", style = MaterialTheme.typography.titleMedium)
+        if (!histogram.isEligible) {
+            Surface(
+                tonalElevation = 1.dp,
+                shape = MaterialTheme.shapes.medium,
+                modifier = Modifier.fillMaxWidth().testTag("onset_gap_refusal")
+            ) {
+                Text(
+                    onsetGapRefusalText(histogram),
+                    modifier = Modifier.padding(16.dp),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            return@Column
+        }
+
+        Text(onsetGapDenominator(histogram), style = MaterialTheme.typography.bodySmall)
+        val maximumCount = histogram.buckets.maxOfOrNull(OnsetGapBucket::count)?.coerceAtLeast(1) ?: 1
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .testTag("onset_gap_bars"),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            histogram.buckets.forEach { bucket ->
+                val isSelected = selectedBucketIndex == bucket.index
+                val barHeight = if (bucket.count == 0) 0.dp else {
+                    (80f * bucket.count / maximumCount).coerceAtLeast(4f).dp
+                }
+                val description = "${bucket.visibleLabel} bucket, ${bucket.count} of " +
+                    "${histogram.gapCount} onset-to-onset gaps, ${bucket.spokenBoundary}"
+                Surface(
+                    onClick = { onSelectBucket(bucket.index) },
+                    shape = MaterialTheme.shapes.small,
+                    color = if (isSelected) {
+                        MaterialTheme.colorScheme.secondaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.surfaceVariant
+                    },
+                    border = BorderStroke(
+                        width = if (isSelected) 2.dp else 1.dp,
+                        color = if (isSelected) {
+                            MaterialTheme.colorScheme.onSecondaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.outlineVariant
+                        }
+                    ),
+                    modifier = Modifier
+                        .width(72.dp)
+                        .heightIn(min = 152.dp)
+                        .testTag("onset_gap_bucket_${bucket.index}")
+                        .semantics(mergeDescendants = true) {
+                            role = Role.Button
+                            selected = isSelected
+                            contentDescription = description
+                        }
+                ) {
+                    Column(
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 8.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(bucket.count.toString(), style = MaterialTheme.typography.labelLarge)
+                        Box(
+                            modifier = Modifier.fillMaxWidth().height(88.dp),
+                            contentAlignment = Alignment.BottomCenter
+                        ) {
+                            Box(
+                                Modifier
+                                    .width(28.dp)
+                                    .height(barHeight)
+                                    .background(MaterialTheme.colorScheme.primary)
+                                    .clearAndSetSemantics { }
+                            )
+                        }
+                        Text(
+                            bucket.visibleLabel,
+                            style = MaterialTheme.typography.labelMedium,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            }
+        }
+        Text(
+            selectedBucketIndex?.let { onsetGapBucketReadout(histogram, it) }
+                ?: "Select a bar to read its exact count.",
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.testTag("onset_gap_readout").semantics {
+                liveRegion = LiveRegionMode.Polite
+            }
+        )
+        Text(
+            ONSET_GAP_CAVEAT,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 
