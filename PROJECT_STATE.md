@@ -14,12 +14,12 @@ The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716c
 - Phase 4 final branch head: `93fac65711e8e3eeb72cf6f1406d386f0386e9da`
 - Phase 4 PR #1: merged into `main` as `c177db20ae5cf7c6ef41dd526b1cb70a5d19baa5` on 2026-08-03 local time (`2026-08-04T03:37:50Z`)
 - Phase 5 spec: `docs/specs/SPEC-insights-foundation.md` — `IMPLEMENTED — VERIFIED LOCALLY`; D-1 through D-10 frozen
+- Phase 5 implementation commit: `cd3a1cf51adb468f968a78a2a04d85ce317d76ed`, pushed to `origin/agent/phase5-insights-foundation` on 2026-08-04
 - Phase 1 spec: `docs/specs/SPEC-track-numpad-logging.md` — `IMPLEMENTED`
 - Phase 2 spec: `docs/specs/SPEC-track-phase2-completeness.md` — `IMPLEMENTED`
 - Phase 3 spec: `docs/specs/SPEC-full-log.md` — `IMPLEMENTED` on 2026-08-03
 - Phase 4 spec: `docs/specs/SPEC-settings-data-control.md` — `IMPLEMENTED` on 2026-08-03/04; D-1 through D-9 remain frozen
-- Current worktree: verified Phase 5 application, schema, test, spec, decision, failure-path, backlog, and state changes on `agent/phase5-insights-foundation`; commit and push were authorized on 2026-08-04 and are pending publication
-- Pre-existing untracked `.agents/` and `.codex/` tooling directories remain outside the Phase 5 change
+- Current worktree: Phase 5 is committed and pushed on `agent/phase5-insights-foundation`; only the pre-existing untracked `.agents/` and `.codex/` tooling directories remain outside the Phase 5 change
 
 ## Environment
 
@@ -89,7 +89,7 @@ The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716c
 
 ## Active blocker
 
-No active blocker. Phase 5 is locally complete and authorized for commit and push.
+No active blocker. Phase 5 is committed, pushed, and ready for review or a pull request.
 
 ## Known decisions
 
@@ -103,7 +103,7 @@ No active blocker. Phase 5 is locally complete and authorized for commit and pus
 
 ## Next tasks
 
-1. Commit and push the verified Phase 5 scope; open a pull request only if separately requested.
+1. Open a Phase 5 pull request only if separately requested.
 2. For the next bounded phase, draft a separate spec around the step-only entry chart with sleep/event overlays, using the verified Phase 5 engine; do not bundle histogram/sleep-comparison/report work without a new decision gate.
 3. Preserve the current Room 4/export 4 interfaces and Phase 5 engine invariants unless a later approved spec explicitly supersedes them.
 
