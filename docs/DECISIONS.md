@@ -57,3 +57,10 @@ Record stable decisions that should survive chat resets and model/provider chang
 - Decision: add one native onset-to-onset elapsed-gap histogram derived from the existing Phase 5 episode model. Require six onsets/five gaps with both onsets inside the selected half-open range; use ten frozen elapsed-day buckets, exact denominators/boundary readouts, and no periodicity or inference claim. Use accessible 48 dp Compose bucket cells and primitive SavedStateHandle selection while keeping the single Room/StateFlow derivation and Room/schema/JSON version 4, CSV, backup rules, permissions, dependencies, and architecture unchanged. See `docs/specs/SPEC-insights-onset-gap-histogram.md`, D-1 through D-10.
 - Reason: this is the next product-defined episode-level view and can reuse the reviewed episode engine without adding storage or a competing onset interpretation; sparse refusal and exact language constrain apophenia risk.
 - Supersedes: none; narrows the onset-gap portion deferred by Phase 5 D-1 and Phase 6 D-1.
+
+## D-009 — Phase 9 onset-time counts
+
+- Date: 2026-08-04
+- Decision: add one native 24-bucket local-clock onset-time count view derived from existing Phase 5 episodes. Require six in-range starts; use the current device zone, explicit recording-displacement/current-zone caveats, exact denominators and half-open hour readouts, and one deterministic wrapping four-hour count sentence with earliest-hour tie-breaking. Use accessible 48 dp Compose cells and primitive `SavedStateHandle` selection while keeping the single Room/StateFlow derivation and Room/schema/JSON version 4, CSV, backup rules, privacy, permissions, dependencies, and architecture unchanged. See `docs/specs/SPEC-insights-onset-time-counts.md`, D-1 through D-10.
+- Reason: this is the next product-defined Insights view and can reuse reviewed episode onsets without a new classifier or persistence change; descriptive sleep counts require separate cohort and boundary decisions.
+- Supersedes: none; narrows the onset-time portion deferred by Phase 5 D-1, Phase 6 D-1, and Phase 8 D-1.

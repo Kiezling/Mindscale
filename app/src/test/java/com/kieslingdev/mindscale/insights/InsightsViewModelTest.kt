@@ -179,6 +179,63 @@ class InsightsViewModelTest {
     }
 
     @Test
+    fun onsetHourSelectionRestoresRefreshesAndClearsIndependently() = runTest {
+        val handle = SavedStateHandle()
+        val source = FakeEpisodeSourceDao(
+            episodeRows(listOf(0L, 2 * hour, 4 * hour, 6 * hour, 8 * hour, 10 * hour))
+        )
+        val now = { Instant.ofEpochMilli(12 * hour) }
+        var vm = viewModel(source, FakeTrackSettingsDao(), handle, now)
+        runCurrent()
+
+        vm.selectOnsetGapBucket(0)
+        vm.selectOnsetHour(4)
+        assertEquals(0, vm.uiState.value.selectedOnsetGapBucketIndex)
+        assertEquals(4, vm.uiState.value.selectedOnsetHour)
+
+        vm.viewModelScope.cancel()
+        vm = viewModel(source, FakeTrackSettingsDao(), handle, now)
+        runCurrent()
+        assertEquals(4, vm.uiState.value.selectedOnsetHour)
+
+        source.rows.value = episodeRows(listOf(hour, 2 * hour, 3 * hour, 4 * hour, 5 * hour, 6 * hour, 7 * hour))
+        runCurrent()
+        assertEquals(4, vm.uiState.value.selectedOnsetHour)
+        assertEquals(1, vm.uiState.value.snapshot!!.onsetTimeCounts.buckets[4].count)
+
+        vm.selectOnsetHour(24)
+        assertEquals(4, vm.uiState.value.selectedOnsetHour)
+
+        source.rows.value = episodeRows(listOf(0L, 2 * hour, 4 * hour))
+        runCurrent()
+        assertNull(vm.uiState.value.selectedOnsetHour)
+        vm.viewModelScope.cancel()
+    }
+
+    @Test
+    fun rangeChangeClearsOnsetHourAndInvalidRestoredHourIsDiscarded() = runTest {
+        val rows = episodeRows(listOf(0L, 2 * hour, 4 * hour, 6 * hour, 8 * hour, 10 * hour))
+        val handle = SavedStateHandle(mapOf("insights.selectedOnsetHour" to 23))
+        val vm = viewModel(FakeEpisodeSourceDao(rows), FakeTrackSettingsDao(), handle, now = { Instant.ofEpochMilli(12 * hour) })
+        runCurrent()
+        assertEquals(23, vm.uiState.value.selectedOnsetHour)
+
+        vm.selectRange(InsightRange.ONE_DAY)
+        assertNull(vm.uiState.value.selectedOnsetHour)
+        vm.viewModelScope.cancel()
+
+        val invalid = viewModel(
+            FakeEpisodeSourceDao(rows),
+            FakeTrackSettingsDao(),
+            SavedStateHandle(mapOf("insights.selectedOnsetHour" to 99)),
+            now = { Instant.ofEpochMilli(12 * hour) }
+        )
+        runCurrent()
+        assertNull(invalid.uiState.value.selectedOnsetHour)
+        invalid.viewModelScope.cancel()
+    }
+
+    @Test
     fun scheduledHoldExpiry_recomputesOngoingEpisodeAsAssumed() = runTest {
         var nowMillis = 7 * hour
         val source = FakeEpisodeSourceDao(listOf(entry(1, 0, 5)))

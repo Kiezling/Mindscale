@@ -82,6 +82,7 @@ fun InsightsRoute(viewModel: InsightsViewModel, modifier: Modifier = Modifier) {
         onPreviousEvent = { viewModel.moveChartMarker(-1) },
         onNextEvent = { viewModel.moveChartMarker(1) },
         onSelectOnsetGapBucket = viewModel::selectOnsetGapBucket,
+        onSelectOnsetHour = viewModel::selectOnsetHour,
         onRetry = viewModel::retry,
         modifier = modifier
     )
@@ -104,6 +105,7 @@ fun InsightsScreen(
     onPreviousEvent: () -> Boolean,
     onNextEvent: () -> Boolean,
     onSelectOnsetGapBucket: (Int) -> Unit,
+    onSelectOnsetHour: (Int) -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
     zoneId: ZoneId = ZoneId.systemDefault()
@@ -259,6 +261,14 @@ fun InsightsScreen(
                     onSelectBucket = onSelectOnsetGapBucket
                 )
             }
+            item(key = "onset_time_counts") {
+                OnsetTimeSection(
+                    counts = snapshot.onsetTimeCounts,
+                    selectedHour = uiState.selectedOnsetHour,
+                    hourFormat = uiState.hourFormat,
+                    onSelectHour = onSelectOnsetHour
+                )
+            }
         }
     }
 }
@@ -366,6 +376,115 @@ private fun OnsetGapSection(
         )
         Text(
             ONSET_GAP_CAVEAT,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+private fun OnsetTimeSection(
+    counts: OnsetTimeCounts,
+    selectedHour: Int?,
+    hourFormat: HourFormat,
+    onSelectHour: (Int) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("Time of day it started", style = MaterialTheme.typography.titleMedium)
+        if (!counts.isEligible) {
+            Surface(
+                tonalElevation = 1.dp,
+                shape = MaterialTheme.shapes.medium,
+                modifier = Modifier.fillMaxWidth().testTag("onset_time_refusal")
+            ) {
+                Text(
+                    onsetTimeRefusalText(counts),
+                    modifier = Modifier.padding(16.dp),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            return@Column
+        }
+
+        Text(onsetTimeDenominator(counts), style = MaterialTheme.typography.bodySmall)
+        val maximumCount = counts.buckets.maxOfOrNull(OnsetHourBucket::count)?.coerceAtLeast(1) ?: 1
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .testTag("onset_time_bars"),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            counts.buckets.forEach { bucket ->
+                val isSelected = selectedHour == bucket.hourOfDay
+                val barHeight = if (bucket.count == 0) 0.dp else {
+                    (72f * bucket.count / maximumCount).coerceAtLeast(4f).dp
+                }
+                val hourLabel = onsetHourVisibleLabel(bucket.hourOfDay, hourFormat)
+                val description = "${onsetHourSpokenLabel(bucket.hourOfDay, hourFormat)} hour, " +
+                    "${bucket.count} of ${counts.eligibleOnsetCount} " +
+                    "recorded starts, ${onsetHourBoundary(bucket.hourOfDay, hourFormat)}"
+                Surface(
+                    onClick = { onSelectHour(bucket.hourOfDay) },
+                    shape = MaterialTheme.shapes.small,
+                    color = if (isSelected) {
+                        MaterialTheme.colorScheme.secondaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.surfaceVariant
+                    },
+                    border = BorderStroke(
+                        width = if (isSelected) 2.dp else 1.dp,
+                        color = if (isSelected) {
+                            MaterialTheme.colorScheme.onSecondaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.outlineVariant
+                        }
+                    ),
+                    modifier = Modifier
+                        .width(64.dp)
+                        .heightIn(min = 144.dp)
+                        .testTag("onset_time_hour_${bucket.hourOfDay}")
+                        .semantics(mergeDescendants = true) {
+                            role = Role.Button
+                            selected = isSelected
+                            contentDescription = description
+                        }
+                ) {
+                    Column(
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 8.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(bucket.count.toString(), style = MaterialTheme.typography.labelLarge)
+                        Box(
+                            modifier = Modifier.fillMaxWidth().height(80.dp),
+                            contentAlignment = Alignment.BottomCenter
+                        ) {
+                            Box(
+                                Modifier
+                                    .width(26.dp)
+                                    .height(barHeight)
+                                    .background(MaterialTheme.colorScheme.primary)
+                                    .clearAndSetSemantics { }
+                            )
+                        }
+                        Text(hourLabel, style = MaterialTheme.typography.labelMedium, textAlign = TextAlign.Center)
+                    }
+                }
+            }
+        }
+        Text(onsetTimeFourHourSentence(counts, hourFormat), style = MaterialTheme.typography.bodyMedium)
+        Text(
+            selectedHour?.let { onsetTimeBucketReadout(counts, it, hourFormat) }
+                ?: "Select an hour to read its exact count.",
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.testTag("onset_time_readout").semantics {
+                liveRegion = LiveRegionMode.Polite
+            }
+        )
+        Text(
+            ONSET_TIME_CAVEAT,
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )

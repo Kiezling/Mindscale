@@ -8,7 +8,19 @@ Build MindScale as a native Android application using Kotlin, Jetpack Compose, M
 
 The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716ca7343`: `SPEC.md` is the rationale and `MindScale v2.dc.html` is the visual/behavioral reference for Track, Full Log, Insights, Report, Safety card, Profile, and Settings. A local exported handoff is available at `C:\Users\mckie\Downloads\MindScale-handoff\mindscale\project\`; its `MindScale v2.dc.html` is the primary implementation reference. Repository specs under `docs/specs/` govern native implementation after human approval.
 
-## Current phase: Phase 8 Insights onset-gap histogram merged and complete
+## Current phase: Phase 9 Insights onset-time counts verified; publication in progress
+
+- Phase 9 branch: `agent/phase9-onset-time-counts`, created from synchronized `main` at `76880a978e68e79348941de891a0bc6251986188`
+- Before branch creation, local `main`, local `origin/main`, and live GitHub `refs/heads/main` all resolved to `76880a978e68e79348941de891a0bc6251986188`; the GitHub connector confirmed `Kiezling/Mindscale` is accessible with push/admin permission and default branch `main`
+- Phase 9 spec: `docs/specs/SPEC-insights-onset-time-counts.md` — `IMPLEMENTED — VERIFIED LOCALLY`; D-1 through D-10 were frozen on 2026-08-04 before application-code edits
+- Reconciled boundary: one six-onset-minimum, 24 local-clock-hour count view derived from the existing Phase 5 episode model, with a deterministic four-hour count sentence, exact denominators, recording-displacement/current-zone caveats, and accessible primitive selection
+- Selection rationale: onset-time counts are the next product-ordered Insights view and need no new source/cohort rules; descriptive sleep counts remain deferred because their night/nap, boundary, incomplete-sleep, and post-wake semantics require a separate spec
+- Approval gate satisfied: the user granted full ownership and authorized decisions, implementation, commits, pushes, PR readiness, merge, and synchronization without another review pause
+- Frozen documentation commit: `1846598`; verified implementation commit: `338a4fe`
+- Exact next action: commit this verification evidence, push the branch, open and ready the PR, merge it, synchronize `main`, and record the phase boundary on `main`
+- Expected untracked paths remain `.agents/` and `.codex/`; they are excluded from product/documentation scope
+
+### Phase 8 publication checkpoint
 
 - Phase 8 branch: `agent/phase8-onset-gap-histogram`, created from synchronized `main` at `86bd313e47515bd81eded5e03796195a3b389bff`
 - Phase 8 PR #5 merged into `main` as `042376265cb801a4d8e80375b3eb7fff54c1d0aa` on 2026-08-04 (`2026-08-04T18:48:52Z`)
@@ -122,9 +134,18 @@ The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716c
 - Kept Room/schema/JSON at version 4 and left CSV, backup, permissions, dependencies, toolchain, manual DI, navigation shell, and local-only architecture unchanged.
 - Expanded pure engine, ViewModel, and Compose coverage for every range, 0–5 refusal arithmetic, all ten exact boundaries, fractional/DST/extreme gaps, selection restoration/refresh, semantics, horizontal reachability, and vertical gesture ownership.
 
+### Phase 9 — Insights onset-time counts
+
+- Added one native `Time of day it started` section derived from the existing Phase 5 episode onsets, with a fixed six-start threshold, exact 0–5 refusal copy, and a covered-local-calendar-day denominator.
+- Added 24 current-zone local-clock buckets, deterministic DST overlap/gap handling, and a wrapping four-hour maximum-count sentence with earliest numeric-hour tie-breaking and exact half-open boundaries.
+- Added horizontally reachable, individually selectable native Compose cells with visible count/hour geometry, redundant border selection, at-least-48-dp targets, exact spoken semantics, a polite live readout, and parent vertical-scroll ownership.
+- Added validated primitive `SavedStateHandle` hour restoration, range/ineligibility clearing, and eligible refresh retention without changing the existing single Room/settings Flow or immutable snapshot publication.
+- Kept Room/schema/JSON at version 4 and left CSV, backup, permissions, dependencies, toolchain, navigation, DI, and local-only architecture unchanged; descriptive sleep counts remain deferred.
+- Added pure engine, copy, ViewModel, Room regression, and Compose coverage for all six ranges, exact hour/midnight/range boundaries, current-zone reprojection, DST overlap/gap, covered-day arithmetic, window wrap/ties, hold/sleep/marker invariance, selection lifecycle, accessibility, hour-23 reachability, and vertical gesture ownership.
+
 ## Active blocker
 
-No active blocker. Phase 8 is merged and complete.
+No active blocker. Phase 9 is verified locally and moving through publication.
 
 ## Known decisions
 
@@ -138,10 +159,31 @@ No active blocker. Phase 8 is merged and complete.
 
 ## Next tasks
 
-1. Reconcile the remaining onset-time and descriptive-sleep Insights backlog and select one bounded Phase 9 slice.
-2. Draft and freeze the Phase 9 specification before changing application code; continue excluding `.agents/` and `.codex/`.
+1. Publish the verified Phase 9 branch through a ready PR, merge it, synchronize local `main`, and add the requested phase-boundary documentation commit on `main`.
+2. Next unstarted product work is the separately specified descriptive sleep-count slice; continue excluding `.agents/` and `.codex/`.
 
 ## Last verification
+
+Phase 9 final local verification completed 2026-08-04 for implementation commit `338a4fe` on `agent/phase9-onset-time-counts`:
+
+- `test`: 158/158 JVM tests passed; 0 failures, 0 errors, 0 skipped across 12 suites.
+- `lint`: passed with 0 errors and the existing 22 warnings.
+- `assembleDebug`: passed.
+- `adb devices -l`: intended `MindScale_API_36` API 36 emulator connected as `emulator-5554`.
+- `connectedDebugAndroidTest`: 95/95 passed; 0 failures, errors, or skips. The focused Insights screen/DAO run passed 22/22 first.
+- Installed-app inspection covered the exact one-start refusal, the exactly-six-start eligible state, denominator, four-hour sentence, selection/live readout, all 24 semantics, hour-23 reachability and selection, parent vertical scrolling, light/dark rendering, 150% font scaling, and landscape scrolling. Device font, theme, and rotation were restored to `1.0`, `no`, and automatic portrait defaults.
+- Critical review covered source/range attribution, zone/DST semantics, hold/sleep reuse, four-hour wrap/tie arithmetic, grammar, accessibility, restoration, single-snapshot concurrency, privacy, unchanged version-4 persistence, and rollback. No blocking finding remained.
+- `git diff --check` passed. No Room/schema, JSON/CSV, backup, manifest/permission, dependency/toolchain, WebView/JavaScript, sample-data, account/server/analytics, or background-work file changed.
+- No reusable failed implementation approach was introduced; `FAILED_PATHS.md` remains unchanged. Expected untracked `.agents/` and `.codex/` remain excluded.
+
+Phase 9 starting-state verification completed 2026-08-04 before application-code edits:
+
+- `git status --short --branch` showed synchronized `main` with only expected untracked `.agents/` and `.codex/`.
+- `HEAD`, local `main`, local `origin/main`, and live `git ls-remote origin refs/heads/main` all resolved to `76880a978e68e79348941de891a0bc6251986188`.
+- GitHub repository metadata confirmed public repository `Kiezling/Mindscale`, default branch `main`, and connector push/admin access.
+- Branch `agent/phase9-onset-time-counts` was created from that exact head.
+- Product rationale, the complete primary HTML handoff, the three governing Insights specs, current engine/ViewModel/Compose/DAO code, and focused JVM/instrumented tests were reconciled before drafting.
+- No Gradle oracle was rerun for this documentation-only approval state; the merged Phase 8 application evidence below remains current.
 
 Repository synchronization verified 2026-08-04 after Phase 8 publication:
 

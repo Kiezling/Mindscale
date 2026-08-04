@@ -3,6 +3,10 @@ package com.kieslingdev.mindscale.data
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.kieslingdev.mindscale.insights.InsightRange
+import com.kieslingdev.mindscale.insights.deriveInsights
+import java.time.Instant
+import java.time.ZoneOffset
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -107,5 +111,42 @@ class EpisodeSourceDaoTest {
         assertFalse(result.promptEnabled)
         assertTrue(result.classificationAvailable)
         assertEquals(1, database.entryDao().observeCount().first())
+    }
+
+    @Test
+    fun onsetTimeCountsReuseRoomProjectionAndIgnoreMarkerMutation() = runBlocking {
+        val hour = 3_600_000L
+        repeat(6) { index ->
+            database.entryDao().insert(Entry(ts = index * 2L * hour, value = 5))
+            database.entryDao().insert(Entry(ts = index * 2L * hour + hour / 2, value = 0))
+        }
+        val before = deriveInsights(
+            rows = dao.observeSource().first(),
+            hold = HoldDuration.SIXTEEN,
+            now = Instant.ofEpochMilli(12 * hour),
+            zoneId = ZoneOffset.UTC,
+            range = InsightRange.ONE_DAY
+        ).onsetTimeCounts
+
+        val markerId = database.markerDao().insert(Marker(ts = hour, text = "private context"))
+        val afterInsert = deriveInsights(
+            rows = dao.observeSource().first(),
+            hold = HoldDuration.SIXTEEN,
+            now = Instant.ofEpochMilli(12 * hour),
+            zoneId = ZoneOffset.UTC,
+            range = InsightRange.ONE_DAY
+        ).onsetTimeCounts
+        database.markerDao().deleteById(markerId)
+        val afterDelete = deriveInsights(
+            rows = dao.observeSource().first(),
+            hold = HoldDuration.SIXTEEN,
+            now = Instant.ofEpochMilli(12 * hour),
+            zoneId = ZoneOffset.UTC,
+            range = InsightRange.ONE_DAY
+        ).onsetTimeCounts
+
+        assertTrue(before.isEligible)
+        assertEquals(before, afterInsert)
+        assertEquals(before, afterDelete)
     }
 }

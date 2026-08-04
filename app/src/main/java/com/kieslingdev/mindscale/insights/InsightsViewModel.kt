@@ -31,6 +31,7 @@ private const val RANGE_KEY = "insights.range"
 private const val EXPLORED_KEY = "insights.exploredInstant"
 private const val CHART_EXPLORED_KEY = "insights.chartExploredInstant"
 private const val ONSET_GAP_BUCKET_KEY = "insights.selectedOnsetGapBucket"
+private const val ONSET_HOUR_KEY = "insights.selectedOnsetHour"
 private const val HOUR_MILLIS = 3_600_000L
 
 data class InsightsUiState(
@@ -40,6 +41,7 @@ data class InsightsUiState(
     val exploredInstantMillis: Long? = null,
     val chartExploredInstantMillis: Long? = null,
     val selectedOnsetGapBucketIndex: Int? = null,
+    val selectedOnsetHour: Int? = null,
     val hourFormat: HourFormat = HourFormat.TWELVE,
     val holdDuration: HoldDuration = HoldDuration.SIXTEEN,
     val hideNotes: Boolean = false,
@@ -74,7 +76,9 @@ class InsightsViewModel(
             exploredInstantMillis = savedStateHandle[EXPLORED_KEY],
             chartExploredInstantMillis = savedStateHandle[CHART_EXPLORED_KEY],
             selectedOnsetGapBucketIndex = savedStateHandle.get<Int>(ONSET_GAP_BUCKET_KEY)
-                ?.takeIf { it in 0 until 10 }
+                ?.takeIf { it in 0 until 10 },
+            selectedOnsetHour = savedStateHandle.get<Int>(ONSET_HOUR_KEY)
+                ?.takeIf { it in 0..23 }
         )
     )
     val uiState: StateFlow<InsightsUiState> = _uiState.asStateFlow()
@@ -118,12 +122,17 @@ class InsightsViewModel(
             val selectedOnsetGapBucket = _uiState.value.selectedOnsetGapBucketIndex
                 ?.takeIf { snapshot.onsetGapHistogram.isEligible }
                 ?.takeIf { it in snapshot.onsetGapHistogram.buckets.indices }
+            val selectedOnsetHour = _uiState.value.selectedOnsetHour
+                ?.takeIf { snapshot.onsetTimeCounts.isEligible }
+                ?.takeIf { hour -> snapshot.onsetTimeCounts.buckets.any { it.hourOfDay == hour } }
             if (explored == null) savedStateHandle.remove<Long>(EXPLORED_KEY)
             else savedStateHandle[EXPLORED_KEY] = explored
             if (chartExplored == null) savedStateHandle.remove<Long>(CHART_EXPLORED_KEY)
             else savedStateHandle[CHART_EXPLORED_KEY] = chartExplored
             if (selectedOnsetGapBucket == null) savedStateHandle.remove<Int>(ONSET_GAP_BUCKET_KEY)
             else savedStateHandle[ONSET_GAP_BUCKET_KEY] = selectedOnsetGapBucket
+            if (selectedOnsetHour == null) savedStateHandle.remove<Int>(ONSET_HOUR_KEY)
+            else savedStateHandle[ONSET_HOUR_KEY] = selectedOnsetHour
             _uiState.update {
                 it.copy(
                     range = range,
@@ -132,6 +141,7 @@ class InsightsViewModel(
                     exploredInstantMillis = explored,
                     chartExploredInstantMillis = chartExplored,
                     selectedOnsetGapBucketIndex = selectedOnsetGapBucket,
+                    selectedOnsetHour = selectedOnsetHour,
                     hourFormat = read.settings.hourFormat,
                     holdDuration = read.settings.holdDuration,
                     hideNotes = read.settings.hideNotes,
@@ -165,12 +175,14 @@ class InsightsViewModel(
         savedStateHandle.remove<Long>(EXPLORED_KEY)
         savedStateHandle.remove<Long>(CHART_EXPLORED_KEY)
         savedStateHandle.remove<Int>(ONSET_GAP_BUCKET_KEY)
+        savedStateHandle.remove<Int>(ONSET_HOUR_KEY)
         _uiState.update {
             it.copy(
                 range = range,
                 exploredInstantMillis = null,
                 chartExploredInstantMillis = null,
                 selectedOnsetGapBucketIndex = null,
+                selectedOnsetHour = null,
                 loading = it.snapshot == null
             )
         }
@@ -227,6 +239,13 @@ class InsightsViewModel(
         if (!histogram.isEligible || index !in histogram.buckets.indices) return
         savedStateHandle[ONSET_GAP_BUCKET_KEY] = index
         _uiState.update { it.copy(selectedOnsetGapBucketIndex = index) }
+    }
+
+    fun selectOnsetHour(hour: Int) {
+        val counts = _uiState.value.snapshot?.onsetTimeCounts ?: return
+        if (!counts.isEligible || counts.buckets.none { it.hourOfDay == hour }) return
+        savedStateHandle[ONSET_HOUR_KEY] = hour
+        _uiState.update { it.copy(selectedOnsetHour = hour) }
     }
 
     private fun moveChartTarget(
