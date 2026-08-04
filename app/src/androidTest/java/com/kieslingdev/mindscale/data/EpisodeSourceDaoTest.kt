@@ -149,4 +149,37 @@ class EpisodeSourceDaoTest {
         assertEquals(before, afterInsert)
         assertEquals(before, afterDelete)
     }
+
+    @Test
+    fun sleepCountsReuseRoomProjectionReactToSleepAndIgnoreEntryMarkerContent() = runBlocking {
+        val hour = 3_600_000L
+        val sleepId = database.sleepDao().insert(SleepInterval(startTs = 0, endTs = 2 * hour))
+        val before = deriveInsights(
+            dao.observeSource().first(), HoldDuration.SIXTEEN,
+            Instant.ofEpochMilli(8 * hour), ZoneOffset.UTC, InsightRange.ONE_DAY
+        ).sleepCounts
+        assertEquals(1, before.completedCount)
+        assertEquals(1, before.categories[1].count)
+
+        database.sleepDao().update(SleepInterval(id = sleepId, startTs = 0, endTs = 4 * hour))
+        val entryId = database.entryDao().insert(
+            Entry(ts = hour, value = 9, chips = listOf("private"), note = "private note")
+        )
+        val markerId = database.markerDao().insert(Marker(ts = hour, text = "private marker"))
+        val changed = deriveInsights(
+            dao.observeSource().first(), HoldDuration.TWENTY_FOUR,
+            Instant.ofEpochMilli(8 * hour), ZoneOffset.UTC, InsightRange.ONE_DAY
+        ).sleepCounts
+        assertEquals(1, changed.completedCount)
+        assertEquals(1, changed.categories[0].count)
+        assertEquals(listOf(4 * hour), changed.categories[0].durationsMillis)
+
+        database.entryDao().updateNote(entryId, "changed private note")
+        database.markerDao().deleteById(markerId)
+        val afterPrivateMutations = deriveInsights(
+            dao.observeSource().first(), HoldDuration.EIGHT,
+            Instant.ofEpochMilli(8 * hour), ZoneOffset.UTC, InsightRange.ONE_DAY
+        ).sleepCounts
+        assertEquals(changed, afterPrivateMutations)
+    }
 }

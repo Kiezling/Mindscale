@@ -236,6 +236,84 @@ class InsightsViewModelTest {
     }
 
     @Test
+    fun sleepCategorySelectionRestoresRefreshesAndClearsIndependently() = runTest {
+        val handle = SavedStateHandle()
+        val source = FakeEpisodeSourceDao(
+            episodeRows(listOf(0L, 2 * hour, 4 * hour, 6 * hour, 8 * hour, 10 * hour)) +
+                sleep(100, 0, 4 * hour)
+        )
+        val now = { Instant.ofEpochMilli(12 * hour) }
+        var vm = viewModel(source, FakeTrackSettingsDao(), handle, now)
+        runCurrent()
+
+        vm.selectOnsetHour(4)
+        vm.selectSleepCategory(1)
+        assertEquals(4, vm.uiState.value.selectedOnsetHour)
+        assertEquals(1, vm.uiState.value.selectedSleepCategoryIndex)
+
+        vm.viewModelScope.cancel()
+        vm = viewModel(source, FakeTrackSettingsDao(), handle, now)
+        runCurrent()
+        assertEquals(1, vm.uiState.value.selectedSleepCategoryIndex)
+        assertEquals(4, vm.uiState.value.selectedOnsetHour)
+
+        source.rows.value = episodeRows(listOf(0L, 2 * hour, 4 * hour, 6 * hour, 8 * hour, 10 * hour)) +
+            listOf(sleep(100, 0, 2 * hour), sleep(101, 5 * hour, 9 * hour))
+        runCurrent()
+        assertEquals(1, vm.uiState.value.selectedSleepCategoryIndex)
+        assertEquals(2, vm.uiState.value.snapshot!!.sleepCounts.completedCount)
+
+        vm.selectSleepCategory(2)
+        assertEquals(1, vm.uiState.value.selectedSleepCategoryIndex)
+        source.rows.value = episodeRows(listOf(0L, 2 * hour, 4 * hour, 6 * hour, 8 * hour, 10 * hour))
+        runCurrent()
+        assertNull(vm.uiState.value.selectedSleepCategoryIndex)
+        assertEquals(4, vm.uiState.value.selectedOnsetHour)
+        vm.viewModelScope.cancel()
+    }
+
+    @Test
+    fun rangeClearsSleepSelectionAndInvalidRestoredCategoryIsDiscarded() = runTest {
+        val rows = listOf(entry(1, 0, 0), sleep(2, 0, 4 * hour))
+        val handle = SavedStateHandle(mapOf("insights.selectedSleepCategory" to 0))
+        val vm = viewModel(FakeEpisodeSourceDao(rows), FakeTrackSettingsDao(), handle, now = { Instant.ofEpochMilli(8 * hour) })
+        runCurrent()
+        assertEquals(0, vm.uiState.value.selectedSleepCategoryIndex)
+
+        vm.selectRange(InsightRange.ONE_DAY)
+        assertNull(vm.uiState.value.selectedSleepCategoryIndex)
+        vm.viewModelScope.cancel()
+
+        val invalid = viewModel(
+            FakeEpisodeSourceDao(rows),
+            FakeTrackSettingsDao(),
+            SavedStateHandle(mapOf("insights.selectedSleepCategory" to 7)),
+            now = { Instant.ofEpochMilli(8 * hour) }
+        )
+        runCurrent()
+        assertNull(invalid.uiState.value.selectedSleepCategoryIndex)
+        invalid.viewModelScope.cancel()
+    }
+
+    @Test
+    fun scheduledFutureSleepEndRecomputesIncompleteAsCompleted() = runTest {
+        var nowMillis = 4 * hour
+        val source = FakeEpisodeSourceDao(listOf(entry(1, 0, 0), sleep(2, 0, 5 * hour)))
+        val vm = viewModel(source, FakeTrackSettingsDao(), now = { Instant.ofEpochMilli(nowMillis) })
+        runCurrent()
+        assertEquals(1, vm.uiState.value.snapshot!!.sleepCounts.incompleteCount)
+        assertEquals(0, vm.uiState.value.snapshot!!.sleepCounts.completedCount)
+
+        nowMillis = 5 * hour + 1
+        advanceTimeBy(hour)
+        runCurrent()
+
+        assertEquals(0, vm.uiState.value.snapshot!!.sleepCounts.incompleteCount)
+        assertEquals(1, vm.uiState.value.snapshot!!.sleepCounts.completedCount)
+        vm.viewModelScope.cancel()
+    }
+
+    @Test
     fun scheduledHoldExpiry_recomputesOngoingEpisodeAsAssumed() = runTest {
         var nowMillis = 7 * hour
         val source = FakeEpisodeSourceDao(listOf(entry(1, 0, 5)))
@@ -293,6 +371,9 @@ class InsightsViewModelTest {
 
     private fun marker(id: Long, ts: Long, text: String) =
         EpisodeSourceRow("MARKER", id, ts, null, null, null, text = text)
+
+    private fun sleep(id: Long, start: Long, end: Long?) =
+        EpisodeSourceRow("SLEEP", id, start, end, null, null)
 
     private fun episodeRows(onsets: List<Long>): List<EpisodeSourceRow> = buildList {
         var id = 1L

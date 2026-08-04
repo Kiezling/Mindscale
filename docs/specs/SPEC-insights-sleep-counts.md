@@ -74,8 +74,8 @@ Native reconciliation:
 
 - Heading: `Sleep you recorded`.
 - Refusal: `No completed sleep periods woke in this range.`
-- If one incomplete normalized period overlaps the range: `1 incomplete sleep period is excluded until a Wake time is available.`
-- Otherwise pluralize deterministically: `{n} incomplete sleep periods are excluded until Wake times are available.`
+- If one incomplete normalized period overlaps the range: `1 incomplete sleep period is excluded because its Wake time is missing or later than now.`
+- Otherwise pluralize deterministically: `{n} incomplete sleep periods are excluded because their Wake times are missing or later than now.`
 - No selectable category cells or duration summary appear when the completed denominator is zero.
 - The explanatory caveat remains visible in the zero state.
 
@@ -88,8 +88,8 @@ Native reconciliation:
   - `Naps`, visible boundary `≤3h`.
 - Each cell shows its exact count. Both cells remain selectable when eligible, including a zero-count category.
 - Default readout: `Select nights or naps to read the exact durations.`
-- Night selection with records: `{count} of {total} completed sleep period(s) were nights over 3 elapsed hours. Middle duration {median}; shortest {min}; longest {max}.`
-- Nap selection with records: `{count} of {total} completed sleep period(s) were naps of 3 elapsed hours or less. Middle duration {median}; shortest {min}; longest {max}.`
+- Night selection with one night uses `was a night`; otherwise it uses `were nights`: `Of {total} completed sleep period(s), {count} {classification}. Middle duration {median}; shortest {min}; longest {max}.`
+- Nap selection with one nap uses `was a nap`; otherwise it uses `were naps`, with the same deterministic duration clause.
 - Zero-category selection replaces the duration clause with `There are no durations in this category.`
 - `formatDuration` supplies deterministic minute-rounded visible durations. Classification and median/min/max use exact milliseconds before formatting; no already-rounded value participates in arithmetic.
 
@@ -280,4 +280,3 @@ Approval gate is satisfied. D-1 through D-10 are frozen; a genuine source-of-tru
 
 - Mark this spec `IMPLEMENTED — VERIFIED LOCALLY`, check the criteria, and record exact test/manual/review/publication evidence.
 - Update `PROJECT_STATE.md`, `docs/specs/BACKLOG.md`, and `docs/DECISIONS.md`; update `FAILED_PATHS.md` only for a plausible reusable dead end.
-
