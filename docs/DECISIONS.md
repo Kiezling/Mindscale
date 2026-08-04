@@ -71,3 +71,10 @@ Record stable decisions that should survive chat resets and model/provider chang
 - Decision: add one native descriptive sleep section from the existing normalized sleep union. Group completed periods by recorded Wake in the selected half-open range, classify exact elapsed duration `<=3h` as nap and `>3h` as night, show direct counts and exact duration summaries from the first completed period, and exclude/disclose incomplete periods. Omit the prototype's five-hour post-wake comparison and every effect claim. Restore only primitive category selection while keeping Room/schema/JSON version 4 and CSV, backup, privacy, permissions, dependencies, and architecture unchanged. See `docs/specs/SPEC-insights-sleep-counts.md`, D-1 through D-10.
 - Reason: this is the smallest handoff-supported sleep slice that preserves raw-data truth and range behavior without turning recording opportunity or sparse later ratings into an implied sleep effect.
 - Supersedes: none; narrows the descriptive sleep portion deferred by Phase 5 D-1, Phase 6 D-1, Phase 8 D-1, and Phase 9 D-1.
+
+## D-011 — Phase 11 clinician summary and Profile foundation
+
+- Date: 2026-08-04
+- Decision: add local Profile and Report overlays, an optional validated display name, and dated PHQ-8/GAD-7 totals explicitly stored as externally obtained and user-entered. Generate one bounded, factual clinician summary from a transactional snapshot using existing episode/onset/sleep semantics; permit only explicit Copy/Share/Save; advance Room/JSON backup additively to version 5; keep records CSV compatible; and erase/reset the new data atomically. Never administer, calculate, interpret, compare, diagnose from, or attach severity/threshold language to either instrument. See `docs/specs/SPEC-clinician-report-profile.md`, D-1 through D-12.
+- Reason: supplies the next product-ordered clinician conversation artifact while preserving local-only privacy, explicit provenance, deterministic data integrity, and MindScale's role as a measurement instrument rather than an assessment.
+- Supersedes: none; resolves the Report/Profile backlog item and rejects conflicting inferential prototype copy.

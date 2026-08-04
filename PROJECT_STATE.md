@@ -8,7 +8,18 @@ Build MindScale as a native Android application using Kotlin, Jetpack Compose, M
 
 The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716ca7343`: `SPEC.md` is the rationale and `MindScale v2.dc.html` is the visual/behavioral reference for Track, Full Log, Insights, Report, Safety card, Profile, and Settings. A local exported handoff is available at `C:\Users\mckie\Downloads\MindScale-handoff\mindscale\project\`; its `MindScale v2.dc.html` is the primary implementation reference. Repository specs under `docs/specs/` govern native implementation after human approval.
 
-## Current phase: Phase 10 Insights descriptive sleep counts merged and complete
+## Current phase: Phase 11 clinician summary and Profile foundation active
+
+- Phase 11 branch: `agent/phase11-clinician-report-profile`, created from synchronized `main` at `9d8cf4bd2dbd3834e2094c81f63e838d6348bdb5`
+- Starting synchronization: `HEAD`, local `main`, local `origin/main`, and live GitHub `refs/heads/main` all resolved to `9d8cf4bd2dbd3834e2094c81f63e838d6348bdb5` before branching
+- Governing spec: `docs/specs/SPEC-clinician-report-profile.md` — `FROZEN — APPROVED`; D-1 through D-12 frozen on 2026-08-04 before application-code edits
+- Reconciled boundary: local Profile/Report overlays; optional name; dated, explicitly external/user-entered PHQ-8 or GAD-7 totals; and a capped factual summary using existing Insights derivations without questionnaire administration, scoring, interpretation, comparison, diagnosis, or severity language
+- Approval gate satisfied: the user granted full Phase 11 ownership and authorized decisions, implementation, verification, commits, pushes, PR readiness, merge, and final synchronization without another routine pause
+- Planned persistence: additive Room 4→5 plus JSON backup v5; records CSV compatibility; transactional snapshot/erase/reset; no import or destructive downgrade
+- Expected untracked paths remain `.agents/` and `.codex/`; they are excluded from product/documentation scope
+- Exact next action: commit the frozen documentation separately, then implement schema/migration/data-control foundations before Profile/Report application UI
+
+### Phase 10 merged checkpoint
 
 - Phase 10 branch: `agent/phase10-insights-sleep-counts`, created from synchronized `main` at `652096b9cb61cdb5ff004ed352ce0f5a54d62e95`
 - Starting synchronization: `HEAD`, local `main`, local `origin/main`, and live GitHub `refs/heads/main` all resolved to `652096b9cb61cdb5ff004ed352ce0f5a54d62e95` before branching
