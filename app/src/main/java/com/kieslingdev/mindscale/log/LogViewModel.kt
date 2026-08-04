@@ -7,6 +7,7 @@ import com.kieslingdev.mindscale.data.Entry
 import com.kieslingdev.mindscale.data.EntryDao
 import com.kieslingdev.mindscale.data.MarkerDao
 import com.kieslingdev.mindscale.data.SleepDao
+import com.kieslingdev.mindscale.data.TrackSettingsDao
 import java.time.LocalDate
 import java.time.ZoneId
 import kotlinx.coroutines.CancellationException
@@ -47,7 +48,8 @@ class LogViewModel(
     private val markerDao: MarkerDao,
     private val savedStateHandle: SavedStateHandle = SavedStateHandle(),
     private val zoneProvider: () -> ZoneId = ZoneId::systemDefault,
-    private val nowProvider: () -> Long = System::currentTimeMillis
+    private val nowProvider: () -> Long = System::currentTimeMillis,
+    private val settingsDao: TrackSettingsDao? = null
 ) : ViewModel() {
 
     private val initialFilter = LogFilter(
@@ -95,6 +97,11 @@ class LogViewModel(
                         }
                     }
                 }
+        }
+        settingsDao?.let { dao ->
+            viewModelScope.launch {
+                dao.observe().collect { settings -> _uiState.update { it.copy(settings = settings) } }
+            }
         }
         viewModelScope.launch {
             combine(

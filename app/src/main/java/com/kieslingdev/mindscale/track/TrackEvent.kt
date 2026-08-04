@@ -37,4 +37,5 @@ sealed interface TrackEvent {
     data object CheckinPauseRequested : TrackEvent
     data object ResumeTracking : TrackEvent
     data object ToastDismissed : TrackEvent
+    data object AnchorPromptDone : TrackEvent
 }

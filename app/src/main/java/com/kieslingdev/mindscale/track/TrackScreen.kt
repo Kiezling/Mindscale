@@ -2,7 +2,6 @@ package com.kieslingdev.mindscale.track
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -50,6 +49,9 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kieslingdev.mindscale.data.Entry
 import com.kieslingdev.mindscale.data.EntryKind
+import com.kieslingdev.mindscale.data.HourFormat
+import com.kieslingdev.mindscale.settings.SettingsFocus
+import com.kieslingdev.mindscale.settings.vocabularyForEntry
 import com.kieslingdev.mindscale.ui.theme.intensityColor
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -69,8 +71,10 @@ private val NumpadRows = listOf(
 )
 private val NumpadEdgeKeys = listOf(0, 10)
 
-private val EntryDateTimeFormatter: DateTimeFormatter =
+private val EntryDateTimeTwelveHourFormatter: DateTimeFormatter =
     DateTimeFormatter.ofPattern("MMM d, yyyy 'at' h:mm a")
+private val EntryDateTimeTwentyFourHourFormatter: DateTimeFormatter =
+    DateTimeFormatter.ofPattern("MMM d, yyyy 'at' HH:mm")
 private val DraftDateFormatter: DateTimeFormatter = DateTimeFormatter.ISO_LOCAL_DATE
 private val DraftTimeFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
 
@@ -81,12 +85,14 @@ private val DraftTimeFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern(
 @Composable
 fun TrackRoute(
     viewModel: TrackViewModel,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onOpenSettings: (SettingsFocus) -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     TrackScreen(
         uiState = uiState,
         onEvent = viewModel::onEvent,
+        onOpenSettings = onOpenSettings,
         modifier = modifier
     )
 }
@@ -98,7 +104,8 @@ fun TrackRoute(
 fun TrackScreen(
     uiState: TrackUiState,
     onEvent: (TrackEvent) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onOpenSettings: (SettingsFocus) -> Unit = {}
 ) {
     Box(modifier = modifier.fillMaxSize()) {
         LazyColumn(
@@ -116,11 +123,22 @@ fun TrackScreen(
             // down regardless of isPaused.
             if (uiState.isPaused) {
                 item {
-                    PausedBanner(onEvent = onEvent)
+                    PausedBanner(onEvent = onEvent, onOpenData = { onOpenSettings(SettingsFocus.DATA) })
                 }
             } else {
                 item {
                     TransientReadoutBanner(uiState.transientReadout)
+                }
+                if (uiState.showAnchorPrompt) {
+                    item {
+                        AnchorPrompt(
+                            onSet = {
+                                onEvent(TrackEvent.AnchorPromptDone)
+                                onOpenSettings(SettingsFocus.ANCHORS)
+                            },
+                            onDismiss = { onEvent(TrackEvent.AnchorPromptDone) }
+                        )
+                    }
                 }
                 item {
                     HelpToggle(helpOpen = uiState.helpOpen, onEvent = onEvent)
@@ -136,7 +154,11 @@ fun TrackScreen(
                 }
                 if (uiState.onsetChipPrompt != null) {
                     item {
-                        OnsetChipCard(prompt = uiState.onsetChipPrompt, onEvent = onEvent)
+                        OnsetChipCard(
+                            prompt = uiState.onsetChipPrompt,
+                            vocabulary = uiState.settings.onsetChips,
+                            onEvent = onEvent
+                        )
                     }
                 }
                 if (uiState.sleepOn) {
@@ -158,7 +180,12 @@ fun TrackScreen(
                 item { EmptyState() }
             } else {
                 items(uiState.recentEntries, key = { it.id }) { entry ->
-                    EntryRow(entry = entry, onEvent = onEvent)
+                    EntryRow(
+                        entry = entry,
+                        onEvent = onEvent,
+                        hideNote = uiState.settings.hideNotes,
+                        hourFormat = uiState.settings.hourFormat
+                    )
                 }
             }
         }
@@ -168,7 +195,11 @@ fun TrackScreen(
         BackdateDialog(state = dialog, onEvent = onEvent)
     }
     uiState.editDialog?.let { dialog ->
-        EditDialog(state = dialog, onEvent = onEvent)
+        EditDialog(
+            state = dialog,
+            vocabulary = vocabularyForEntry(uiState.settings, dialog.chips),
+            onEvent = onEvent
+        )
     }
     uiState.noteDialog?.let { dialog ->
         NoteDialog(state = dialog, onEvent = onEvent)
@@ -201,7 +232,11 @@ private fun ToastBanner(toast: String?) {
 }
 
 @Composable
-private fun PausedBanner(onEvent: (TrackEvent) -> Unit, modifier: Modifier = Modifier) {
+private fun PausedBanner(
+    onEvent: (TrackEvent) -> Unit,
+    onOpenData: () -> Unit,
+    modifier: Modifier = Modifier
+) {
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
         shape = RoundedCornerShape(14.dp),
@@ -221,6 +256,9 @@ private fun PausedBanner(onEvent: (TrackEvent) -> Unit, modifier: Modifier = Mod
                     .testTag("resume_tracking_button")
                     .semantics { contentDescription = "Start tracking again" }
             ) { Text("Start again") }
+            TextButton(onClick = onOpenData, modifier = Modifier.testTag("paused_data_button")) {
+                Text("Export or delete")
+            }
         }
     }
 }
@@ -275,6 +313,7 @@ private fun HelpCard(modifier: Modifier = Modifier) {
 @Composable
 private fun OnsetChipCard(
     prompt: OnsetChipPromptState,
+    vocabulary: List<String>,
     onEvent: (TrackEvent) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -288,7 +327,7 @@ private fun OnsetChipCard(
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(text = "What was happening?", style = MaterialTheme.typography.labelSmall)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                DEFAULT_ONSET_CHIPS.forEach { chip ->
+                vocabulary.forEach { chip ->
                     val selected = chip in prompt.selected
                     FilterChip(
                         selected = selected,
@@ -317,6 +356,24 @@ private fun OnsetChipCard(
 }
 
 @Composable
+private fun AnchorPrompt(onSet: () -> Unit, onDismiss: () -> Unit) {
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        shape = RoundedCornerShape(14.dp),
+        modifier = Modifier.fillMaxWidth().testTag("anchor_prompt")
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Make the numbers yours", style = MaterialTheme.typography.titleSmall)
+            Text("A few personal examples can help your ratings stay consistent over time.")
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                TextButton(onClick = onSet, modifier = Modifier.testTag("set_anchors")) { Text("Set anchors") }
+                TextButton(onClick = onDismiss, modifier = Modifier.testTag("dismiss_anchors")) { Text("Not now") }
+            }
+        }
+    }
+}
+
+@Composable
 private fun SleepWakeRow(uiState: TrackUiState, onEvent: (TrackEvent) -> Unit) {
     val armed = uiState.armedCapture
     val openInterval = uiState.openSleepInterval
@@ -326,7 +383,7 @@ private fun SleepWakeRow(uiState: TrackUiState, onEvent: (TrackEvent) -> Unit) {
     ) {
         val sleepDescription = when {
             armed == EntryKind.SLEEP -> "Sleep armed. Tap a number to log falling asleep."
-            openInterval != null -> "Asleep since ${formatClockTime(openInterval.startTs)}"
+            openInterval != null -> "Asleep since ${formatClockTime(openInterval.startTs, uiState.settings.hourFormat)}"
             else -> "Mark falling asleep. Then tap how you felt."
         }
         TextButton(
@@ -436,15 +493,23 @@ private fun TransientReadoutBanner(readout: ReadoutState?) {
         shape = RoundedCornerShape(12.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
-        Text(
-            text = "${readout.value} · ${readout.band}",
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier
-                .padding(12.dp)
-                .semantics {
-                    contentDescription = "Logged ${readout.value}, ${readout.band}"
+        Column(modifier = Modifier.padding(12.dp)) {
+            Text(
+                text = "${readout.value} · ${readout.band}",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.semantics {
+                    contentDescription = "Logged ${readout.value}, ${readout.band}" +
+                        if (readout.anchor.isBlank()) "" else ", ${readout.anchor}"
                 }
-        )
+            )
+            if (readout.anchor.isNotBlank()) {
+                Text(
+                    readout.anchor,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.testTag("readout_anchor")
+                )
+            }
+        }
     }
 }
 
@@ -571,15 +636,20 @@ private fun entryKindBadge(entry: Entry): String? {
 private fun EntryRow(
     entry: Entry,
     onEvent: (TrackEvent) -> Unit,
+    hideNote: Boolean,
+    hourFormat: HourFormat,
     modifier: Modifier = Modifier
 ) {
-    val isDark = isSystemInDarkTheme()
+    val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
     val color = intensityColor(entry.value, isDark)
     val bandText = band(entry.value)
-    val formatted = remember(entry.ts) {
+    val formatted = remember(entry.ts, hourFormat) {
         java.time.Instant.ofEpochMilli(entry.ts)
             .atZone(ZoneId.systemDefault())
-            .format(EntryDateTimeFormatter)
+            .format(
+                if (hourFormat == HourFormat.TWENTY_FOUR) EntryDateTimeTwentyFourHourFormatter
+                else EntryDateTimeTwelveHourFormatter
+            )
     }
     val onColor = if (color.luminance() > 0.5f) Color.Black else Color.White
     val badge = entryKindBadge(entry)
@@ -625,7 +695,7 @@ private fun EntryRow(
                     )
                 }
                 val note = entry.note
-                if (!note.isNullOrBlank()) {
+                if (!hideNote && !note.isNullOrBlank()) {
                     Text(
                         text = note,
                         style = MaterialTheme.typography.bodySmall,
@@ -666,10 +736,14 @@ private fun tryParseTimestamp(dateText: String, timeText: String, zone: ZoneId):
         null
     }
 
-private val ClockTimeFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("h:mm a")
+private val ClockTimeTwelveHourFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("h:mm a")
+private val ClockTimeTwentyFourHourFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
 
-private fun formatClockTime(epochMillis: Long): String =
-    java.time.Instant.ofEpochMilli(epochMillis).atZone(ZoneId.systemDefault()).format(ClockTimeFormatter)
+private fun formatClockTime(epochMillis: Long, hourFormat: HourFormat): String =
+    java.time.Instant.ofEpochMilli(epochMillis).atZone(ZoneId.systemDefault()).format(
+        if (hourFormat == HourFormat.TWENTY_FOUR) ClockTimeTwentyFourHourFormatter
+        else ClockTimeTwelveHourFormatter
+    )
 
 /**
  * Shared timestamp-edit dialog body for the backdate and edit flows. Draft date/time
@@ -693,7 +767,8 @@ private fun TimestampEditDialog(
     onSave: () -> Unit,
     onCancel: () -> Unit,
     chips: Set<String>? = null,
-    onChipToggled: ((String) -> Unit)? = null
+    onChipToggled: ((String) -> Unit)? = null,
+    vocabulary: List<String> = DEFAULT_ONSET_CHIPS
 ) {
     val zone = remember { ZoneId.systemDefault() }
     var dateText by rememberSaveable {
@@ -755,7 +830,7 @@ private fun TimestampEditDialog(
                         modifier = Modifier.padding(top = 8.dp)
                     )
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        DEFAULT_ONSET_CHIPS.forEach { chip ->
+                        vocabulary.forEach { chip ->
                             val selected = chip in chips
                             FilterChip(
                                 selected = selected,
@@ -800,7 +875,11 @@ private fun BackdateDialog(state: BackdateDialogState, onEvent: (TrackEvent) -> 
 }
 
 @Composable
-private fun EditDialog(state: EditEntryState, onEvent: (TrackEvent) -> Unit) {
+private fun EditDialog(
+    state: EditEntryState,
+    vocabulary: List<String>,
+    onEvent: (TrackEvent) -> Unit
+) {
     TimestampEditDialog(
         title = "Edit entry",
         value = state.value,
@@ -811,7 +890,8 @@ private fun EditDialog(state: EditEntryState, onEvent: (TrackEvent) -> Unit) {
         onSave = { onEvent(TrackEvent.EditSaveConfirmed) },
         onCancel = { onEvent(TrackEvent.EditCancelled) },
         chips = state.chips,
-        onChipToggled = { onEvent(TrackEvent.EditChipToggled(it)) }
+        onChipToggled = { onEvent(TrackEvent.EditChipToggled(it)) },
+        vocabulary = vocabulary
     )
 }
 

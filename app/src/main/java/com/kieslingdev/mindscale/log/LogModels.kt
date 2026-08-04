@@ -3,6 +3,7 @@ package com.kieslingdev.mindscale.log
 import com.kieslingdev.mindscale.data.Entry
 import com.kieslingdev.mindscale.data.Marker
 import com.kieslingdev.mindscale.data.SleepInterval
+import com.kieslingdev.mindscale.data.TrackSettings
 import java.time.LocalDate
 
 sealed interface LogItem {
@@ -59,5 +60,6 @@ data class LogUiState(
     val noteDraft: LogNoteDraft? = null,
     val deleteTarget: LogDeleteTarget? = null,
     val message: String? = null,
-    val readError: String? = null
+    val readError: String? = null,
+    val settings: TrackSettings = TrackSettings()
 )

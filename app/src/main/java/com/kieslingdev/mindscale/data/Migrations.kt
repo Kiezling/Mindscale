@@ -42,3 +42,18 @@ val MIGRATION_1_2: Migration = object : Migration(1, 2) {
         )
     }
 }
+
+/** Phase 4 additive-only settings expansion. Existing records and columns are untouched. */
+val MIGRATION_2_3: Migration = object : Migration(2, 3) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        val encodedDefaults = DEFAULT_ONSET_CHIPS.joinToString("\u001F").replace("'", "''")
+        db.execSQL("ALTER TABLE track_settings ADD COLUMN themeMode TEXT NOT NULL DEFAULT 'SYSTEM'")
+        db.execSQL("ALTER TABLE track_settings ADD COLUMN hourFormat TEXT NOT NULL DEFAULT 'TWELVE'")
+        db.execSQL("ALTER TABLE track_settings ADD COLUMN anchor2 TEXT NOT NULL DEFAULT ''")
+        db.execSQL("ALTER TABLE track_settings ADD COLUMN anchor5 TEXT NOT NULL DEFAULT ''")
+        db.execSQL("ALTER TABLE track_settings ADD COLUMN anchor8 TEXT NOT NULL DEFAULT ''")
+        db.execSQL("ALTER TABLE track_settings ADD COLUMN onsetChips TEXT NOT NULL DEFAULT '$encodedDefaults'")
+        db.execSQL("ALTER TABLE track_settings ADD COLUMN hideNotes INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE track_settings ADD COLUMN anchorPromptDone INTEGER NOT NULL DEFAULT 0")
+    }
+}

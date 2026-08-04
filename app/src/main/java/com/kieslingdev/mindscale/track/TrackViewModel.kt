@@ -12,6 +12,7 @@ import com.kieslingdev.mindscale.data.SleepCaptureOutcome
 import com.kieslingdev.mindscale.data.SleepDao
 import com.kieslingdev.mindscale.data.TrackSettings
 import com.kieslingdev.mindscale.data.TrackSettingsDao
+import com.kieslingdev.mindscale.data.HourFormat
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -51,7 +52,8 @@ private const val MARKER_SAVED_TOAST = "Event marked"
 private const val MARKER_OPEN_KEY = "track.markerOpen"
 private const val MARKER_DRAFT_KEY = "track.markerDraft"
 
-private val ToastTimeFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("h:mm a")
+private val TwelveHourTimeFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("h:mm a")
+private val TwentyFourHourTimeFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
 
 class TrackViewModel(
     private val entryDao: EntryDao,
@@ -87,7 +89,10 @@ class TrackViewModel(
                             isEmpty = count == 0,
                             sleepOn = settings.sleepOn,
                             isPaused = settings.paused,
-                            showCheckin = computeShowCheckin(settings, count)
+                            showCheckin = computeShowCheckin(settings, count),
+                            settings = settings,
+                            showAnchorPrompt = count >= 15 && !settings.anchorPromptDone &&
+                                settings.anchor2.isBlank() && settings.anchor5.isBlank() && settings.anchor8.isBlank()
                         )
                     }
                 }
@@ -135,6 +140,7 @@ class TrackViewModel(
             TrackEvent.CheckinPauseRequested -> handleCheckinPauseRequested()
             TrackEvent.ResumeTracking -> handleResumeTracking()
             TrackEvent.ToastDismissed -> handleToastDismissed()
+            TrackEvent.AnchorPromptDone -> viewModelScope.launch { settingsDao.setAnchorPromptDone(true) }
         }
     }
 
@@ -146,7 +152,12 @@ class TrackViewModel(
         val expiresAt = now + READOUT_DURATION_MILLIS
         _uiState.update {
             it.copy(
-                transientReadout = ReadoutState(value, band(value), expiresAt),
+                transientReadout = ReadoutState(
+                    value,
+                    band(value),
+                    expiresAt,
+                    anchorFor(value, it.settings)
+                ),
                 helpOpen = false,
                 armedCapture = null
             )
@@ -250,7 +261,7 @@ class TrackViewModel(
         viewModelScope.launch {
             val settings = settingsDao.observe().first()
             if (!settings.sleepIntroShown) {
-                settingsDao.update(settings.copy(sleepIntroShown = true))
+                settingsDao.setSleepIntroShown(true)
                 setToast(SLEEP_INTRO_TOAST)
             } else {
                 setToast(armedToast)
@@ -400,22 +411,19 @@ class TrackViewModel(
 
     private fun handleCheckinStillUseful() {
         viewModelScope.launch {
-            val settings = settingsDao.observe().first()
-            settingsDao.update(settings.copy(checkinAt = nowProvider()))
+            settingsDao.recordCheckin(nowProvider(), paused = false)
         }
     }
 
     private fun handleCheckinPauseRequested() {
         viewModelScope.launch {
-            val settings = settingsDao.observe().first()
-            settingsDao.update(settings.copy(checkinAt = nowProvider(), paused = true))
+            settingsDao.recordCheckin(nowProvider(), paused = true)
         }
     }
 
     private fun handleResumeTracking() {
         viewModelScope.launch {
-            val settings = settingsDao.observe().first()
-            settingsDao.update(settings.copy(paused = false))
+            settingsDao.setPaused(false)
         }
     }
 
@@ -434,8 +442,21 @@ class TrackViewModel(
         }
     }
 
-    private fun formatTime(epochMillis: Long): String =
-        ToastTimeFormatter.format(Instant.ofEpochMilli(epochMillis).atZone(ZoneId.systemDefault()))
+    private fun formatTime(epochMillis: Long): String {
+        val formatter = if (_uiState.value.settings.hourFormat == HourFormat.TWENTY_FOUR) {
+            TwentyFourHourTimeFormatter
+        } else {
+            TwelveHourTimeFormatter
+        }
+        return formatter.format(Instant.ofEpochMilli(epochMillis).atZone(ZoneId.systemDefault()))
+    }
+
+    private fun anchorFor(value: Int, settings: TrackSettings): String = when (value) {
+        in 1..3 -> settings.anchor2
+        in 4..6 -> settings.anchor5
+        in 7..10 -> settings.anchor8
+        else -> ""
+    }.trim()
 
     private fun formatDuration(millis: Long): String {
         val totalMinutes = millis / 60_000L

@@ -8,15 +8,16 @@ Build MindScale as a native Android application using Kotlin, Jetpack Compose, M
 
 The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716ca7343`: `SPEC.md` is the rationale and `MindScale v2.dc.html` is the visual/behavioral reference for Track, Full Log, Insights, Report, Safety card, Profile, and Settings. A local exported handoff is available at `C:\Users\mckie\Downloads\MindScale-handoff\mindscale\project\`; its `MindScale v2.dc.html` is the primary implementation reference. Repository specs under `docs/specs/` govern native implementation after human approval.
 
-## Current phase: Phase 3 implemented and verified; awaiting commit approval
+## Current phase: Phase 4 implemented and verified; awaiting commit approval
 
 - Branch: `main`
-- Current committed checkpoint: `4cf9f068d42a0c906b76ddac460d4b5e907410d3` (`Implement Phase 2 track completeness`)
+- Current committed checkpoint: `87eb817713a459fd231ce77169dfa522b249f641` (`Implement Phase 3 full log`)
 - Upstream: `origin/main` at the same commit; remote is `https://github.com/Kiezling/Mindscale.git`
 - Phase 1 spec: `docs/specs/SPEC-track-numpad-logging.md` — `IMPLEMENTED`
 - Phase 2 spec: `docs/specs/SPEC-track-phase2-completeness.md` — `IMPLEMENTED`
 - Phase 3 spec: `docs/specs/SPEC-full-log.md` — `IMPLEMENTED` on 2026-08-03
-- Current worktree: verified Phase 3 implementation and documentation are uncommitted; the committed/upstream checkpoint remains Phase 2 until the user explicitly requests a commit
+- Phase 4 spec: `docs/specs/SPEC-settings-data-control.md` — `IMPLEMENTED` on 2026-08-03/04; D-1 through D-9 remain frozen
+- Current worktree: complete, verified Phase 4 implementation/spec/schema/tests are uncommitted; the committed/upstream checkpoint remains Phase 3
 
 ## Environment
 
@@ -64,10 +65,20 @@ The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716c
 - Refactored Track's edit/note/delete path onto the same targeted DAO mutations, eliminating stale full-row overwrites without changing Track behavior.
 - Critical review corrected a terminal read-error collector, action semantics swallowed by a merged row, filtered-empty wording, and mutation UI closing before Room confirmed success.
 - Kept Room at schema version 2; no migration, new toolchain dependency, paging library, navigation library, or DI framework was introduced.
+- Committed and pushed as `87eb817713a459fd231ce77169dfa522b249f641` (`Implement Phase 3 full log`).
+
+### Phase 4 — Settings, anchors, and data control
+
+- Added additive Room migration 2→3, exported schema 3, appearance/time enums, anchors, custom onset vocabulary, note-preview privacy, and one-shot anchor-prompt state.
+- Replaced production full-row settings writes with targeted mutations and added a transactional guard that refuses to hide Sleep/Wake while an interval is open.
+- Added a reachable Settings overlay that returns to Track or Log, deep links from the paused/anchor cards, and state restoration for destination, focus, and drafts.
+- Applied the gold/ink Light/Dark/System theme globally and removed dynamic wallpaper colors; 12/24-hour mode now reaches Track feedback/history and Full Log.
+- Added deterministic version-3 JSON backup and RFC-4180 CSV export through `CreateDocument`, with no storage permission, plus export-first atomic erase/reset.
+- Critical review fixed an untappable status-bar-overlapped Settings action, retained encoded exports for write retry, and made word de-duplication locale-independent.
 
 ## Active blocker
 
-None. Phase 3 is implemented and fully verified. It is intentionally uncommitted until the user explicitly approves commit/push. D-9 option A remains in force: keep the existing native theme for Phase 3 and apply gold/ink tokens consistently in the later global brand phase.
+None. Phase 4 is implemented and fully verified. It remains intentionally uncommitted until the user explicitly authorizes a Phase 4 commit and push.
 
 ## Known decisions
 
@@ -81,15 +92,14 @@ None. Phase 3 is implemented and fully verified. It is intentionally uncommitted
 
 ## Next tasks
 
-1. User reviews the running Phase 3 result or requests adjustments.
-2. On explicit approval only, commit the complete Phase 3 diff and push `main` to `origin/main`.
+1. User reviews the running Phase 4 Settings/data-control result or requests adjustments.
+2. On explicit approval only, commit the complete Phase 4 diff and push `main` to `origin/main`.
 3. Select and approve the next bounded product phase before changing application code.
-4. Before later Settings/Profile work, reconcile the template purple/dynamic-color theme with the design's gold/ink brand tokens.
-5. Continue backlog items in `docs/specs/BACKLOG.md` only when their governing phase is approved.
+4. Keep Insights, Profile/Report/Safety, import, biometrics, breathing, and other deferred controls out of Phase 4.
 
 ## Last verification
 
-Phase 3 final pre-commit verification completed 2026-08-03 from `S:\Android\AndroidProjects\MindScale`:
+Phase 4 final pre-commit verification completed 2026-08-03/04 from `S:\Android\AndroidProjects\MindScale`:
 
 ```powershell
 .\gradlew.bat test
@@ -102,21 +112,22 @@ git diff --check
 
 Results:
 
-- Unit tests: 80/80 passed; 0 failures, 0 errors, 0 skipped.
-- Lint: passed with 0 errors and 22 existing template/dependency-version warnings.
+- Unit tests: 89/89 passed; 0 failures, 0 errors, 0 skipped.
+- Lint: passed with 0 errors and 22 existing template/dependency/toolchain warnings; the two Phase 4 modifier-order warnings found during review were fixed.
 - Debug assembly: passed.
 - Intended device: `emulator-5554`, `MindScale_API_36`.
-- Instrumented tests: 51/51 passed with 0 failures and 0 skipped, including existing Phase 1/2 regressions, real Room DAO bounds/mutations, mixed Full Log Compose coverage, Track/Log navigation, and recreation.
+- Instrumented tests: 59/59 passed with 0 failures and 0 skipped, including Room 1→3/2→3 migration, settings mutations/open-sleep guard, snapshot/erase, Phase 1–3 regressions, Settings navigation, and recreation.
 - Diff check: passed; only harmless line-ending notices were emitted.
-- Manual installed-app walkthrough used mixed seeded records and confirmed ordering, numeric ratings, Sleep badge/interval duration, marker, chips/note, inline edit persistence, distinct actions, native date picker, rotation retention, clean process relaunch, and Back-to-Track behavior. The temporary instrumentation seeder was removed before final scope inspection.
-- Current commit/upstream remain `4cf9f068d42a0c906b76ddac460d4b5e907410d3`; Phase 3 is not committed or pushed.
+- Manual installed-app walkthrough confirmed physical Settings touch after status-bar inset correction, all upper/lower sections, real JSON and CSV writes through DocumentsUI, neutral picker cancellation, and the export-first erase confirmation. The destructive confirmation was canceled.
+- Emulator Downloads contains three harmless empty-state verification artifacts: two version-3 JSON backups and one CSV records file.
+- Phase 3 checkpoint is `87eb817713a459fd231ce77169dfa522b249f641`; local `main` and `origin/main` match.
 
 ## Known coverage gaps and backlog
 
 - Phase 1 backdate/edit/note dialog-open state still needs a dedicated true process-recreation correction; see `docs/specs/BACKLOG.md`.
-- No Settings UI yet exposes Phase 2's `sleepOn`, `askChips`, paused/check-in, or custom vocabulary controls.
+- JSON/CSV import remains deferred; Phase 4 exports are one-way until a separately approved validation/merge/rollback spec exists.
 - The approved time-weighted/hold/auto-end episode model remains unimplemented and must reconcile Phase 2's simplified onset rule.
-- Brand theming remains the template Material 3 palette until its approved phase.
+- Gold/ink theming is implemented; approved typography assets remain a future design decision.
 - Full Log import/export and clinician-report data actions remain deferred; no inert controls are shown.
 
 ## Handoff checklist

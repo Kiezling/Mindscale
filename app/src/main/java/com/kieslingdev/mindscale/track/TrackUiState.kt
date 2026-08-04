@@ -3,6 +3,7 @@ package com.kieslingdev.mindscale.track
 import com.kieslingdev.mindscale.data.Entry
 import com.kieslingdev.mindscale.data.EntryKind
 import com.kieslingdev.mindscale.data.SleepInterval
+import com.kieslingdev.mindscale.data.TrackSettings
 
 data class TrackUiState(
     val recentEntries: List<Entry> = emptyList(),
@@ -22,10 +23,17 @@ data class TrackUiState(
     val markerDraft: String = "",
     val isPaused: Boolean = false,
     val showCheckin: Boolean = false,
-    val toast: String? = null
+    val toast: String? = null,
+    val settings: TrackSettings = TrackSettings(),
+    val showAnchorPrompt: Boolean = false
 )
 
-data class ReadoutState(val value: Int, val band: String, val expiresAtMillis: Long)
+data class ReadoutState(
+    val value: Int,
+    val band: String,
+    val expiresAtMillis: Long,
+    val anchor: String = ""
+)
 data class BackdateDialogState(val value: Int, val timestampMillis: Long, val error: String? = null)
 
 data class OnsetChipPromptState(val entryId: Long, val selected: Set<String> = emptySet())

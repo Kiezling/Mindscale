@@ -9,15 +9,16 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
     entities = [Entry::class, SleepInterval::class, Marker::class, TrackSettings::class],
-    version = 2,
+    version = 3,
     exportSchema = true
 )
-@TypeConverters(ChipsConverter::class, EntryKindConverter::class)
+@TypeConverters(ChipsConverter::class, EntryKindConverter::class, SettingsConverters::class)
 abstract class MindScaleDatabase : RoomDatabase() {
     abstract fun entryDao(): EntryDao
     abstract fun sleepDao(): SleepDao
     abstract fun markerDao(): MarkerDao
     abstract fun trackSettingsDao(): TrackSettingsDao
+    abstract fun dataControlDao(): DataControlDao
 
     companion object {
         const val NAME = "mindscale.db"
@@ -33,8 +34,10 @@ abstract class MindScaleDatabase : RoomDatabase() {
             override fun onCreate(db: SupportSQLiteDatabase) {
                 super.onCreate(db)
                 db.execSQL(
-                    "INSERT INTO track_settings (id, sleepOn, askChips, paused, checkinAt, sleepIntroShown) " +
-                        "VALUES (0, 1, 0, 0, 0, 0)"
+                    "INSERT INTO track_settings (id, sleepOn, askChips, paused, checkinAt, sleepIntroShown, " +
+                        "themeMode, hourFormat, anchor2, anchor5, anchor8, onsetChips, hideNotes, anchorPromptDone) " +
+                        "VALUES (0, 1, 0, 0, 0, 0, 'SYSTEM', 'TWELVE', '', '', '', " +
+                        "'${DEFAULT_ONSET_CHIPS.joinToString("\u001F").replace("'", "''")}', 0, 0)"
                 )
             }
         }
@@ -42,7 +45,7 @@ abstract class MindScaleDatabase : RoomDatabase() {
         /** Manual singleton construction (no DI framework, per Invariant 11 / D-3). */
         fun build(context: Context): MindScaleDatabase =
             Room.databaseBuilder(context.applicationContext, MindScaleDatabase::class.java, NAME)
-                .addMigrations(MIGRATION_1_2)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                 .addCallback(seedSettingsCallback)
                 .build()
     }

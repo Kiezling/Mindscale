@@ -1,57 +1,55 @@
 package com.kieslingdev.mindscale.ui.theme
 
-import android.app.Activity
-import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.Color
+import com.kieslingdev.mindscale.data.ThemeMode
 
 private val DarkColorScheme = darkColorScheme(
-    primary = Purple80,
-    secondary = PurpleGrey80,
-    tertiary = Pink80
+    primary = MindScaleDarkGold,
+    onPrimary = Color(0xFF2A1E0A),
+    primaryContainer = MindScaleDarkGoldContainer,
+    onPrimaryContainer = MindScaleDarkInk,
+    secondary = MindScaleDarkGold,
+    secondaryContainer = Color(0xFF342B1D),
+    background = MindScaleDarkBackground,
+    onBackground = MindScaleDarkInk,
+    surface = MindScaleDarkSurface,
+    onSurface = MindScaleDarkInk,
+    surfaceVariant = Color(0xFF26211B),
+    onSurfaceVariant = Color(0xFFD5CEC2)
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = Purple40,
-    secondary = PurpleGrey40,
-    tertiary = Pink40
-
-    /* Other default colors to override
-    background = Color(0xFFFFFBFE),
-    surface = Color(0xFFFFFBFE),
+    primary = MindScaleLightGold,
     onPrimary = Color.White,
-    onSecondary = Color.White,
-    onTertiary = Color.White,
-    onBackground = Color(0xFF1C1B1F),
-    onSurface = Color(0xFF1C1B1F),
-    */
+    primaryContainer = MindScaleLightGoldContainer,
+    onPrimaryContainer = MindScaleLightInk,
+    secondary = MindScaleLightGold,
+    secondaryContainer = Color(0xFFF4EAD7),
+    background = MindScaleLightBackground,
+    onBackground = MindScaleLightInk,
+    surface = MindScaleLightSurface,
+    onSurface = MindScaleLightInk,
+    surfaceVariant = Color(0xFFF3EFE8),
+    onSurfaceVariant = Color(0xFF5D554A)
 )
 
 @Composable
 fun MindScaleTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
-    // Dynamic color is available on Android 12+
-    dynamicColor: Boolean = true,
+    themeMode: ThemeMode = ThemeMode.SYSTEM,
     content: @Composable () -> Unit
 ) {
-    val colorScheme = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        }
-
-        darkTheme -> DarkColorScheme
-        else -> LightColorScheme
+    val darkTheme = when (themeMode) {
+        ThemeMode.SYSTEM -> isSystemInDarkTheme()
+        ThemeMode.LIGHT -> false
+        ThemeMode.DARK -> true
     }
-
     MaterialTheme(
-        colorScheme = colorScheme,
+        colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme,
         typography = Typography,
         content = content
     )
