@@ -8,7 +8,7 @@ Build MindScale as a native Android application using Kotlin, Jetpack Compose, M
 
 The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716ca7343`: `SPEC.md` is the rationale and `MindScale v2.dc.html` is the visual/behavioral reference for Track, Full Log, Insights, Report, Safety card, Profile, and Settings. A local exported handoff is available at `C:\Users\mckie\Downloads\MindScale-handoff\mindscale\project\`; its `MindScale v2.dc.html` is the primary implementation reference. Repository specs under `docs/specs/` govern native implementation after human approval.
 
-## Current phase: Phase 11 clinician summary and Profile foundation verified; publication in progress
+## Current phase: Phase 11 clinician summary and Profile foundation merged and complete
 
 - Phase 11 branch: `agent/phase11-clinician-report-profile`, created from synchronized `main` at `9d8cf4bd2dbd3834e2094c81f63e838d6348bdb5`
 - Starting synchronization: `HEAD`, local `main`, local `origin/main`, and live GitHub `refs/heads/main` all resolved to `9d8cf4bd2dbd3834e2094c81f63e838d6348bdb5` before branching
@@ -20,7 +20,10 @@ The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716c
 - Frozen documentation commit: `2019897655f9db5f143ef91c0707f16ba7c13cb8`; verified implementation commit: `cb469100b3b34fd3a8716428ff1448668af1cdcb`
 - Verification: 180/180 JVM tests, lint with 0 errors/22 unchanged warnings, debug assembly, confirmed API 36 emulator, 111/111 connected tests, `git diff --check`, installed-app/manual export/reset matrix, and one critical review with all five blocking findings resolved
 - Honest gaps: no actual share recipient was selected; provider-open/write failure was tested at the ViewModel boundary; TalkBack semantic order was tested but spoken audio was not manually audited
-- Exact next action: commit this verification state, push the branch, open/ready/verify/merge the PR at the exact head, fast-forward local `main`, and record the final phase boundary
+- Verification-state commit: `e020e3a18a8a4b2e552ede554986590499c52d7d`
+- Phase 11 PR #8 was opened as draft, marked ready, and verified mergeable at exact head `e020e3a18a8a4b2e552ede554986590499c52d7d`; no remote status checks were configured
+- PR #8 merged into `main` as `3dd139278bc3d190f720edd61112666f6129b564` on 2026-08-04; local `main`, `origin/main`, and live GitHub `refs/heads/main` matched that merge before this phase-boundary documentation commit
+- Exact next action after the phase boundary: leave JSON/CSV import/restore, Safety, and paced breathing unstarted until separately scoped and approved
 
 ### Phase 10 merged checkpoint
 
