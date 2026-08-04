@@ -8,7 +8,16 @@ Build MindScale as a native Android application using Kotlin, Jetpack Compose, M
 
 The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716ca7343`: `SPEC.md` is the rationale and `MindScale v2.dc.html` is the visual/behavioral reference for Track, Full Log, Insights, Report, Safety card, Profile, and Settings. A local exported handoff is available at `C:\Users\mckie\Downloads\MindScale-handoff\mindscale\project\`; its `MindScale v2.dc.html` is the primary implementation reference. Repository specs under `docs/specs/` govern native implementation after human approval.
 
-## Current phase: Phase 7 Track dialog restoration implemented and verified locally
+## Current phase: Phase 8 Insights onset-gap histogram specification drafted — awaiting approval
+
+- Branch: `agent/phase8-onset-gap-histogram`, created from synchronized `main` at `86bd313e47515bd81eded5e03796195a3b389bff`
+- Local `main`, local `origin/main`, and live GitHub `refs/heads/main` were verified at `86bd313e47515bd81eded5e03796195a3b389bff` before branch creation
+- Phase 8 draft spec: `docs/specs/SPEC-insights-onset-gap-histogram.md` — `DRAFT — AWAITING APPROVAL`; D-1 through D-10 are proposed, not frozen
+- Phase 8 reconciled boundary: one six-onset-minimum, ten-bucket, elapsed onset-to-onset gap histogram derived from the existing Phase 5 episode model; onset-time and sleep views remain deferred
+- Approval blocker: no application-code edit may begin until the user approves the complete Phase 8 spec and D-1 through D-10
+- Expected untracked paths remain `.agents/` and `.codex/`; they are excluded from product/documentation scope
+
+### Prior phase publication
 
 - Branch: `agent/phase7-track-dialog-restoration`, created from synchronized `main` at `372d1d3d91f7308ad35b8824c996bce641b0ce57`
 - Local `main`, its tracking ref, and live `origin/main` were verified at `372d1d3d91f7308ad35b8824c996bce641b0ce57` before the branch was created
@@ -104,7 +113,7 @@ The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716c
 
 ## Active blocker
 
-No active blocker. Phase 7 is implemented, fully verified locally, and merged into synchronized `main`.
+Phase 8 is approval-gated. The detailed specification and D-1 through D-10 must be approved before application-code edits begin.
 
 ## Known decisions
 
@@ -118,10 +127,18 @@ No active blocker. Phase 7 is implemented, fully verified locally, and merged in
 
 ## Next tasks
 
-1. Draft and approve the next bounded Insights specification from the remaining backlog; the likely Phase 8 candidate is an onset-gap histogram, but its sample refusal, bucket semantics, descriptive grammar, accessibility, and no-inference boundaries must be reconciled before implementation.
-2. Create the Phase 8 feature branch only after confirming clean synchronized `main`; continue excluding `.agents/` and `.codex/`.
+1. Obtain approval for `docs/specs/SPEC-insights-onset-gap-histogram.md` and proposed D-1 through D-10.
+2. After approval, freeze the spec, record D-008, and implement the pure histogram model/derivation tests first; continue excluding `.agents/` and `.codex/`.
 
 ## Last verification
+
+Phase 8 starting-state verification completed 2026-08-04 before specification edits:
+
+- `git status --short --branch` showed synchronized `main` with only the expected untracked `.agents/` and `.codex/` directories.
+- `HEAD`, local `main`, local `origin/main`, and live `git ls-remote origin refs/heads/main` all resolved to `86bd313e47515bd81eded5e03796195a3b389bff`.
+- A sandboxed `git fetch origin --prune` could not update `.git/FETCH_HEAD` because the sandbox exposes `.git` read-only, but the independent live `git ls-remote` check succeeded and matched every local ref.
+- Branch `agent/phase8-onset-gap-histogram` was created from that exact head.
+- No Gradle oracle was rerun because this approval-gated step changes documentation only; the merged Phase 7 application tree and its verification evidence below remain unchanged.
 
 Repository synchronization verified 2026-08-04 after Phase 7 publication:
 
