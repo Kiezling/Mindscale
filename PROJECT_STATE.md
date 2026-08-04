@@ -8,10 +8,11 @@ Build MindScale as a native Android application using Kotlin, Jetpack Compose, M
 
 The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716ca7343`: `SPEC.md` is the rationale and `MindScale v2.dc.html` is the visual/behavioral reference for Track, Full Log, Insights, Report, Safety card, Profile, and Settings. A local exported handoff is available at `C:\Users\mckie\Downloads\MindScale-handoff\mindscale\project\`; its `MindScale v2.dc.html` is the primary implementation reference. Repository specs under `docs/specs/` govern native implementation after human approval.
 
-## Current phase: Phase 8 Insights onset-gap histogram implemented and verified — publication ready
+## Current phase: Phase 8 Insights onset-gap histogram merged and complete
 
-- Branch: `agent/phase8-onset-gap-histogram`, created from synchronized `main` at `86bd313e47515bd81eded5e03796195a3b389bff`
-- Local `main`, local `origin/main`, and live GitHub `refs/heads/main` were verified at `86bd313e47515bd81eded5e03796195a3b389bff` before branch creation
+- Phase 8 branch: `agent/phase8-onset-gap-histogram`, created from synchronized `main` at `86bd313e47515bd81eded5e03796195a3b389bff`
+- Phase 8 PR #5 merged into `main` as `042376265cb801a4d8e80375b3eb7fff54c1d0aa` on 2026-08-04 (`2026-08-04T18:48:52Z`)
+- Local `main`, local `origin/main`, and live GitHub `refs/heads/main` are synchronized at `042376265cb801a4d8e80375b3eb7fff54c1d0aa`
 - Phase 8 spec: `docs/specs/SPEC-insights-onset-gap-histogram.md` — `IMPLEMENTED — VERIFIED LOCALLY`; D-1 through D-10 were frozen on 2026-08-04 before application-code edits
 - Phase 8 reconciled boundary: one six-onset-minimum, ten-bucket, elapsed onset-to-onset gap histogram derived from the existing Phase 5 episode model; onset-time and sleep views remain deferred
 - Approval gate satisfied: the user reiterated full project ownership and authorized all decisions, implementation, commits, pushes, and PRs without further approval
@@ -123,7 +124,7 @@ The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716c
 
 ## Active blocker
 
-No active blocker. Phase 8 is implemented, verified, and ready to publish and merge.
+No active blocker. Phase 8 is merged and complete.
 
 ## Known decisions
 
@@ -137,10 +138,17 @@ No active blocker. Phase 8 is implemented, verified, and ready to publish and me
 
 ## Next tasks
 
-1. Publish `agent/phase8-onset-gap-histogram`, open and merge the Phase 8 pull request into synchronized `main`.
-2. Record the Phase 8 merge checkpoint on `main`; continue excluding `.agents/` and `.codex/`.
+1. Reconcile the remaining onset-time and descriptive-sleep Insights backlog and select one bounded Phase 9 slice.
+2. Draft and freeze the Phase 9 specification before changing application code; continue excluding `.agents/` and `.codex/`.
 
 ## Last verification
+
+Repository synchronization verified 2026-08-04 after Phase 8 publication:
+
+- GitHub PR #5 merged `agent/phase8-onset-gap-histogram` into `main` as `042376265cb801a4d8e80375b3eb7fff54c1d0aa` at `2026-08-04T18:48:52Z`.
+- Local `main`, `origin/main`, and live `refs/heads/main` all resolved to `042376265cb801a4d8e80375b3eb7fff54c1d0aa` before this documentation-only merge checkpoint.
+- Phase 8 implementation commit `d2d546686d6ced87e98eea5c2e73ed66ee41138e` and verification-state commit `f63ae4d2ab1fbc4d8f8d8c9c79da86019d48de32` are ancestors of the merge.
+- No Android oracle was rerun for the merge or this documentation-only checkpoint; the complete Phase 8 verification evidence below applies to the merged application tree.
 
 Phase 8 final local verification completed 2026-08-04 for implementation commit `d2d546686d6ced87e98eea5c2e73ed66ee41138e` on `agent/phase8-onset-gap-histogram`:
 
