@@ -29,6 +29,7 @@ import kotlin.math.max
 
 private const val RANGE_KEY = "insights.range"
 private const val EXPLORED_KEY = "insights.exploredInstant"
+private const val CHART_EXPLORED_KEY = "insights.chartExploredInstant"
 private const val HOUR_MILLIS = 3_600_000L
 
 data class InsightsUiState(
@@ -36,8 +37,10 @@ data class InsightsUiState(
     val loading: Boolean = true,
     val snapshot: InsightsSnapshot? = null,
     val exploredInstantMillis: Long? = null,
+    val chartExploredInstantMillis: Long? = null,
     val hourFormat: HourFormat = HourFormat.TWELVE,
     val holdDuration: HoldDuration = HoldDuration.SIXTEEN,
+    val hideNotes: Boolean = false,
     val error: String? = null
 )
 
@@ -66,7 +69,8 @@ class InsightsViewModel(
     private val _uiState = MutableStateFlow(
         InsightsUiState(
             range = initialRange,
-            exploredInstantMillis = savedStateHandle[EXPLORED_KEY]
+            exploredInstantMillis = savedStateHandle[EXPLORED_KEY],
+            chartExploredInstantMillis = savedStateHandle[CHART_EXPLORED_KEY]
         )
     )
     val uiState: StateFlow<InsightsUiState> = _uiState.asStateFlow()
@@ -105,16 +109,22 @@ class InsightsViewModel(
             }
             val explored = _uiState.value.exploredInstantMillis
                 ?.coerceIn(snapshot.rangeStartMillis, snapshot.nowMillis)
+            val chartExplored = _uiState.value.chartExploredInstantMillis
+                ?.coerceIn(snapshot.rangeStartMillis, snapshot.nowMillis)
             if (explored == null) savedStateHandle.remove<Long>(EXPLORED_KEY)
             else savedStateHandle[EXPLORED_KEY] = explored
+            if (chartExplored == null) savedStateHandle.remove<Long>(CHART_EXPLORED_KEY)
+            else savedStateHandle[CHART_EXPLORED_KEY] = chartExplored
             _uiState.update {
                 it.copy(
                     range = range,
                     loading = false,
                     snapshot = snapshot,
                     exploredInstantMillis = explored,
+                    chartExploredInstantMillis = chartExplored,
                     hourFormat = read.settings.hourFormat,
                     holdDuration = read.settings.holdDuration,
+                    hideNotes = read.settings.hideNotes,
                     error = null
                 )
             }
@@ -143,7 +153,15 @@ class InsightsViewModel(
     fun selectRange(range: InsightRange) {
         savedStateHandle[RANGE_KEY] = range.name
         savedStateHandle.remove<Long>(EXPLORED_KEY)
-        _uiState.update { it.copy(range = range, exploredInstantMillis = null, loading = it.snapshot == null) }
+        savedStateHandle.remove<Long>(CHART_EXPLORED_KEY)
+        _uiState.update {
+            it.copy(
+                range = range,
+                exploredInstantMillis = null,
+                chartExploredInstantMillis = null,
+                loading = it.snapshot == null
+            )
+        }
         rangeFlow.value = range
     }
 
@@ -167,6 +185,41 @@ class InsightsViewModel(
         val current = Instant.ofEpochMilli(_uiState.value.exploredInstantMillis ?: snapshot.nowMillis)
             .atZone(zone)
         explore(current.plusDays(delta.toLong()).toInstant().toEpochMilli())
+        return true
+    }
+
+    fun exploreChart(instantMillis: Long) {
+        val snapshot = _uiState.value.snapshot ?: return
+        val clamped = instantMillis.coerceIn(snapshot.rangeStartMillis, snapshot.nowMillis)
+        savedStateHandle[CHART_EXPLORED_KEY] = clamped
+        _uiState.update { it.copy(chartExploredInstantMillis = clamped) }
+    }
+
+    fun moveChartHour(delta: Int): Boolean {
+        val snapshot = _uiState.value.snapshot ?: return false
+        val current = _uiState.value.chartExploredInstantMillis ?: snapshot.nowMillis
+        exploreChart(current + delta * HOUR_MILLIS)
+        return true
+    }
+
+    fun moveChartRating(delta: Int): Boolean = moveChartTarget(delta) { snapshot ->
+        snapshot.entryChart.segments.mapNotNull(EntryChartSegment::sourceEntryMillis).distinct().sorted()
+    }
+
+    fun moveChartMarker(delta: Int): Boolean = moveChartTarget(delta) { snapshot ->
+        snapshot.entryChart.markers.map(EntryChartMarker::atMillis).distinct().sorted()
+    }
+
+    private fun moveChartTarget(
+        delta: Int,
+        targets: (InsightsSnapshot) -> List<Long>
+    ): Boolean {
+        val snapshot = _uiState.value.snapshot ?: return false
+        val current = _uiState.value.chartExploredInstantMillis ?: snapshot.nowMillis
+        val target = if (delta < 0) targets(snapshot).lastOrNull { it < current }
+        else targets(snapshot).firstOrNull { it > current }
+        target ?: return false
+        exploreChart(target)
         return true
     }
 

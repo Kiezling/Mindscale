@@ -2,16 +2,21 @@ package com.kieslingdev.mindscale.insights
 
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.click
+import androidx.compose.ui.test.swipe
 import androidx.compose.ui.test.swipeUp
 import androidx.compose.ui.unit.dp
 import com.kieslingdev.mindscale.data.EpisodeSourceRow
@@ -22,6 +27,7 @@ import java.time.Instant
 import java.time.ZoneOffset
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
@@ -66,6 +72,7 @@ class InsightsScreenTest {
         composeTestRule.onNode(
             SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("Episodes, 1"))
         ).assertExists()
+        composeTestRule.onNodeWithTag("insights_screen").performScrollToNode(hasText("Each episode"))
         composeTestRule.onNodeWithText("Each episode").assertExists()
     }
 
@@ -93,6 +100,69 @@ class InsightsScreenTest {
     }
 
     @Test
+    fun entryChartTouchAndAccessibilityActionsUseOneExplorationSurface() {
+        var explored: Long? = null
+        var exploreCalls = 0
+        var previousEventCalls = 0
+        val state = InsightsUiState(
+            loading = false,
+            snapshot = snapshot(
+                listOf(entry(1, 0, 5), marker(2, HOUR, "dose change"), entry(3, 2 * HOUR, 0))
+            )
+        )
+        setContent(
+            state,
+            onExploreChart = { explored = it; exploreCalls++ },
+            onPreviousEvent = { previousEventCalls++; true }
+        )
+
+        val chart = composeTestRule.onNodeWithTag("entry_chart")
+            .assertHeightIsAtLeast(48.dp)
+            .assert(
+                SemanticsMatcher.expectValue(
+                    SemanticsProperties.StateDescription,
+                    "Touch or drag to read the chart"
+                )
+            )
+        val actions = chart.fetchSemanticsNode().config[SemanticsActions.CustomActions]
+        assertEquals(6, actions.size)
+        actions[4].action()
+        chart.performTouchInput { click(center) }
+        chart.performTouchInput {
+            swipe(
+                start = Offset(center.x * 0.8f, center.y),
+                end = Offset(center.x * 1.6f, center.y),
+                durationMillis = 500
+            )
+        }
+
+        assertEquals(1, previousEventCalls)
+        assertNotNull(explored)
+        assertTrue(exploreCalls > 1)
+    }
+
+    @Test
+    fun entryChartReadoutShowsChipsAndEventButHonorsHiddenNotes() {
+        val selected = HOUR
+        val state = InsightsUiState(
+            loading = false,
+            hideNotes = true,
+            chartExploredInstantMillis = selected,
+            snapshot = snapshot(
+                listOf(
+                    entry(1, 0, 5, chips = listOf("work"), note = "private note"),
+                    marker(2, selected, "dose change")
+                )
+            )
+        )
+        setContent(state)
+
+        composeTestRule.onNodeWithText("work", substring = true).assertExists()
+        composeTestRule.onNodeWithText("event: dose change", substring = true).assertExists()
+        composeTestRule.onNodeWithText("private note", substring = true).assertDoesNotExist()
+    }
+
+    @Test
     fun verticalSwipeOnThirtyDayRasterScrollsToFacts() {
         val rows = listOf(entry(1, 0, 5), entry(2, 2 * HOUR, 0))
         setContent(
@@ -103,11 +173,26 @@ class InsightsScreenTest {
             )
         )
 
-        repeat(2) {
-            composeTestRule.onNodeWithTag("raster_chart").performTouchInput { swipeUp() }
-        }
+        val list = composeTestRule.onNodeWithTag("insights_screen")
+        val before = list.fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange].value()
+        composeTestRule.onNodeWithTag("raster_chart").performTouchInput { swipeUp() }
+        val after = list.fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange].value()
 
-        composeTestRule.onNodeWithText("Each episode").assertExists()
+        assertTrue(after > before)
+    }
+
+    @Test
+    fun verticalSwipeOnEntryChartScrollsToEpisodeFacts() {
+        val rows = listOf(entry(1, 0, 5), entry(2, 2 * HOUR, 0))
+        setContent(InsightsUiState(loading = false, snapshot = snapshot(rows)))
+
+        val list = composeTestRule.onNodeWithTag("insights_screen")
+        list.performScrollToNode(hasTestTag("entry_chart"))
+        val before = list.fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange].value()
+        composeTestRule.onNodeWithTag("entry_chart").performTouchInput { swipeUp() }
+        val after = list.fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange].value()
+
+        assertTrue(after > before)
     }
 
     @Test
@@ -156,6 +241,8 @@ class InsightsScreenTest {
         onRangeSelected: (InsightRange) -> Unit = {},
         onExplore: (Long) -> Unit = {},
         onEarlierHour: () -> Boolean = { true },
+        onExploreChart: (Long) -> Unit = {},
+        onPreviousEvent: () -> Boolean = { true },
         onRetry: () -> Unit = {}
     ) {
         composeTestRule.setContent {
@@ -168,6 +255,13 @@ class InsightsScreenTest {
                     onLaterHour = { true },
                     onPreviousDay = { true },
                     onNextDay = { true },
+                    onExploreChart = onExploreChart,
+                    onEarlierChartHour = { true },
+                    onLaterChartHour = { true },
+                    onPreviousRating = { true },
+                    onNextRating = { true },
+                    onPreviousEvent = onPreviousEvent,
+                    onNextEvent = { true },
                     onRetry = onRetry,
                     zoneId = ZoneOffset.UTC
                 )
@@ -186,8 +280,16 @@ class InsightsScreenTest {
         range = range
     )
 
-    private fun entry(id: Long, ts: Long, value: Int) =
-        EpisodeSourceRow("ENTRY", id, ts, null, value, emptyList())
+    private fun entry(
+        id: Long,
+        ts: Long,
+        value: Int,
+        chips: List<String> = emptyList(),
+        note: String? = null
+    ) = EpisodeSourceRow("ENTRY", id, ts, null, value, chips, note = note)
+
+    private fun marker(id: Long, ts: Long, text: String) =
+        EpisodeSourceRow("MARKER", id, ts, null, null, null, text = text)
 
     private companion object { const val HOUR = 3_600_000L }
 }

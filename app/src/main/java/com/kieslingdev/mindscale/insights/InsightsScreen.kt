@@ -29,6 +29,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
@@ -41,6 +45,7 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
@@ -51,6 +56,7 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
+import kotlin.math.abs
 import kotlin.math.roundToLong
 
 @Composable
@@ -65,6 +71,13 @@ fun InsightsRoute(viewModel: InsightsViewModel, modifier: Modifier = Modifier) {
         onLaterHour = { viewModel.moveExplorationHour(1) },
         onPreviousDay = { viewModel.moveExplorationDay(-1) },
         onNextDay = { viewModel.moveExplorationDay(1) },
+        onExploreChart = viewModel::exploreChart,
+        onEarlierChartHour = { viewModel.moveChartHour(-1) },
+        onLaterChartHour = { viewModel.moveChartHour(1) },
+        onPreviousRating = { viewModel.moveChartRating(-1) },
+        onNextRating = { viewModel.moveChartRating(1) },
+        onPreviousEvent = { viewModel.moveChartMarker(-1) },
+        onNextEvent = { viewModel.moveChartMarker(1) },
         onRetry = viewModel::retry,
         modifier = modifier
     )
@@ -79,6 +92,13 @@ fun InsightsScreen(
     onLaterHour: () -> Boolean,
     onPreviousDay: () -> Boolean,
     onNextDay: () -> Boolean,
+    onExploreChart: (Long) -> Unit,
+    onEarlierChartHour: () -> Boolean,
+    onLaterChartHour: () -> Boolean,
+    onPreviousRating: () -> Boolean,
+    onNextRating: () -> Boolean,
+    onPreviousEvent: () -> Boolean,
+    onNextEvent: () -> Boolean,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
     zoneId: ZoneId = ZoneId.systemDefault()
@@ -181,6 +201,33 @@ fun InsightsScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+            }
+            item(key = "entry_chart") {
+                val chartReadout = uiState.chartExploredInstantMillis?.let {
+                    entryChartReadout(
+                        chart = snapshot.entryChart,
+                        instantMillis = it,
+                        hourFormat = uiState.hourFormat,
+                        zoneId = zoneId,
+                        hideNotes = uiState.hideNotes
+                    )
+                } ?: "Touch or drag to read the chart"
+                EntryChartSection(
+                    chart = snapshot.entryChart,
+                    selectedInstantMillis = uiState.chartExploredInstantMillis,
+                    readout = chartReadout,
+                    holdHours = uiState.holdDuration.hours,
+                    range = uiState.range,
+                    hourFormat = uiState.hourFormat,
+                    zoneId = zoneId,
+                    onExplore = onExploreChart,
+                    onEarlierHour = onEarlierChartHour,
+                    onLaterHour = onLaterChartHour,
+                    onPreviousRating = onPreviousRating,
+                    onNextRating = onNextRating,
+                    onPreviousEvent = onPreviousEvent,
+                    onNextEvent = onNextEvent
+                )
             }
             item(key = "facts_title") { Text("Episodes", style = MaterialTheme.typography.titleMedium) }
             items(snapshot.facts.size, key = { "fact:$it" }) { index ->
@@ -357,6 +404,321 @@ private fun RasterLegend() {
             }
         }
     }
+}
+
+@Composable
+private fun EntryChartSection(
+    chart: EntryChart,
+    selectedInstantMillis: Long?,
+    readout: String,
+    holdHours: Int,
+    range: InsightRange,
+    hourFormat: HourFormat,
+    zoneId: ZoneId,
+    onExplore: (Long) -> Unit,
+    onEarlierHour: () -> Boolean,
+    onLaterHour: () -> Boolean,
+    onPreviousRating: () -> Boolean,
+    onNextRating: () -> Boolean,
+    onPreviousEvent: () -> Boolean,
+    onNextEvent: () -> Boolean
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("What you recorded", style = MaterialTheme.typography.titleMedium)
+        Text(
+            readout,
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }
+        )
+        EntryStepChart(
+            chart = chart,
+            selectedInstantMillis = selectedInstantMillis,
+            readout = readout,
+            range = range,
+            hourFormat = hourFormat,
+            zoneId = zoneId,
+            onExplore = onExplore,
+            onEarlierHour = onEarlierHour,
+            onLaterHour = onLaterHour,
+            onPreviousRating = onPreviousRating,
+            onNextRating = onNextRating,
+            onPreviousEvent = onPreviousEvent,
+            onNextEvent = onNextEvent
+        )
+        EntryChartLegend()
+        Text(
+            "Ratings stay flat until another rating or the ${holdHours}h waking-hour limit. " +
+                "The line stops during sleep. Dotted lines are events you marked.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+private fun EntryStepChart(
+    chart: EntryChart,
+    selectedInstantMillis: Long?,
+    readout: String,
+    range: InsightRange,
+    hourFormat: HourFormat,
+    zoneId: ZoneId,
+    onExplore: (Long) -> Unit,
+    onEarlierHour: () -> Boolean,
+    onLaterHour: () -> Boolean,
+    onPreviousRating: () -> Boolean,
+    onNextRating: () -> Boolean,
+    onPreviousEvent: () -> Boolean,
+    onNextEvent: () -> Boolean
+) {
+    val primary = MaterialTheme.colorScheme.primary
+    val area = primary.copy(alpha = 0.14f)
+    val grid = MaterialTheme.colorScheme.outlineVariant
+    val sleep = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
+    val sleepStripe = MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)
+    val event = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f)
+    val selection = MaterialTheme.colorScheme.onSurface
+    val span = (chart.endMillis - chart.startMillis).coerceAtLeast(1L)
+
+    Surface(
+        shape = MaterialTheme.shapes.medium,
+        tonalElevation = 1.dp,
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .testTag("entry_chart")
+            .semantics {
+                contentDescription = "Recorded intensity step chart"
+                stateDescription = readout
+                customActions = listOf(
+                    CustomAccessibilityAction("Earlier chart hour", onEarlierHour),
+                    CustomAccessibilityAction("Later chart hour", onLaterHour),
+                    CustomAccessibilityAction("Previous recorded change", onPreviousRating),
+                    CustomAccessibilityAction("Next recorded change", onNextRating),
+                    CustomAccessibilityAction("Previous event", onPreviousEvent),
+                    CustomAccessibilityAction("Next event", onNextEvent)
+                )
+            }
+    ) {
+        Column(Modifier.padding(horizontal = 10.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(
+                    modifier = Modifier.width(24.dp).height(180.dp).clearAndSetSemantics { },
+                    verticalArrangement = Arrangement.SpaceBetween,
+                    horizontalAlignment = Alignment.End
+                ) {
+                    Text("10", style = MaterialTheme.typography.labelSmall)
+                    Text("5", style = MaterialTheme.typography.labelSmall)
+                    Text("0", style = MaterialTheme.typography.labelSmall)
+                }
+                Spacer(Modifier.width(6.dp))
+                Canvas(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(180.dp)
+                        .pointerInput(chart) {
+                            detectTapGestures { offset ->
+                                onExplore(
+                                    chartInstantFromPosition(
+                                        x = offset.x,
+                                        width = size.width.toFloat(),
+                                        chart = chart,
+                                        eventSnapPixels = 24.dp.toPx()
+                                    )
+                                )
+                            }
+                        }
+                        .pointerInput(chart) {
+                            detectHorizontalDragGestures { change, _ ->
+                                onExplore(
+                                    chartInstantFromPosition(
+                                        x = change.position.x,
+                                        width = size.width.toFloat(),
+                                        chart = chart,
+                                        eventSnapPixels = 24.dp.toPx()
+                                    )
+                                )
+                            }
+                        }
+                        .clearAndSetSemantics { }
+                ) {
+                    fun xOf(millis: Long): Float =
+                        size.width * ((millis - chart.startMillis).toDouble() / span).toFloat().coerceIn(0f, 1f)
+                    fun yOf(value: Int): Float = size.height * (1f - value.coerceIn(0, 10) / 10f)
+
+                    chart.sleeps.forEach { band ->
+                        val left = xOf(band.startMillis)
+                        val right = xOf(band.endMillis)
+                        drawRect(sleep, Offset(left, 0f), Size((right - left).coerceAtLeast(1f), size.height))
+                        var stripeX = left - size.height
+                        while (stripeX < right) {
+                            drawLine(
+                                color = sleepStripe,
+                                start = Offset(stripeX, size.height),
+                                end = Offset(stripeX + size.height, 0f),
+                                strokeWidth = 1.dp.toPx()
+                            )
+                            stripeX += 14.dp.toPx()
+                        }
+                    }
+                    listOf(10, 5, 0).forEach { value ->
+                        drawLine(grid, Offset(0f, yOf(value)), Offset(size.width, yOf(value)), 1.dp.toPx())
+                    }
+                    chart.markers.forEach { marker ->
+                        val x = xOf(marker.atMillis)
+                        drawLine(
+                            color = event,
+                            start = Offset(x, 0f),
+                            end = Offset(x, size.height),
+                            strokeWidth = 1.dp.toPx(),
+                            pathEffect = PathEffect.dashPathEffect(floatArrayOf(5.dp.toPx(), 5.dp.toPx()))
+                        )
+                    }
+                    chart.segments.forEachIndexed { index, segment ->
+                        val left = xOf(segment.startMillis)
+                        val right = xOf(segment.endMillis)
+                        val y = yOf(segment.value)
+                        if (segment.value > 0) {
+                            drawRect(area, Offset(left, y), Size((right - left).coerceAtLeast(1f), size.height - y))
+                        }
+                        drawLine(
+                            color = primary,
+                            start = Offset(left, y),
+                            end = Offset(right, y),
+                            strokeWidth = 2.dp.toPx(),
+                            cap = StrokeCap.Round
+                        )
+                        val next = chart.segments.getOrNull(index + 1)
+                        if (next != null && next.startMillis == segment.endMillis) {
+                            drawLine(
+                                color = primary,
+                                start = Offset(right, y),
+                                end = Offset(right, yOf(next.value)),
+                                strokeWidth = 2.dp.toPx(),
+                                cap = StrokeCap.Round
+                            )
+                        }
+                    }
+                    selectedInstantMillis?.let { selectedMillis ->
+                        val clamped = selectedMillis.coerceIn(chart.startMillis, chart.endMillis)
+                        val x = xOf(clamped)
+                        drawLine(selection, Offset(x, 0f), Offset(x, size.height), 1.dp.toPx())
+                        val reading = chart.readingAt(clamped)
+                        if (reading.state == EntryChartState.WELL || reading.state == EntryChartState.INTENSITY) {
+                            drawCircle(selection, 4.dp.toPx(), Offset(x, yOf(reading.value ?: 0)))
+                        }
+                    }
+                }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(start = 30.dp).clearAndSetSemantics { },
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                entryChartTicks(chart, range, hourFormat, zoneId).forEachIndexed { index, label ->
+                    Text(
+                        label,
+                        style = MaterialTheme.typography.labelSmall,
+                        modifier = Modifier.weight(1f),
+                        textAlign = when (index) {
+                            0 -> TextAlign.Start
+                            3 -> TextAlign.End
+                            else -> TextAlign.Center
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EntryChartLegend() {
+    val items = listOf(
+        Triple("recorded intensity", MaterialTheme.colorScheme.primary, false),
+        Triple("asleep", MaterialTheme.colorScheme.outlineVariant, false),
+        Triple("event", MaterialTheme.colorScheme.onSurfaceVariant, true)
+    )
+    Row(
+        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        items.forEach { (label, color, dotted) ->
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Canvas(Modifier.size(18.dp, 10.dp).clearAndSetSemantics { }) {
+                    if (dotted) {
+                        drawLine(
+                            color,
+                            Offset(size.width / 2f, 0f),
+                            Offset(size.width / 2f, size.height),
+                            1.dp.toPx(),
+                            pathEffect = PathEffect.dashPathEffect(floatArrayOf(2.dp.toPx(), 2.dp.toPx()))
+                        )
+                    } else drawRect(color)
+                }
+                Spacer(Modifier.width(5.dp))
+                Text(label, style = MaterialTheme.typography.labelSmall)
+            }
+        }
+    }
+}
+
+private fun chartInstantFromPosition(
+    x: Float,
+    width: Float,
+    chart: EntryChart,
+    eventSnapPixels: Float
+): Long {
+    val safeWidth = width.coerceAtLeast(1f)
+    val fraction = (x / safeWidth).coerceIn(0f, 0.999999f)
+    val raw = chart.startMillis + ((chart.endMillis - chart.startMillis) * fraction).roundToLong()
+    val closest = chart.markers.minByOrNull { marker ->
+        abs((marker.atMillis - chart.startMillis).toDouble() / (chart.endMillis - chart.startMillis).coerceAtLeast(1L) * safeWidth - x)
+    }
+    val markerDistance = closest?.let { marker ->
+        abs((marker.atMillis - chart.startMillis).toDouble() / (chart.endMillis - chart.startMillis).coerceAtLeast(1L) * safeWidth - x)
+    }
+    return if (closest != null && markerDistance != null && markerDistance <= eventSnapPixels) closest.atMillis else raw
+}
+
+private fun entryChartTicks(
+    chart: EntryChart,
+    range: InsightRange,
+    hourFormat: HourFormat,
+    zoneId: ZoneId
+): List<String> = (0..3).map { index ->
+    val millis = chart.startMillis + (chart.endMillis - chart.startMillis) * index / 3L
+    val zoned = Instant.ofEpochMilli(millis).atZone(zoneId)
+    val pattern = when (range) {
+        InsightRange.ONE_DAY -> if (hourFormat == HourFormat.TWENTY_FOUR) "HH:mm" else "h a"
+        InsightRange.THREE_DAYS -> if (hourFormat == HourFormat.TWENTY_FOUR) "M/d HH" else "M/d h a"
+        else -> "M/d"
+    }
+    DateTimeFormatter.ofPattern(pattern).format(zoned)
+}
+
+private fun entryChartReadout(
+    chart: EntryChart,
+    instantMillis: Long,
+    hourFormat: HourFormat,
+    zoneId: ZoneId,
+    hideNotes: Boolean
+): String {
+    val instant = instantMillis.coerceIn(chart.startMillis, chart.endMillis)
+    val reading = chart.readingAt(instant)
+    val parts = mutableListOf(formatDateTime(instant, hourFormat, zoneId))
+    parts += when (reading.state) {
+        EntryChartState.NO_DATA -> "no data yet"
+        EntryChartState.WELL -> "nothing recorded"
+        EntryChartState.INTENSITY -> "intensity ${reading.value}"
+        EntryChartState.ASLEEP -> "asleep"
+    }
+    reading.sourceEntryMillis?.let { parts += "recorded ${formatDateTime(it, hourFormat, zoneId)}" }
+    if (reading.chips.isNotEmpty()) parts += reading.chips.joinToString(", ")
+    if (!hideNotes) reading.note?.takeIf(String::isNotBlank)?.let { note ->
+        parts += if (note.length <= 120) note else note.take(120) + "…"
+    }
+    reading.markers.forEach { marker -> parts += "event: ${marker.text.ifBlank { "event" }}" }
+    return parts.joinToString(" · ")
 }
 
 @Composable

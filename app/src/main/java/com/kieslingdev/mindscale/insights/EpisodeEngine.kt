@@ -15,8 +15,11 @@ private data class EntryFact(
     val id: Long,
     val ts: Long,
     val value: Int,
-    val chips: List<String>
+    val chips: List<String>,
+    val note: String?
 )
+
+private data class MarkerFact(val id: Long, val ts: Long, val text: String)
 
 private data class SleepSpan(
     val start: Long,
@@ -137,6 +140,14 @@ fun deriveInsights(
         }
     }
     val raster = buildRaster(startDate, today, zoneId, nowMillis, model.entries.firstOrNull()?.ts, model.sleeps, model.segments)
+    val entryChart = buildEntryChart(
+        rangeStart = rangeStart,
+        nowMillis = nowMillis,
+        entries = model.entries,
+        sleeps = model.sleeps,
+        intensitySegments = model.segments,
+        markers = model.markers
+    )
     val nextMidnight = today.plusDays(1).atStartOfDay(zoneId).toInstant().toEpochMilli()
     val candidates = listOfNotNull(model.futureBoundary, model.nextHoldExpiry, nextMidnight)
         .filter { it > nowMillis }
@@ -155,6 +166,7 @@ fun deriveInsights(
         facts = facts,
         recentEpisodes = intersecting.sortedByDescending { it.onsetMillis }.take(8),
         rasterDays = raster,
+        entryChart = entryChart,
         nextInvalidationMillis = candidates.minOrNull()
     )
 }
@@ -162,6 +174,7 @@ fun deriveInsights(
 private data class BuiltModel(
     val entries: List<EntryFact>,
     val sleeps: List<SleepSpan>,
+    val markers: List<MarkerFact>,
     val episodes: List<DerivedEpisode>,
     val segments: List<IntensitySegment>,
     val futureBoundary: Long?,
@@ -176,13 +189,16 @@ private fun buildModel(rows: List<EpisodeSourceRow>, hold: HoldDuration, nowMill
     val entries = rows.filter { it.recordType == "ENTRY" && it.ts <= nowMillis }.map { row ->
         val value = requireNotNull(row.value) { "Entry ${row.id} has no value" }
         require(value in 0..10) { "Entry ${row.id} has invalid value $value" }
-        EntryFact(row.id, row.ts, value, row.chips.orEmpty())
+        EntryFact(row.id, row.ts, value, row.chips.orEmpty(), row.note)
     }.groupBy { it.ts }.values.map { sameTime -> sameTime.maxBy { it.id } }.sortedWith(
         compareBy<EntryFact> { it.ts }.thenBy { it.id }
     )
-    rows.filter { it.recordType != "ENTRY" && it.recordType != "SLEEP" }
+    rows.filter { it.recordType != "ENTRY" && it.recordType != "SLEEP" && it.recordType != "MARKER" }
         .firstOrNull()?.let { error("Unknown episode source ${it.recordType}") }
     val sleeps = normalizeSleeps(rows.filter { it.recordType == "SLEEP" }, nowMillis)
+    val markers = rows.filter { it.recordType == "MARKER" && it.ts <= nowMillis }
+        .map { MarkerFact(it.id, it.ts, it.text ?: error("Marker ${it.id} has no text")) }
+        .sortedWith(compareBy<MarkerFact> { it.ts }.thenBy { it.id })
     val sleepActiveNow = rows.any {
         it.recordType == "SLEEP" && it.ts <= nowMillis && (it.endTs == null || it.endTs > nowMillis)
     }
@@ -203,7 +219,15 @@ private fun buildModel(rows: List<EpisodeSourceRow>, hold: HoldDuration, nowMill
             val awake = awakeMillis(entry.ts, segmentEnd, sleeps)
             builder.awakeMillis += awake
             builder.intensityHours += entry.value * awake.toDouble() / HOUR_MILLIS
-            builder.segments += IntensitySegment(entry.ts, segmentEnd, entry.value)
+            builder.segments += IntensitySegment(
+                startMillis = entry.ts,
+                endMillis = segmentEnd,
+                value = entry.value,
+                sourceEntryId = entry.id,
+                sourceEntryMillis = entry.ts,
+                chips = entry.chips,
+                note = entry.note
+            )
         }
         builder.end = segmentEnd
         when {
@@ -227,7 +251,7 @@ private fun buildModel(rows: List<EpisodeSourceRow>, hold: HoldDuration, nowMill
         }
     }
     val allSegments = episodes.flatMap { it.segments }.sortedBy { it.startMillis }
-    return BuiltModel(entries, sleeps, episodes, allSegments, futureBoundary, nextHoldExpiry)
+    return BuiltModel(entries, sleeps, markers, episodes, allSegments, futureBoundary, nextHoldExpiry)
 }
 
 private fun EpisodeBuilder.finish(endMillis: Long, reason: EpisodeEndReason, sleeps: List<SleepSpan>): DerivedEpisode {
@@ -340,6 +364,103 @@ private fun clearDayStats(
         date = date.plusDays(1)
     }
     return ClearStats(clear, eligible, longest)
+}
+
+private fun buildEntryChart(
+    rangeStart: Long,
+    nowMillis: Long,
+    entries: List<EntryFact>,
+    sleeps: List<SleepSpan>,
+    intensitySegments: List<IntensitySegment>,
+    markers: List<MarkerFact>
+): EntryChart {
+    val clippedSleeps = overlappingSleeps(sleeps, rangeStart, nowMillis).mapNotNull { sleep ->
+        val start = max(rangeStart, sleep.start)
+        val end = min(nowMillis, sleep.end)
+        if (end > start) EntryChartSleep(start, end) else null
+    }.toList()
+    val clippedMarkers = markers.asSequence()
+        .dropWhile { it.ts < rangeStart }
+        .takeWhile { it.ts < nowMillis }
+        .map { EntryChartMarker(it.id, it.ts, it.text) }
+        .toList()
+    if (nowMillis <= rangeStart) {
+        return EntryChart(rangeStart, nowMillis, entries.firstOrNull()?.ts, emptyList(), clippedSleeps, clippedMarkers)
+    }
+
+    val boundaries = sortedSetOf(rangeStart, nowMillis)
+    entries.asSequence().map { it.ts }.filter { it in (rangeStart + 1) until nowMillis }.forEach(boundaries::add)
+    overlappingSleeps(sleeps, rangeStart, nowMillis).forEach { sleep ->
+        boundaries += max(rangeStart, sleep.start)
+        boundaries += min(nowMillis, sleep.end)
+    }
+    overlappingIntensity(intensitySegments, rangeStart, nowMillis).forEach { segment ->
+        boundaries += max(rangeStart, segment.startMillis)
+        boundaries += min(nowMillis, segment.endMillis)
+    }
+
+    val chartSegments = mutableListOf<EntryChartSegment>()
+    val firstEntry = entries.firstOrNull()?.ts
+    boundaries.zipWithNext().forEach { (start, end) ->
+        if (end <= start) return@forEach
+        val midpoint = start + (end - start) / 2
+        if (firstEntry == null || midpoint < firstEntry || sleepAt(sleeps, midpoint) != null) return@forEach
+        val positive = intensityAt(intensitySegments, midpoint)
+        val zeroSource = if (positive == null) entryAtOrBefore(entries, midpoint)?.takeIf { it.value == 0 } else null
+        val segment = if (positive != null) {
+            EntryChartSegment(
+                startMillis = start,
+                endMillis = end,
+                value = positive.value,
+                sourceEntryId = positive.sourceEntryId,
+                sourceEntryMillis = positive.sourceEntryMillis,
+                chips = positive.chips,
+                note = positive.note
+            )
+        } else {
+            EntryChartSegment(
+                startMillis = start,
+                endMillis = end,
+                value = 0,
+                sourceEntryId = zeroSource?.id,
+                sourceEntryMillis = zeroSource?.ts,
+                chips = zeroSource?.chips.orEmpty(),
+                note = zeroSource?.note
+            )
+        }
+        val previous = chartSegments.lastOrNull()
+        if (
+            previous != null && previous.endMillis == segment.startMillis &&
+            previous.value == segment.value && previous.sourceEntryId == segment.sourceEntryId &&
+            previous.sourceEntryMillis == segment.sourceEntryMillis && previous.chips == segment.chips &&
+            previous.note == segment.note
+        ) {
+            chartSegments[chartSegments.lastIndex] = previous.copy(endMillis = segment.endMillis)
+        } else chartSegments += segment
+    }
+    return EntryChart(
+        startMillis = rangeStart,
+        endMillis = nowMillis,
+        firstEntryMillis = firstEntry,
+        segments = chartSegments,
+        sleeps = clippedSleeps,
+        markers = clippedMarkers
+    )
+}
+
+private fun entryAtOrBefore(entries: List<EntryFact>, instant: Long): EntryFact? {
+    var low = 0
+    var high = entries.lastIndex
+    var result: EntryFact? = null
+    while (low <= high) {
+        val mid = (low + high) ushr 1
+        val entry = entries[mid]
+        if (entry.ts <= instant) {
+            result = entry
+            low = mid + 1
+        } else high = mid - 1
+    }
+    return result
 }
 
 private fun buildRaster(

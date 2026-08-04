@@ -31,23 +31,29 @@ class EpisodeSourceDaoTest {
     fun closeDatabase() = database.close()
 
     @Test
-    fun observeSource_projectsEntriesAndSleepsInDeterministicOrder_andReactsToMutations() = runBlocking {
-        val entryId = database.entryDao().insert(Entry(ts = 200, value = 4, chips = listOf("work")))
+    fun observeSource_projectsEntriesSleepsAndMarkersInDeterministicOrder_andReactsToMutations() = runBlocking {
+        val entryId = database.entryDao().insert(
+            Entry(ts = 200, value = 4, chips = listOf("work"), note = "private context")
+        )
         val sleepId = database.sleepDao().insert(SleepInterval(startTs = 100, endTs = 300))
+        val markerId = database.markerDao().insert(Marker(ts = 150, text = "dose change"))
 
         var rows = dao.observeSource().first()
-        assertEquals(listOf("SLEEP", "ENTRY"), rows.map(EpisodeSourceRow::recordType))
-        assertEquals(listOf(100L, 200L), rows.map(EpisodeSourceRow::ts))
+        assertEquals(listOf("SLEEP", "MARKER", "ENTRY"), rows.map(EpisodeSourceRow::recordType))
+        assertEquals(listOf(100L, 150L, 200L), rows.map(EpisodeSourceRow::ts))
         assertEquals(300L, rows[0].endTs)
-        assertEquals(listOf("work"), rows[1].chips)
+        assertEquals("dose change", rows[1].text)
+        assertEquals(listOf("work"), rows[2].chips)
+        assertEquals("private context", rows[2].note)
 
         database.entryDao().updateEditableFields(entryId, 50, 7, listOf("meal"))
         rows = dao.observeSource().first()
-        assertEquals(listOf("ENTRY", "SLEEP"), rows.map(EpisodeSourceRow::recordType))
+        assertEquals(listOf("ENTRY", "SLEEP", "MARKER"), rows.map(EpisodeSourceRow::recordType))
         assertEquals(7, rows[0].value)
 
         database.entryDao().deleteById(entryId)
         database.sleepDao().deleteById(sleepId)
+        database.markerDao().deleteById(markerId)
         assertTrue(dao.observeSource().first().isEmpty())
     }
 
@@ -55,6 +61,7 @@ class EpisodeSourceDaoTest {
     fun insertOrdinaryAndClassify_usesHoldExplicitZeroAndCaptureTimestamp() = runBlocking {
         database.trackSettingsDao().setAskChips(true)
         database.trackSettingsDao().setHoldDuration(HoldDuration.EIGHT)
+        database.markerDao().insert(Marker(ts = 500, text = "context only"))
         val hour = 3_600_000L
 
         val first = dao.insertOrdinaryAndClassify(Entry(ts = 0, value = 5))
