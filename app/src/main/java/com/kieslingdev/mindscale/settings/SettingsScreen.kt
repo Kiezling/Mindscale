@@ -227,6 +227,11 @@ fun SettingsScreen(
         item(key = "data") {
             SettingsSection("Your data") {
                 Text("Exports stay local and go only to the document location you choose.")
+                Text(
+                    "Records CSV contains ratings, sleep, and marked events only. It excludes your Profile name " +
+                        "and external PHQ-8/GAD-7 totals. JSON backup includes them; Clinician summary exports " +
+                        "the bounded factual summary."
+                )
                 TextButton(onClick = viewModel::requestBackup, modifier = Modifier.testTag("export_backup")) {
                     Text("Export backup")
                 }
@@ -268,7 +273,8 @@ fun SettingsScreen(
                 Text(
                     "This permanently deletes ${confirmation.entryCount} ratings, " +
                         "${confirmation.sleepCount} sleep intervals, and ${confirmation.markerCount} markers. " +
-                        "Anchors, custom words, and preferences will reset too."
+                        "Your Profile name and all externally obtained totals are also deleted. " +
+                        "Anchors, custom words, preferences, drafts, and retained export text reset too."
                 )
             },
             confirmButton = {

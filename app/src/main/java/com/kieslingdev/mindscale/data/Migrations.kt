@@ -66,3 +66,29 @@ val MIGRATION_3_4: Migration = object : Migration(3, 4) {
         )
     }
 }
+
+/** Phase 11 additive-only Profile and externally obtained assessment totals. */
+val MIGRATION_4_5: Migration = object : Migration(4, 5) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS user_profile (" +
+                "id INTEGER PRIMARY KEY NOT NULL, " +
+                "displayName TEXT NOT NULL)"
+        )
+        db.execSQL("INSERT INTO user_profile (id, displayName) VALUES (0, '')")
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS external_scores (" +
+                "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                "instrument TEXT NOT NULL, " +
+                "total INTEGER NOT NULL, " +
+                "assessedEpochDay INTEGER NOT NULL, " +
+                "provenance TEXT NOT NULL, " +
+                "enteredAt INTEGER NOT NULL)"
+        )
+        db.execSQL(
+            "CREATE UNIQUE INDEX IF NOT EXISTS " +
+                "index_external_scores_instrument_assessedEpochDay " +
+                "ON external_scores (instrument, assessedEpochDay)"
+        )
+    }
+}

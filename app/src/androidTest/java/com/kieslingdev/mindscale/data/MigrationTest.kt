@@ -194,4 +194,91 @@ class MigrationTest {
             assertEquals("SIXTEEN", c.getString(1))
         }
     }
+
+    @Test
+    fun migrate4To5_preservesVersion4Data_andSeedsProfileAndScores() {
+        var db = helper.createDatabase(TEST_DB, 4)
+        db.execSQL("INSERT INTO entries (id, ts, value, chips, note, kind) VALUES (21, 1000, 7, '', 'keep', NULL)")
+        db.execSQL(
+            "INSERT INTO track_settings " +
+                "(id, sleepOn, askChips, paused, checkinAt, sleepIntroShown, themeMode, hourFormat, " +
+                "anchor2, anchor5, anchor8, onsetChips, hideNotes, anchorPromptDone, holdDuration) " +
+                "VALUES (0, 1, 0, 0, 0, 0, 'DARK', 'TWENTY_FOUR', '', '', '', '', 0, 0, 'TWENTY_FOUR')"
+        )
+        db.close()
+
+        db = helper.runMigrationsAndValidate(TEST_DB, 5, true, MIGRATION_4_5)
+        db.query("SELECT value, note FROM entries WHERE id = 21").use { c ->
+            assertTrue(c.moveToFirst())
+            assertEquals(7, c.getInt(0))
+            assertEquals("keep", c.getString(1))
+        }
+        db.query("SELECT themeMode, hourFormat, holdDuration FROM track_settings WHERE id = 0").use { c ->
+            assertTrue(c.moveToFirst())
+            assertEquals("DARK", c.getString(0))
+            assertEquals("TWENTY_FOUR", c.getString(1))
+            assertEquals("TWENTY_FOUR", c.getString(2))
+        }
+        db.query("SELECT id, displayName FROM user_profile").use { c ->
+            assertTrue(c.moveToFirst())
+            assertEquals(0, c.getInt(0))
+            assertEquals("", c.getString(1))
+            assertTrue(!c.moveToNext())
+        }
+        db.query("SELECT COUNT(*) FROM external_scores").use { c ->
+            assertTrue(c.moveToFirst())
+            assertEquals(0, c.getInt(0))
+        }
+    }
+
+    @Test
+    fun migrate1To5_runsEveryAdditiveStep() {
+        var db = helper.createDatabase(TEST_DB, 1)
+        db.execSQL("INSERT INTO entries (id, ts, value, chips, note) VALUES (31, 44, 5, '', NULL)")
+        db.close()
+        db = helper.runMigrationsAndValidate(
+            TEST_DB, 5, true, MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5
+        )
+        assertVersion5Chain(db, 31, 5)
+    }
+
+    @Test
+    fun migrate2To5_runsEveryRemainingAdditiveStep() {
+        var db = helper.createDatabase(TEST_DB, 2)
+        db.execSQL("INSERT INTO entries (id, ts, value, chips, note, kind) VALUES (32, 55, 6, '', NULL, NULL)")
+        db.execSQL("INSERT INTO track_settings (id, sleepOn, askChips, paused, checkinAt, sleepIntroShown) VALUES (0, 1, 0, 0, 0, 0)")
+        db.close()
+        db = helper.runMigrationsAndValidate(TEST_DB, 5, true, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+        assertVersion5Chain(db, 32, 6)
+    }
+
+    @Test
+    fun migrate3To5_runsEveryRemainingAdditiveStep() {
+        var db = helper.createDatabase(TEST_DB, 3)
+        db.execSQL("INSERT INTO entries (id, ts, value, chips, note, kind) VALUES (33, 66, 7, '', NULL, NULL)")
+        db.execSQL(
+            "INSERT INTO track_settings " +
+                "(id, sleepOn, askChips, paused, checkinAt, sleepIntroShown, themeMode, hourFormat, " +
+                "anchor2, anchor5, anchor8, onsetChips, hideNotes, anchorPromptDone) " +
+                "VALUES (0, 1, 0, 0, 0, 0, 'SYSTEM', 'TWELVE', '', '', '', '', 0, 0)"
+        )
+        db.close()
+        db = helper.runMigrationsAndValidate(TEST_DB, 5, true, MIGRATION_3_4, MIGRATION_4_5)
+        assertVersion5Chain(db, 33, 7)
+    }
+
+    private fun assertVersion5Chain(db: androidx.sqlite.db.SupportSQLiteDatabase, entryId: Long, value: Int) {
+        db.query("SELECT value FROM entries WHERE id = $entryId").use { c ->
+            assertTrue(c.moveToFirst())
+            assertEquals(value, c.getInt(0))
+        }
+        db.query("SELECT holdDuration FROM track_settings WHERE id = 0").use { c ->
+            assertTrue(c.moveToFirst())
+            assertEquals("SIXTEEN", c.getString(0))
+        }
+        db.query("SELECT displayName FROM user_profile WHERE id = 0").use { c ->
+            assertTrue(c.moveToFirst())
+            assertEquals("", c.getString(0))
+        }
+    }
 }

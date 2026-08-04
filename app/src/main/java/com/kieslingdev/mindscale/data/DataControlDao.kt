@@ -9,10 +9,17 @@ data class DataSnapshot(
     val entries: List<Entry>,
     val sleeps: List<SleepInterval>,
     val markers: List<Marker>,
-    val settings: TrackSettings
+    val settings: TrackSettings,
+    val profile: UserProfile = UserProfile(),
+    val externalScores: List<ExternalScore> = emptyList()
 )
 
-data class EraseCounts(val entries: Int, val sleeps: Int, val markers: Int)
+data class EraseCounts(
+    val entries: Int,
+    val sleeps: Int,
+    val markers: Int,
+    val externalScores: Int = 0
+)
 
 @Dao
 interface DataControlDao {
@@ -28,6 +35,12 @@ interface DataControlDao {
     @Query("SELECT * FROM track_settings WHERE id = 0")
     suspend fun settings(): TrackSettings
 
+    @Query("SELECT * FROM user_profile WHERE id = 0")
+    suspend fun profile(): UserProfile
+
+    @Query("SELECT * FROM external_scores ORDER BY assessedEpochDay DESC, id DESC")
+    suspend fun allExternalScores(): List<ExternalScore>
+
     @Query("DELETE FROM entries")
     suspend fun deleteEntries(): Int
 
@@ -37,17 +50,36 @@ interface DataControlDao {
     @Query("DELETE FROM markers")
     suspend fun deleteMarkers(): Int
 
+    @Query("DELETE FROM external_scores")
+    suspend fun deleteExternalScores(): Int
+
     @Update
     suspend fun resetSettings(defaults: TrackSettings): Int
 
+    @Update
+    suspend fun resetProfile(defaults: UserProfile): Int
+
     @Transaction
     suspend fun snapshot(): DataSnapshot =
-        DataSnapshot(allEntries(), allSleeps(), allMarkers(), settings())
+        DataSnapshot(
+            allEntries(),
+            allSleeps(),
+            allMarkers(),
+            settings(),
+            profile(),
+            allExternalScores()
+        )
 
     @Transaction
     suspend fun eraseEverythingAndResetSettings(): EraseCounts {
-        val counts = EraseCounts(deleteEntries(), deleteSleeps(), deleteMarkers())
+        val counts = EraseCounts(
+            deleteEntries(),
+            deleteSleeps(),
+            deleteMarkers(),
+            deleteExternalScores()
+        )
         check(resetSettings(TrackSettings()) == 1) { "Canonical settings row is missing" }
+        check(resetProfile(UserProfile()) == 1) { "Canonical profile row is missing" }
         return counts
     }
 }

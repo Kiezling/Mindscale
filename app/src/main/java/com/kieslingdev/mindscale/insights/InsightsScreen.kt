@@ -63,7 +63,11 @@ import kotlin.math.abs
 import kotlin.math.roundToLong
 
 @Composable
-fun InsightsRoute(viewModel: InsightsViewModel, modifier: Modifier = Modifier) {
+fun InsightsRoute(
+    viewModel: InsightsViewModel,
+    modifier: Modifier = Modifier,
+    onOpenReport: () -> Unit = {}
+) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.refreshTime() }
     InsightsScreen(
@@ -85,6 +89,7 @@ fun InsightsRoute(viewModel: InsightsViewModel, modifier: Modifier = Modifier) {
         onSelectOnsetHour = viewModel::selectOnsetHour,
         onSelectSleepCategory = viewModel::selectSleepCategory,
         onRetry = viewModel::retry,
+        onOpenReport = onOpenReport,
         modifier = modifier
     )
 }
@@ -110,6 +115,7 @@ fun InsightsScreen(
     onSelectSleepCategory: (Int) -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
+    onOpenReport: () -> Unit = {},
     zoneId: ZoneId = ZoneId.systemDefault()
 ) {
     LazyColumn(
@@ -278,6 +284,12 @@ fun InsightsScreen(
                     onSelectCategory = onSelectSleepCategory
                 )
             }
+        }
+        item(key = "clinician_summary") {
+            TextButton(
+                onClick = onOpenReport,
+                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("insights_open_report")
+            ) { Text("Clinician summary") }
         }
     }
 }

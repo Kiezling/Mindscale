@@ -14,6 +14,7 @@ import androidx.compose.runtime.getValue
 import com.kieslingdev.mindscale.log.LogViewModel
 import com.kieslingdev.mindscale.insights.InsightsViewModel
 import com.kieslingdev.mindscale.settings.SettingsViewModel
+import com.kieslingdev.mindscale.report.ReportProfileViewModel
 import com.kieslingdev.mindscale.track.TrackViewModel
 import com.kieslingdev.mindscale.ui.theme.MindScaleTheme
 
@@ -59,7 +60,8 @@ class MainActivity : ComponentActivity() {
                 return SettingsViewModel(
                     settingsDao = database.trackSettingsDao(),
                     dataControlDao = database.dataControlDao(),
-                    savedStateHandle = extras.createSavedStateHandle()
+                    savedStateHandle = extras.createSavedStateHandle(),
+                    onEraseCompleted = { reportProfileViewModel.clearAfterErase() }
                 ) as T
             }
         }
@@ -78,6 +80,20 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private val reportProfileViewModel: ReportProfileViewModel by viewModels {
+        object : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
+                return ReportProfileViewModel(
+                    profileDao = database.profileDao(),
+                    dataControlDao = database.dataControlDao(),
+                    insightsState = insightsViewModel.uiState,
+                    savedStateHandle = extras.createSavedStateHandle()
+                ) as T
+            }
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -88,7 +104,9 @@ class MainActivity : ComponentActivity() {
                     trackViewModel = trackViewModel,
                     logViewModel = logViewModel,
                     insightsViewModel = insightsViewModel,
-                    settingsViewModel = settingsViewModel
+                    settingsViewModel = settingsViewModel,
+                    reportProfileViewModel = reportProfileViewModel,
+                    eraseRevision = settingsState.eraseRevision
                 )
             }
         }

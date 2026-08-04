@@ -48,6 +48,7 @@ data class SettingsUiState(
     val retryDocument: PendingDocument? = null,
     val preparingExport: Boolean = false,
     val eraseConfirmation: EraseConfirmation? = null,
+    val eraseRevision: Long = 0,
     val message: String? = null,
     val readError: String? = null
 )
@@ -56,7 +57,8 @@ class SettingsViewModel(
     private val settingsDao: TrackSettingsDao,
     private val dataControlDao: DataControlDao,
     private val savedStateHandle: SavedStateHandle = SavedStateHandle(),
-    private val nowProvider: () -> Instant = Instant::now
+    private val nowProvider: () -> Instant = Instant::now,
+    private val onEraseCompleted: () -> Unit = {}
 ) : ViewModel() {
 
     private val restoredAnchors = listOf(A2_KEY, A5_KEY, A8_KEY).any(savedStateHandle::contains)
@@ -289,19 +291,25 @@ class SettingsViewModel(
         viewModelScope.launch {
             try {
                 dataControlDao.eraseEverythingAndResetSettings()
-                clearDraftSavedState()
-                _uiState.update {
-                    it.copy(
-                        anchorDraft = AnchorDraft(),
-                        chipDraft = defaultChipDraft(),
-                        eraseConfirmation = null,
-                        message = "Everything on this device was erased"
-                    )
-                }
             } catch (error: Throwable) {
                 if (error is CancellationException) throw error
                 showMessage("Could not erase the data. Nothing was partially deleted.")
+                return@launch
             }
+            clearDraftSavedState()
+            _uiState.update {
+                it.copy(
+                    anchorDraft = AnchorDraft(),
+                    chipDraft = defaultChipDraft(),
+                    pendingDocument = null,
+                    retryDocument = null,
+                    preparingExport = false,
+                    eraseConfirmation = null,
+                    eraseRevision = maxOf(it.eraseRevision + 1, nowProvider().toEpochMilli()),
+                    message = "Everything on this device was erased"
+                )
+            }
+            runCatching(onEraseCompleted)
         }
     }
 

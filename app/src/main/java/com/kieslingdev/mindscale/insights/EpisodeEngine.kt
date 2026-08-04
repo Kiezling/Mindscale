@@ -192,7 +192,8 @@ fun deriveInsights(
             typicalLengthMillis = durations.takeIf { it.isNotEmpty() }?.let(::median),
             clearDays = clear.clearDays,
             eligibleDays = clear.eligibleDays,
-            peak = peakValues.maxOrNull()
+            peak = peakValues.maxOrNull(),
+            intensityHours = rangeAuc
         ),
         facts = facts,
         recentEpisodes = intersecting.sortedByDescending { it.onsetMillis }.take(8),

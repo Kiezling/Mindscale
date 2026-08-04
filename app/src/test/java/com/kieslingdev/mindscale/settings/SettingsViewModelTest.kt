@@ -3,10 +3,12 @@ package com.kieslingdev.mindscale.settings
 import androidx.lifecycle.SavedStateHandle
 import com.kieslingdev.mindscale.data.DataControlDao
 import com.kieslingdev.mindscale.data.Entry
+import com.kieslingdev.mindscale.data.ExternalScore
 import com.kieslingdev.mindscale.data.Marker
 import com.kieslingdev.mindscale.data.HoldDuration
 import com.kieslingdev.mindscale.data.SleepInterval
 import com.kieslingdev.mindscale.data.TrackSettings
+import com.kieslingdev.mindscale.data.UserProfile
 import com.kieslingdev.mindscale.track.FakeTrackSettingsDao
 import java.time.Instant
 import kotlinx.coroutines.Dispatchers
@@ -32,11 +34,13 @@ class SettingsViewModelTest {
     @Test
     fun eraseCannotBeConfirmedUntilBackupWriteSucceeds() = runTest {
         val data = FakeDataControlDao()
+        var completedCallbacks = 0
         val vm = SettingsViewModel(
             FakeTrackSettingsDao(),
             data,
             SavedStateHandle(),
-            nowProvider = { Instant.parse("2026-08-03T12:00:00Z") }
+            nowProvider = { Instant.parse("2026-08-03T12:00:00Z") },
+            onEraseCompleted = { completedCallbacks += 1 }
         )
         dispatcher.scheduler.runCurrent()
 
@@ -62,6 +66,10 @@ class SettingsViewModelTest {
         vm.confirmErase()
         dispatcher.scheduler.runCurrent()
         assertEquals(1, data.eraseCalls)
+        assertEquals(1, completedCallbacks)
+        assertEquals(Instant.parse("2026-08-03T12:00:00Z").toEpochMilli(), vm.uiState.value.eraseRevision)
+        assertNull(vm.uiState.value.pendingDocument)
+        assertNull(vm.uiState.value.retryDocument)
         assertNull(vm.uiState.value.eraseConfirmation)
     }
 
@@ -122,18 +130,29 @@ private class FakeDataControlDao : DataControlDao {
     private val sleeps = mutableListOf(SleepInterval(id = 2, startTs = 2_000, endTs = 3_000))
     private val markers = mutableListOf(Marker(id = 3, ts = 4_000, text = "event"))
     private var settings = TrackSettings()
+    private var profile = UserProfile()
+    private val externalScores = mutableListOf<ExternalScore>()
     var eraseCalls = 0
 
     override suspend fun allEntries(): List<Entry> = entries.toList()
     override suspend fun allSleeps(): List<SleepInterval> = sleeps.toList()
     override suspend fun allMarkers(): List<Marker> = markers.toList()
     override suspend fun settings(): TrackSettings = settings
+    override suspend fun profile(): UserProfile = profile
+    override suspend fun allExternalScores(): List<ExternalScore> = externalScores.toList()
     override suspend fun deleteEntries(): Int = entries.size.also { entries.clear() }
     override suspend fun deleteSleeps(): Int = sleeps.size.also { sleeps.clear() }
     override suspend fun deleteMarkers(): Int = markers.size.also { markers.clear() }
+    override suspend fun deleteExternalScores(): Int =
+        externalScores.size.also { externalScores.clear() }
     override suspend fun resetSettings(defaults: TrackSettings): Int {
         eraseCalls += 1
         settings = defaults
+        return 1
+    }
+
+    override suspend fun resetProfile(defaults: UserProfile): Int {
+        profile = defaults
         return 1
     }
 }

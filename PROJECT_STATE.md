@@ -8,7 +8,21 @@ Build MindScale as a native Android application using Kotlin, Jetpack Compose, M
 
 The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716ca7343`: `SPEC.md` is the rationale and `MindScale v2.dc.html` is the visual/behavioral reference for Track, Full Log, Insights, Report, Safety card, Profile, and Settings. A local exported handoff is available at `C:\Users\mckie\Downloads\MindScale-handoff\mindscale\project\`; its `MindScale v2.dc.html` is the primary implementation reference. Repository specs under `docs/specs/` govern native implementation after human approval.
 
-## Current phase: Phase 10 Insights descriptive sleep counts merged and complete
+## Current phase: Phase 11 clinician summary and Profile foundation verified; publication in progress
+
+- Phase 11 branch: `agent/phase11-clinician-report-profile`, created from synchronized `main` at `9d8cf4bd2dbd3834e2094c81f63e838d6348bdb5`
+- Starting synchronization: `HEAD`, local `main`, local `origin/main`, and live GitHub `refs/heads/main` all resolved to `9d8cf4bd2dbd3834e2094c81f63e838d6348bdb5` before branching
+- Governing spec: `docs/specs/SPEC-clinician-report-profile.md` — `IMPLEMENTED — VERIFIED LOCALLY`; D-1 through D-12 frozen on 2026-08-04 before application-code edits
+- Reconciled boundary: local Profile/Report overlays; optional name; dated, explicitly external/user-entered PHQ-8 or GAD-7 totals; and a capped factual summary using existing Insights derivations without questionnaire administration, scoring, interpretation, comparison, diagnosis, or severity language
+- Approval gate satisfied: the user granted full Phase 11 ownership and authorized decisions, implementation, verification, commits, pushes, PR readiness, merge, and final synchronization without another routine pause
+- Persistence delivered: additive Room 4→5 plus JSON backup v5; records CSV compatibility; transactional snapshot/erase/reset; no import or destructive downgrade
+- Expected untracked paths remain `.agents/` and `.codex/`; they are excluded from product/documentation scope
+- Frozen documentation commit: `2019897655f9db5f143ef91c0707f16ba7c13cb8`; verified implementation commit: `cb469100b3b34fd3a8716428ff1448668af1cdcb`
+- Verification: 180/180 JVM tests, lint with 0 errors/22 unchanged warnings, debug assembly, confirmed API 36 emulator, 111/111 connected tests, `git diff --check`, installed-app/manual export/reset matrix, and one critical review with all five blocking findings resolved
+- Honest gaps: no actual share recipient was selected; provider-open/write failure was tested at the ViewModel boundary; TalkBack semantic order was tested but spoken audio was not manually audited
+- Exact next action: commit this verification state, push the branch, open/ready/verify/merge the PR at the exact head, fast-forward local `main`, and record the final phase boundary
+
+### Phase 10 merged checkpoint
 
 - Phase 10 branch: `agent/phase10-insights-sleep-counts`, created from synchronized `main` at `652096b9cb61cdb5ff004ed352ce0f5a54d62e95`
 - Starting synchronization: `HEAD`, local `main`, local `origin/main`, and live GitHub `refs/heads/main` all resolved to `652096b9cb61cdb5ff004ed352ce0f5a54d62e95` before branching

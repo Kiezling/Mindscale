@@ -16,7 +16,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -33,41 +35,63 @@ import com.kieslingdev.mindscale.insights.InsightsViewModel
 import com.kieslingdev.mindscale.settings.SettingsFocus
 import com.kieslingdev.mindscale.settings.SettingsRoute
 import com.kieslingdev.mindscale.settings.SettingsViewModel
+import com.kieslingdev.mindscale.report.ProfileRoute
+import com.kieslingdev.mindscale.report.ReportProfileViewModel
+import com.kieslingdev.mindscale.report.ReportRoute
 import com.kieslingdev.mindscale.track.TrackRoute
 import com.kieslingdev.mindscale.track.TrackViewModel
 
-enum class AppDestination { TRACK, LOG, INSIGHTS, SETTINGS }
+enum class AppDestination { TRACK, LOG, INSIGHTS, PROFILE, REPORT, SETTINGS }
 
 @Composable
 fun MindScaleApp(
     trackViewModel: TrackViewModel,
     logViewModel: LogViewModel,
     insightsViewModel: InsightsViewModel,
-    settingsViewModel: SettingsViewModel
+    settingsViewModel: SettingsViewModel,
+    reportProfileViewModel: ReportProfileViewModel,
+    eraseRevision: Long = 0
 ) {
-    var destinationName by rememberSaveable { mutableStateOf(AppDestination.TRACK.name) }
-    var priorDestinationName by rememberSaveable { mutableStateOf(AppDestination.TRACK.name) }
+    var destinationStackState by rememberSaveable { mutableStateOf(AppDestination.TRACK.name) }
     var settingsFocusName by rememberSaveable { mutableStateOf(SettingsFocus.TOP.name) }
-    val destination = AppDestination.valueOf(destinationName)
+    var handledEraseRevision by rememberSaveable { mutableLongStateOf(0L) }
+    val destinationStack = destinationStackState.split(',')
+    val destination = AppDestination.valueOf(destinationStack.last())
 
-    fun openSettings(focus: SettingsFocus) {
-        priorDestinationName = if (destination == AppDestination.SETTINGS) {
-            priorDestinationName
-        } else destination.name
-        settingsFocusName = focus.name
-        destinationName = AppDestination.SETTINGS.name
-    }
-
-    fun navigateBack() {
-        destinationName = when (destination) {
-            AppDestination.SETTINGS -> priorDestinationName
-            AppDestination.LOG -> AppDestination.TRACK.name
-            AppDestination.INSIGHTS -> AppDestination.TRACK.name
-            AppDestination.TRACK -> AppDestination.TRACK.name
+    LaunchedEffect(eraseRevision) {
+        if (eraseRevision > 0 && eraseRevision != handledEraseRevision) {
+            destinationStackState = AppDestination.TRACK.name
+            settingsFocusName = SettingsFocus.TOP.name
+            handledEraseRevision = eraseRevision
         }
     }
 
-    BackHandler(enabled = destination != AppDestination.TRACK, onBack = ::navigateBack)
+    fun setRoot(root: AppDestination) {
+        destinationStackState = root.name
+    }
+
+    fun openOverlay(overlay: AppDestination) {
+        if (destination == overlay) return
+        destinationStackState = (destinationStack + overlay.name).joinToString(",")
+    }
+
+    fun openSettings(focus: SettingsFocus) {
+        settingsFocusName = focus.name
+        openOverlay(AppDestination.SETTINGS)
+    }
+
+    fun navigateBack() {
+        if (destinationStack.size > 1) {
+            destinationStackState = destinationStack.dropLast(1).joinToString(",")
+        } else {
+            when (AppDestination.valueOf(destinationStack.last())) {
+                AppDestination.LOG, AppDestination.INSIGHTS -> setRoot(AppDestination.TRACK)
+                else -> Unit
+            }
+        }
+    }
+
+    BackHandler(enabled = destination != AppDestination.TRACK) { navigateBack() }
 
     Scaffold(
         topBar = {
@@ -80,8 +104,8 @@ fun MindScaleApp(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    if (destination == AppDestination.SETTINGS) {
-                        TextButton(onClick = ::navigateBack, modifier = Modifier.testTag("settings_back")) {
+                    if (destination in setOf(AppDestination.PROFILE, AppDestination.REPORT, AppDestination.SETTINGS)) {
+                        TextButton(onClick = ::navigateBack, modifier = Modifier.testTag("overlay_back")) {
                             Text("Back")
                         }
                     } else {
@@ -92,16 +116,18 @@ fun MindScaleApp(
                             AppDestination.TRACK -> "Track"
                             AppDestination.LOG -> "Full Log"
                             AppDestination.INSIGHTS -> "Insights"
+                            AppDestination.PROFILE -> "Profile"
+                            AppDestination.REPORT -> "Clinician summary"
                             AppDestination.SETTINGS -> "Settings"
                         },
                         style = MaterialTheme.typography.titleMedium
                     )
-                    if (destination != AppDestination.SETTINGS) {
+                    if (destination in setOf(AppDestination.TRACK, AppDestination.LOG, AppDestination.INSIGHTS)) {
                         TextButton(
-                            onClick = { openSettings(SettingsFocus.TOP) },
-                            modifier = Modifier.testTag("settings_action")
-                                .semantics { contentDescription = "Open Settings" }
-                        ) { Text("Settings") }
+                            onClick = { openOverlay(AppDestination.PROFILE) },
+                            modifier = Modifier.testTag("profile_action")
+                                .semantics { contentDescription = "Open Profile" }
+                        ) { Text("Profile") }
                     } else {
                         Text("")
                     }
@@ -109,25 +135,25 @@ fun MindScaleApp(
             }
         },
         bottomBar = {
-            if (destination != AppDestination.SETTINGS) {
+            if (destination in setOf(AppDestination.TRACK, AppDestination.LOG, AppDestination.INSIGHTS)) {
                 NavigationBar(modifier = Modifier.testTag("main_navigation")) {
                     NavigationBarItem(
                         selected = destination == AppDestination.TRACK,
-                        onClick = { destinationName = AppDestination.TRACK.name },
+                        onClick = { setRoot(AppDestination.TRACK) },
                         icon = { Text("●") },
                         label = { Text("Track") },
                         modifier = Modifier.semantics { contentDescription = "Track tab" }
                     )
                     NavigationBarItem(
                         selected = destination == AppDestination.LOG,
-                        onClick = { destinationName = AppDestination.LOG.name },
+                        onClick = { setRoot(AppDestination.LOG) },
                         icon = { Text("≡") },
                         label = { Text("Log") },
                         modifier = Modifier.semantics { contentDescription = "Log tab" }
                     )
                     NavigationBarItem(
                         selected = destination == AppDestination.INSIGHTS,
-                        onClick = { destinationName = AppDestination.INSIGHTS.name },
+                        onClick = { setRoot(AppDestination.INSIGHTS) },
                         icon = { Text("▦") },
                         label = { Text("Insights") },
                         modifier = Modifier
@@ -145,7 +171,22 @@ fun MindScaleApp(
                 modifier = Modifier.padding(innerPadding)
             )
             AppDestination.LOG -> LogRoute(logViewModel, Modifier.padding(innerPadding))
-            AppDestination.INSIGHTS -> InsightsRoute(insightsViewModel, Modifier.padding(innerPadding))
+            AppDestination.INSIGHTS -> InsightsRoute(
+                insightsViewModel,
+                Modifier.padding(innerPadding),
+                onOpenReport = { openOverlay(AppDestination.REPORT) }
+            )
+            AppDestination.PROFILE -> ProfileRoute(
+                viewModel = reportProfileViewModel,
+                onOpenReport = { openOverlay(AppDestination.REPORT) },
+                onOpenSettings = { openSettings(SettingsFocus.TOP) },
+                modifier = Modifier.padding(innerPadding)
+            )
+            AppDestination.REPORT -> ReportRoute(
+                viewModel = reportProfileViewModel,
+                onRangeSelected = insightsViewModel::selectRange,
+                modifier = Modifier.padding(innerPadding)
+            )
             AppDestination.SETTINGS -> SettingsRoute(
                 settingsViewModel,
                 focus = SettingsFocus.valueOf(settingsFocusName),
