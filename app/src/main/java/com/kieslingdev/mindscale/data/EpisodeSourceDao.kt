@@ -13,7 +13,9 @@ data class EpisodeSourceRow(
     val ts: Long,
     val endTs: Long?,
     val value: Int?,
-    val chips: List<String>?
+    val chips: List<String>?,
+    val note: String? = null,
+    val text: String? = null
 )
 
 data class OrdinaryCaptureResult(
@@ -27,23 +29,31 @@ data class OrdinaryCaptureResult(
 @Dao
 interface EpisodeSourceDao {
     @Query(
-        """SELECT 'ENTRY' AS recordType, id, ts, NULL AS endTs, value, chips
+        """SELECT 'ENTRY' AS recordType, id, ts, NULL AS endTs, value, chips, note, NULL AS text
            FROM entries
            UNION ALL
            SELECT 'SLEEP' AS recordType, id, startTs AS ts, endTs,
-                  NULL AS value, NULL AS chips
+                  NULL AS value, NULL AS chips, NULL AS note, NULL AS text
            FROM sleeps
+           UNION ALL
+           SELECT 'MARKER' AS recordType, id, ts, NULL AS endTs,
+                  NULL AS value, NULL AS chips, NULL AS note, text
+           FROM markers
            ORDER BY ts ASC, recordType ASC, id ASC"""
     )
     fun observeSource(): Flow<List<EpisodeSourceRow>>
 
     @Query(
-        """SELECT 'ENTRY' AS recordType, id, ts, NULL AS endTs, value, chips
+        """SELECT 'ENTRY' AS recordType, id, ts, NULL AS endTs, value, chips, note, NULL AS text
            FROM entries WHERE ts <= :ts
            UNION ALL
            SELECT 'SLEEP' AS recordType, id, startTs AS ts, endTs,
-                  NULL AS value, NULL AS chips
+                  NULL AS value, NULL AS chips, NULL AS note, NULL AS text
            FROM sleeps WHERE startTs <= :ts
+           UNION ALL
+           SELECT 'MARKER' AS recordType, id, ts, NULL AS endTs,
+                  NULL AS value, NULL AS chips, NULL AS note, text
+           FROM markers WHERE ts <= :ts
            ORDER BY ts ASC, recordType ASC, id ASC"""
     )
     suspend fun sourceAtOrBefore(ts: Long): List<EpisodeSourceRow>

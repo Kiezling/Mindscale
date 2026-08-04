@@ -318,6 +318,84 @@ class EpisodeEngineTest {
         assertTrue(snapshot.facts.any { it.text.contains("eligible days") })
     }
 
+    @Test
+    fun entryChartUsesStepStatesSourceMetadataAndSleepGaps() {
+        val snapshot = deriveInsights(
+            rows = listOf(
+                entry(1, 0, 5, listOf("work"), note = "hard morning"),
+                sleep(2, 2 * hour, 4 * hour),
+                entry(3, 6 * hour, 0)
+            ),
+            hold = HoldDuration.SIXTEEN,
+            now = Instant.ofEpochMilli(8 * hour),
+            zoneId = ZoneOffset.UTC,
+            range = InsightRange.ONE_DAY
+        )
+
+        val chart = snapshot.entryChart
+        assertEquals(listOf(0L to 2 * hour, 4 * hour to 6 * hour), chart.segments.filter { it.value == 5 }.map { it.startMillis to it.endMillis })
+        assertEquals(listOf("work"), chart.segments.first().chips)
+        assertEquals("hard morning", chart.segments.first().note)
+        assertEquals(listOf(2 * hour to 4 * hour), chart.sleeps.map { it.startMillis to it.endMillis })
+        assertEquals(0, chart.readingAt(7 * hour).value ?: 0)
+        assertEquals(EntryChartState.ASLEEP, chart.readingAt(3 * hour).state)
+    }
+
+    @Test
+    fun assumedHoldDropsStepToMetadataFreeWellState() {
+        val chart = deriveInsights(
+            rows = listOf(entry(1, 0, 7, note = "source")),
+            hold = HoldDuration.EIGHT,
+            now = Instant.ofEpochMilli(12 * hour),
+            zoneId = ZoneOffset.UTC,
+            range = InsightRange.ONE_DAY
+        ).entryChart
+
+        assertEquals(7, chart.readingAt(7 * hour).value)
+        val afterHold = chart.segments.single { 9 * hour in it.startMillis until it.endMillis }
+        assertEquals(0, afterHold.value)
+        assertEquals(null, afterHold.sourceEntryMillis)
+        assertEquals(null, afterHold.note)
+    }
+
+    @Test
+    fun markersAreOrderedClippedAndNeverChangeEpisodes() {
+        val now = 12 * hour
+        val snapshot = deriveInsights(
+            rows = listOf(
+                entry(1, 0, 5),
+                marker(9, 4 * hour, "second"),
+                marker(8, 4 * hour, "first"),
+                marker(10, 13 * hour, "future")
+            ),
+            hold = HoldDuration.SIXTEEN,
+            now = Instant.ofEpochMilli(now),
+            zoneId = ZoneOffset.UTC,
+            range = InsightRange.ONE_DAY
+        )
+
+        assertEquals(listOf(8L, 9L), snapshot.entryChart.markers.map(EntryChartMarker::id))
+        assertEquals(listOf("first", "second"), snapshot.entryChart.readingAt(4 * hour).markers.map(EntryChartMarker::text))
+        assertEquals(1, snapshot.summary.episodeCount)
+        assertEquals(13 * hour, snapshot.nextInvalidationMillis)
+    }
+
+    @Test
+    fun carriedChartStateClipsGeometryButRetainsSourceTimestamp() {
+        val now = Instant.parse("2026-01-31T04:00:00Z")
+        val source = Instant.parse("2026-01-30T22:00:00Z").toEpochMilli()
+        val chart = deriveInsights(
+            rows = listOf(entry(1, source, 4, note = "before range")),
+            hold = HoldDuration.EIGHT,
+            now = now,
+            zoneId = ZoneOffset.UTC,
+            range = InsightRange.ONE_DAY
+        ).entryChart
+
+        assertEquals(Instant.parse("2026-01-31T00:00:00Z").toEpochMilli(), chart.segments.first().startMillis)
+        assertEquals(source, chart.segments.first().sourceEntryMillis)
+    }
+
     private fun derive(
         rows: List<EpisodeSourceRow>,
         hold: HoldDuration = HoldDuration.SIXTEEN,
@@ -334,9 +412,13 @@ class EpisodeEngineTest {
         id: Long,
         ts: Long,
         value: Int,
-        chips: List<String> = emptyList()
-    ) = EpisodeSourceRow("ENTRY", id, ts, null, value, chips)
+        chips: List<String> = emptyList(),
+        note: String? = null
+    ) = EpisodeSourceRow("ENTRY", id, ts, null, value, chips, note = note)
 
     private fun sleep(id: Long, start: Long, end: Long?) =
         EpisodeSourceRow("SLEEP", id, start, end, null, null)
+
+    private fun marker(id: Long, ts: Long, text: String) =
+        EpisodeSourceRow("MARKER", id, ts, null, null, null, text = text)
 }

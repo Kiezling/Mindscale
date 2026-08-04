@@ -70,6 +70,7 @@ class InsightsViewModelTest {
         vm.selectRange(InsightRange.SEVEN_DAYS)
         runCurrent()
         vm.explore(2 * hour)
+        vm.exploreChart(3 * hour)
 
         vm.viewModelScope.cancel()
         vm = viewModel(source, settings, handle, now)
@@ -77,6 +78,49 @@ class InsightsViewModelTest {
 
         assertEquals(InsightRange.SEVEN_DAYS, vm.uiState.value.range)
         assertEquals(2 * hour, vm.uiState.value.exploredInstantMillis)
+        assertEquals(3 * hour, vm.uiState.value.chartExploredInstantMillis)
+        vm.viewModelScope.cancel()
+    }
+
+    @Test
+    fun chartActionsNavigateRatingsAndEventsAndRangeClearsSelection() = runTest {
+        val source = FakeEpisodeSourceDao(
+            listOf(
+                entry(1, 0, 4),
+                marker(2, hour, "therapy"),
+                entry(3, 2 * hour, 7),
+                marker(4, 3 * hour, "dose")
+            )
+        )
+        val vm = viewModel(source, FakeTrackSettingsDao(), now = { Instant.ofEpochMilli(6 * hour) })
+        runCurrent()
+
+        assertEquals(true, vm.moveChartRating(-1))
+        assertEquals(2 * hour, vm.uiState.value.chartExploredInstantMillis)
+        assertEquals(true, vm.moveChartMarker(-1))
+        assertEquals(hour, vm.uiState.value.chartExploredInstantMillis)
+        assertEquals(true, vm.moveChartMarker(1))
+        assertEquals(3 * hour, vm.uiState.value.chartExploredInstantMillis)
+        assertEquals(false, vm.moveChartMarker(1))
+        assertEquals(true, vm.moveChartHour(-1))
+        assertEquals(2 * hour, vm.uiState.value.chartExploredInstantMillis)
+
+        vm.selectRange(InsightRange.ONE_DAY)
+        assertNull(vm.uiState.value.chartExploredInstantMillis)
+        vm.viewModelScope.cancel()
+    }
+
+    @Test
+    fun hideNotesSettingFlowsToChartPrivacyState() = runTest {
+        val settings = FakeTrackSettingsDao()
+        val vm = viewModel(FakeEpisodeSourceDao(listOf(entry(1, 0, 5))), settings, now = { Instant.ofEpochMilli(hour) })
+        runCurrent()
+        assertFalse(vm.uiState.value.hideNotes)
+
+        settings.setHideNotes(true)
+        runCurrent()
+
+        assertEquals(true, vm.uiState.value.hideNotes)
         vm.viewModelScope.cancel()
     }
 
@@ -135,6 +179,9 @@ class InsightsViewModelTest {
 
     private fun entry(id: Long, ts: Long, value: Int) =
         EpisodeSourceRow("ENTRY", id, ts, null, value, emptyList())
+
+    private fun marker(id: Long, ts: Long, text: String) =
+        EpisodeSourceRow("MARKER", id, ts, null, null, null, text = text)
 }
 
 private class FakeEpisodeSourceDao(
@@ -161,7 +208,9 @@ private class FakeEpisodeSourceDao(
 
     override suspend fun insertEntry(entry: Entry): Long {
         val id = nextId++
-        rows.value += EpisodeSourceRow("ENTRY", id, entry.ts, null, entry.value, entry.chips)
+        rows.value += EpisodeSourceRow(
+            "ENTRY", id, entry.ts, null, entry.value, entry.chips, note = entry.note
+        )
         return id
     }
 }

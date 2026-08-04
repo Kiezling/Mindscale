@@ -16,8 +16,68 @@ enum class EpisodeEndReason { EXPLICIT_ZERO, ASSUMED_HOLD, ONGOING }
 data class IntensitySegment(
     val startMillis: Long,
     val endMillis: Long,
-    val value: Int
+    val value: Int,
+    val sourceEntryId: Long? = null,
+    val sourceEntryMillis: Long? = null,
+    val chips: List<String> = emptyList(),
+    val note: String? = null
 )
+
+data class EntryChartSegment(
+    val startMillis: Long,
+    val endMillis: Long,
+    val value: Int,
+    val sourceEntryId: Long?,
+    val sourceEntryMillis: Long?,
+    val chips: List<String>,
+    val note: String?
+)
+
+data class EntryChartSleep(val startMillis: Long, val endMillis: Long)
+
+data class EntryChartMarker(val id: Long, val atMillis: Long, val text: String)
+
+enum class EntryChartState { NO_DATA, WELL, INTENSITY, ASLEEP }
+
+data class EntryChartReading(
+    val state: EntryChartState,
+    val value: Int? = null,
+    val sourceEntryMillis: Long? = null,
+    val chips: List<String> = emptyList(),
+    val note: String? = null,
+    val markers: List<EntryChartMarker> = emptyList()
+)
+
+data class EntryChart(
+    val startMillis: Long,
+    val endMillis: Long,
+    val firstEntryMillis: Long?,
+    val segments: List<EntryChartSegment>,
+    val sleeps: List<EntryChartSleep>,
+    val markers: List<EntryChartMarker>
+) {
+    fun readingAt(instantMillis: Long): EntryChartReading {
+        val lastReadable = (endMillis - 1L).coerceAtLeast(startMillis)
+        val instant = instantMillis.coerceIn(startMillis, lastReadable)
+        val exactMarkers = markers.filter { it.atMillis == instant }
+        if (firstEntryMillis == null || instant < firstEntryMillis) {
+            return EntryChartReading(EntryChartState.NO_DATA, markers = exactMarkers)
+        }
+        if (sleeps.any { instant in it.startMillis until it.endMillis }) {
+            return EntryChartReading(EntryChartState.ASLEEP, markers = exactMarkers)
+        }
+        val segment = segments.firstOrNull { instant in it.startMillis until it.endMillis }
+            ?: return EntryChartReading(EntryChartState.WELL, markers = exactMarkers)
+        return EntryChartReading(
+            state = if (segment.value > 0) EntryChartState.INTENSITY else EntryChartState.WELL,
+            value = segment.value.takeIf { it > 0 },
+            sourceEntryMillis = segment.sourceEntryMillis,
+            chips = segment.chips,
+            note = segment.note,
+            markers = exactMarkers
+        )
+    }
+}
 
 data class DerivedEpisode(
     val onsetMillis: Long,
@@ -68,6 +128,7 @@ data class InsightsSnapshot(
     val facts: List<InsightFact>,
     val recentEpisodes: List<DerivedEpisode>,
     val rasterDays: List<RasterDay>,
+    val entryChart: EntryChart,
     val nextInvalidationMillis: Long?
 ) {
     fun rasterStateAt(instantMillis: Long): Pair<RasterState, Int?> {

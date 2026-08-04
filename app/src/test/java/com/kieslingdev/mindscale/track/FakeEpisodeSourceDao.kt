@@ -32,6 +32,7 @@ class FakeEpisodeSourceDao(
         ts = entry.ts,
         endTs = null,
         value = entry.value,
-        chips = entry.chips
+        chips = entry.chips,
+        note = entry.note
     )
 }

@@ -8,18 +8,21 @@ Build MindScale as a native Android application using Kotlin, Jetpack Compose, M
 
 The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716ca7343`: `SPEC.md` is the rationale and `MindScale v2.dc.html` is the visual/behavioral reference for Track, Full Log, Insights, Report, Safety card, Profile, and Settings. A local exported handoff is available at `C:\Users\mckie\Downloads\MindScale-handoff\mindscale\project\`; its `MindScale v2.dc.html` is the primary implementation reference. Repository specs under `docs/specs/` govern native implementation after human approval.
 
-## Current phase: Phase 5 Insights foundation implemented and verified locally
+## Current phase: Phase 6 Insights entry chart implemented and verified locally
 
 - Branch: `agent/phase5-insights-foundation`, created from updated `main` at `c177db20ae5cf7c6ef41dd526b1cb70a5d19baa5`
 - Phase 4 final branch head: `93fac65711e8e3eeb72cf6f1406d386f0386e9da`
 - Phase 4 PR #1: merged into `main` as `c177db20ae5cf7c6ef41dd526b1cb70a5d19baa5` on 2026-08-03 local time (`2026-08-04T03:37:50Z`)
 - Phase 5 spec: `docs/specs/SPEC-insights-foundation.md` — `IMPLEMENTED — VERIFIED LOCALLY`; D-1 through D-10 frozen
 - Phase 5 implementation commit: `cd3a1cf51adb468f968a78a2a04d85ce317d76ed`, pushed to `origin/agent/phase5-insights-foundation` on 2026-08-04
+- Phase 6 branch: `agent/phase6-entry-chart`, stacked from published Phase 5 head `c8a7bdb17a12aba58dba59927ffc81506d5b42dc` because Phase 5 is not yet merged
+- Phase 6 spec: `docs/specs/SPEC-insights-entry-chart.md` — `IMPLEMENTED — VERIFIED LOCALLY`; D-1 through D-8 frozen
+- Phase 6 implementation commit: `53f9d54ea79f56b2d069297f4d6a4b8923aeae23`, pushed to `origin/agent/phase6-entry-chart` on 2026-08-04
 - Phase 1 spec: `docs/specs/SPEC-track-numpad-logging.md` — `IMPLEMENTED`
 - Phase 2 spec: `docs/specs/SPEC-track-phase2-completeness.md` — `IMPLEMENTED`
 - Phase 3 spec: `docs/specs/SPEC-full-log.md` — `IMPLEMENTED` on 2026-08-03
 - Phase 4 spec: `docs/specs/SPEC-settings-data-control.md` — `IMPLEMENTED` on 2026-08-03/04; D-1 through D-9 remain frozen
-- Current worktree: Phase 5 is committed and pushed on `agent/phase5-insights-foundation`; only the pre-existing untracked `.agents/` and `.codex/` tooling directories remain outside the Phase 5 change
+- Current worktree: Phase 6 is committed and pushed on `agent/phase6-entry-chart`; only the pre-existing untracked `.agents/` and `.codex/` tooling directories remain outside feature scope
 
 ## Environment
 
@@ -87,9 +90,16 @@ The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716c
 - Added native Material 3 summary/fact/episode UI and a Canvas day/hour raster with text legend, future hatching, touch/horizontal-drag exploration, visible live readout, TalkBack custom actions, stable date keys, and explicit 48 dp range/choice targets.
 - Critical review and manual API 36 inspection fixed carried-duration leakage, future sleep-end invalidation, raster vertical-scroll interception, low-contrast future state, duplicate ongoing copy, and undersized range targets.
 
+### Phase 6 — Insights entry chart
+
+- Added a native step-only `What you recorded` chart driven by the Phase 5 effective-state engine, with 0/5/10 axes, shared ranges, sleep gaps/bands, event lines, and no interpolation or chart dependency.
+- Expanded the single reactive Room UNION projection with Entry note and Marker text while keeping Room/schema/backup at version 4 and preserving transactional onset classification.
+- Added independent chart selection restoration, touch and horizontal-drag exploration, event snapping, visible/live source-rating readout, note-preview privacy, and six TalkBack navigation actions.
+- Added pure engine, ViewModel, Room, Compose, gesture-ownership, semantics, and privacy coverage; final manual inspection covered touch readout, event discovery, light/dark rendering, and 150% font scaling.
+
 ## Active blocker
 
-No active blocker. Phase 5 is committed, pushed, and ready for review or a pull request.
+No active blocker. Phase 6 is committed, pushed, and ready for stacked review after Phase 5.
 
 ## Known decisions
 
@@ -103,11 +113,31 @@ No active blocker. Phase 5 is committed, pushed, and ready for review or a pull 
 
 ## Next tasks
 
-1. Open a Phase 5 pull request only if separately requested.
-2. For the next bounded phase, draft a separate spec around the step-only entry chart with sleep/event overlays, using the verified Phase 5 engine; do not bundle histogram/sleep-comparison/report work without a new decision gate.
-3. Preserve the current Room 4/export 4 interfaces and Phase 5 engine invariants unless a later approved spec explicitly supersedes them.
+1. Open pull requests only if separately requested; Phase 6 review must retain its Phase 5 dependency or wait until Phase 5 is merged.
+2. Preserve Room schema 4, backup format 4, and every Phase 5/6 engine invariant.
+3. Require a new bounded spec/decision gate before beginning another Insights view or product area.
 
 ## Last verification
+
+Phase 6 final local verification completed 2026-08-04 from `S:\Android\AndroidProjects\MindScale` for implementation commit `53f9d54ea79f56b2d069297f4d6a4b8923aeae23`, based on Phase 5 publication head `c8a7bdb17a12aba58dba59927ffc81506d5b42dc`:
+
+```powershell
+.\gradlew.bat test lint assembleDebug --no-daemon --console=plain
+adb devices -l
+.\gradlew.bat connectedDebugAndroidTest --no-daemon --console=plain
+git diff --check
+```
+
+Results:
+
+- JVM tests: 122/122 passed; 0 failures, 0 errors, 0 skipped.
+- Lint: passed with 0 errors and the same 22 existing template/dependency/toolchain warnings; no Phase 6 warning remains.
+- Debug assembly: passed; no dependency, toolchain, manifest, permission, or schema JSON change was made.
+- Intended device: `emulator-5554`, `MindScale_API_36` (API 36).
+- Instrumented/UI tests: 80/80 passed; 0 failures, 0 errors, 0 skipped. Coverage includes the unified Entry/Sleep/Marker source, transactional onset with markers present, chart touch/horizontal drag, vertical scroll ownership, note privacy, event text, all six semantic actions' ViewModel targets, and all Phase 1–5 regressions.
+- Manual installed-app review used local UI-created records and verified the 30-day compressed step geometry, persistent source/event readout, event-line snapping, scroll into episode facts, light mode, dark mode, and 150% font scaling. Emulator `font_scale` and night mode were restored to `1.0` and `no`.
+- Final review found no blocking product, persistence, concurrency, accessibility, grammar, or architecture issue. A stale off-screen heading assertion and an over-broad drag-test start were corrected; the focused 11-test Insights class and final 80-test suite then passed.
+- `git diff --check` passed with only Windows line-ending notices.
 
 Phase 5 final local verification completed 2026-08-04 from `S:\Android\AndroidProjects\MindScale` at uncommitted branch head/base `c177db20ae5cf7c6ef41dd526b1cb70a5d19baa5`:
 
