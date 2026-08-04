@@ -1,10 +1,21 @@
 package com.kieslingdev.mindscale.track
 
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.test.longClick
 import com.kieslingdev.mindscale.data.Entry
 import com.kieslingdev.mindscale.ui.theme.MindScaleTheme
@@ -22,11 +33,17 @@ class TrackScreenTest {
 
     private fun setContent(
         uiState: TrackUiState = TrackUiState(),
+        fontScale: Float = 1f,
         onEvent: (TrackEvent) -> Unit = {}
     ) {
         composeTestRule.setContent {
-            MindScaleTheme {
-                TrackScreen(uiState = uiState, onEvent = onEvent)
+            val density = LocalDensity.current
+            CompositionLocalProvider(
+                LocalDensity provides Density(density.density, fontScale)
+            ) {
+                MindScaleTheme {
+                    TrackScreen(uiState = uiState, onEvent = onEvent)
+                }
             }
         }
     }
@@ -238,5 +255,95 @@ class TrackScreenTest {
 
         composeTestRule.onNodeWithTag("toast_banner").assertExists()
         composeTestRule.onNodeWithText("Event marked").assertExists()
+    }
+
+    @Test
+    fun backdateDialog_rendersViewModelOwnedRawDraft_andEmitsRawTextEvents() {
+        val events = mutableListOf<TrackEvent>()
+        setContent(
+            uiState = TrackUiState(
+                activeModal = TrackModalState.Backdate(
+                    draft = BackdateDraft(7, "2026-0", "1", null),
+                    timestampError = "Use yyyy-MM-dd and HH:mm."
+                )
+            ),
+            onEvent = { events += it }
+        )
+
+        composeTestRule.onNodeWithText("Backdate entry").assertExists()
+        composeTestRule.onNodeWithTag("track_dialog_date").performTextReplacement("2026-08-04")
+        composeTestRule.onNodeWithTag("track_dialog_time").performTextReplacement("09:30")
+        composeTestRule.onNodeWithText("Save").assertIsNotEnabled()
+
+        assertTrue(events.contains(TrackEvent.BackdateDateTextChanged("2026-08-04")))
+        assertTrue(events.contains(TrackEvent.BackdateTimeTextChanged("09:30")))
+    }
+
+    @Test
+    fun editConflict_keepsDraftVisible_andRequiresExplicitWarnedSave() {
+        setContent(
+            uiState = TrackUiState(
+                activeModal = TrackModalState.Edit(
+                    draft = EditEntryDraft(
+                        entryId = 9L,
+                        baselineTimestampMillis = 0L,
+                        baselineValue = 4,
+                        baselineChips = listOf("flat"),
+                        value = 8,
+                        dateText = "1970-01-01",
+                        timeText = "00:00",
+                        chips = listOf("flat", "wired")
+                    ),
+                    validation = RecordValidation.Conflicting
+                )
+            )
+        )
+
+        composeTestRule.onNodeWithText("Edit entry").assertExists()
+        composeTestRule.onNodeWithText("Value: 8").assertExists()
+        composeTestRule.onNodeWithText("Save my changes").assertExists()
+        composeTestRule.onNodeWithText(
+            "This rating changed elsewhere. Saving will replace its current value, time, and chips. " +
+                "Cancel and reopen to use the latest record."
+        ).assertExists()
+    }
+
+    @Test
+    fun noteChecking_disablesSave_andShowsExactMultilineDraft() {
+        setContent(
+            uiState = TrackUiState(
+                activeModal = TrackModalState.Note(
+                    draft = NoteEntryDraft(3L, "old", "  first\nsecond  "),
+                    validation = RecordValidation.Checking
+                )
+            )
+        )
+
+        composeTestRule.onNodeWithText("Edit note").assertExists()
+        composeTestRule.onNodeWithText("Checking record").assertExists()
+        composeTestRule.onNodeWithText("Save").assertIsNotEnabled()
+        composeTestRule.onNodeWithTag("track_note_text").assertExists()
+    }
+
+    @Test
+    fun dialogErrorAndActions_remainReachableAt200PercentFont_andErrorIsLive() {
+        val error = "Use yyyy-MM-dd and HH:mm."
+        setContent(
+            uiState = TrackUiState(
+                activeModal = TrackModalState.Backdate(
+                    draft = BackdateDraft(7, "2026-0", "1", null),
+                    timestampError = error
+                )
+            ),
+            fontScale = 2f
+        )
+
+        composeTestRule.onNodeWithText("Backdate entry").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("track_dialog_date").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithText(error).performScrollTo().assertIsDisplayed().assert(
+            SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite)
+        )
+        composeTestRule.onNodeWithText("Cancel").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Save").assertIsDisplayed().assertIsNotEnabled()
     }
 }

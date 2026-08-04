@@ -24,8 +24,10 @@ class FakeSleepDao : SleepDao {
     val updateCalls = mutableListOf<SleepInterval>()
     val deleteByIdCalls = mutableListOf<Long>()
     var deleteByIdError: Throwable? = null
+    var insertError: Throwable? = null
 
     override suspend fun insert(interval: SleepInterval): Long {
+        insertError?.let { throw it }
         val id = nextId++
         val stored = interval.copy(id = id)
         insertCalls += stored

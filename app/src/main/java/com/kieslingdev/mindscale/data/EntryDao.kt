@@ -20,6 +20,9 @@ interface EntryDao {
     @Query("SELECT COUNT(*) FROM entries")
     fun observeCount(): Flow<Int>
 
+    @Query("SELECT * FROM entries WHERE id = :id LIMIT 1")
+    fun observeById(id: Long): Flow<Entry?>
+
     @Query(
         """SELECT * FROM entries
            WHERE (:fromTs IS NULL OR ts >= :fromTs)

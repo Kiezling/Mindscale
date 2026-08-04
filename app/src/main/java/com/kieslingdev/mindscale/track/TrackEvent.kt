@@ -5,11 +5,15 @@ import com.kieslingdev.mindscale.data.Entry
 sealed interface TrackEvent {
     data class KeyTapped(val value: Int) : TrackEvent
     data class KeyLongPressed(val value: Int) : TrackEvent
+    data class BackdateDateTextChanged(val text: String) : TrackEvent
+    data class BackdateTimeTextChanged(val text: String) : TrackEvent
     data class BackdateTimestampChanged(val timestampMillis: Long) : TrackEvent
     data object BackdateSaveConfirmed : TrackEvent
     data object BackdateCancelled : TrackEvent
     data class EditRequested(val entry: Entry) : TrackEvent
     data class EditValueChanged(val value: Int) : TrackEvent
+    data class EditDateTextChanged(val text: String) : TrackEvent
+    data class EditTimeTextChanged(val text: String) : TrackEvent
     data class EditTimestampChanged(val timestampMillis: Long) : TrackEvent
     data object EditSaveConfirmed : TrackEvent
     data object EditCancelled : TrackEvent
@@ -20,6 +24,7 @@ sealed interface TrackEvent {
     data class DeleteRequested(val entry: Entry) : TrackEvent
     data object DeleteConfirmed : TrackEvent
     data object DeleteCancelled : TrackEvent
+    data object DialogValidationRetry : TrackEvent
     data object ReadoutDismissed : TrackEvent
     // -- Phase 2 --
     data class EditChipToggled(val chip: String) : TrackEvent
