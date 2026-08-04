@@ -8,16 +8,17 @@ Build MindScale as a native Android application using Kotlin, Jetpack Compose, M
 
 The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716ca7343`: `SPEC.md` is the rationale and `MindScale v2.dc.html` is the visual/behavioral reference for Track, Full Log, Insights, Report, Safety card, Profile, and Settings. A local exported handoff is available at `C:\Users\mckie\Downloads\MindScale-handoff\mindscale\project\`; its `MindScale v2.dc.html` is the primary implementation reference. Repository specs under `docs/specs/` govern native implementation after human approval.
 
-## Current phase: Phase 4 implemented and verified; awaiting commit approval
+## Current phase: Phase 4 published for review; Phase 5 starts in a new session
 
-- Branch: `main`
-- Current committed checkpoint: `87eb817713a459fd231ce77169dfa522b249f641` (`Implement Phase 3 full log`)
-- Upstream: `origin/main` at the same commit; remote is `https://github.com/Kiezling/Mindscale.git`
+- Branch: `agent/phase4-settings-data-control`
+- Phase 4 implementation checkpoint: `ea30fdeaa0dfe3987fd5cb71201756ccbe72092d` (`Implement Phase 4 settings and data control`)
+- Upstream: `origin/agent/phase4-settings-data-control`; base `origin/main` remains `87eb817713a459fd231ce77169dfa522b249f641`
+- Draft pull request: `https://github.com/Kiezling/Mindscale/pull/1` targeting `main`
 - Phase 1 spec: `docs/specs/SPEC-track-numpad-logging.md` — `IMPLEMENTED`
 - Phase 2 spec: `docs/specs/SPEC-track-phase2-completeness.md` — `IMPLEMENTED`
 - Phase 3 spec: `docs/specs/SPEC-full-log.md` — `IMPLEMENTED` on 2026-08-03
 - Phase 4 spec: `docs/specs/SPEC-settings-data-control.md` — `IMPLEMENTED` on 2026-08-03/04; D-1 through D-9 remain frozen
-- Current worktree: complete, verified Phase 4 implementation/spec/schema/tests are uncommitted; the committed/upstream checkpoint remains Phase 3
+- Current worktree: Phase 4 implementation is committed and pushed; this closure update is the final documentation-only follow-up
 
 ## Environment
 
@@ -78,7 +79,7 @@ The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716c
 
 ## Active blocker
 
-None. Phase 4 is implemented and fully verified. It remains intentionally uncommitted until the user explicitly authorizes a Phase 4 commit and push.
+No code blocker. Draft PR #1 is open, mergeable, and awaiting human review/merge. Phase 5 should begin from updated `main` after PR #1 is merged, or from this feature branch if review is still pending.
 
 ## Known decisions
 
@@ -92,14 +93,14 @@ None. Phase 4 is implemented and fully verified. It remains intentionally uncomm
 
 ## Next tasks
 
-1. User reviews the running Phase 4 Settings/data-control result or requests adjustments.
-2. On explicit approval only, commit the complete Phase 4 diff and push `main` to `origin/main`.
-3. Select and approve the next bounded product phase before changing application code.
-4. Keep Insights, Profile/Report/Safety, import, biometrics, breathing, and other deferred controls out of Phase 4.
+1. Review and merge draft PR #1 into `main` when satisfied.
+2. Start Phase 5 in a new session; fetch first and verify whether PR #1 has merged before changing code.
+3. Re-read `AGENTS.md`, `PROJECT_STATE.md`, `DECISIONS.md`, `FAILURES.md`, `docs/specs/BACKLOG.md`, and all implemented specs before drafting Phase 5.
+4. Inspect the local Claude Design handoff and propose one bounded Phase 5 spec; do not implement until its decisions are approved.
 
 ## Last verification
 
-Phase 4 final pre-commit verification completed 2026-08-03/04 from `S:\Android\AndroidProjects\MindScale`:
+Phase 4 final pre-publication verification completed 2026-08-03/04 from `S:\Android\AndroidProjects\MindScale`:
 
 ```powershell
 .\gradlew.bat test
@@ -120,7 +121,7 @@ Results:
 - Diff check: passed; only harmless line-ending notices were emitted.
 - Manual installed-app walkthrough confirmed physical Settings touch after status-bar inset correction, all upper/lower sections, real JSON and CSV writes through DocumentsUI, neutral picker cancellation, and the export-first erase confirmation. The destructive confirmation was canceled.
 - Emulator Downloads contains three harmless empty-state verification artifacts: two version-3 JSON backups and one CSV records file.
-- Phase 3 checkpoint is `87eb817713a459fd231ce77169dfa522b249f641`; local `main` and `origin/main` match.
+- Phase 4 implementation is `ea30fdeaa0dfe3987fd5cb71201756ccbe72092d` on `agent/phase4-settings-data-control`; draft PR #1 targets Phase 3 checkpoint `87eb817713a459fd231ce77169dfa522b249f641` on `main`.
 
 ## Known coverage gaps and backlog
 

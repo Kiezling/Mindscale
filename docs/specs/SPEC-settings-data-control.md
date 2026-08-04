@@ -6,11 +6,11 @@ Owner: TBD
 
 Date: 2026-08-03
 
-Last verified commit: `87eb817713a459fd231ce77169dfa522b249f641` (`Implement Phase 3 full log`), pushed to `origin/main`
+Last verified implementation commit: `ea30fdeaa0dfe3987fd5cb71201756ccbe72092d` (`Implement Phase 4 settings and data control`)
 
 Approval: On 2026-08-03, the user approved D-1 through D-9 and authorized the separate Phase 3 checkpoint commit and push. Phase 4 implementation is authorized against that clean checkpoint.
 
-Implementation: Completed and oracle-verified on 2026-08-03/04 against the API 36 emulator. The Phase 4 worktree is intentionally uncommitted pending a separate user commit request.
+Implementation: Completed and oracle-verified on 2026-08-03/04 against the API 36 emulator, pushed on `agent/phase4-settings-data-control`, and opened as draft PR #1 targeting `main`.
 
 ## Critical review findings resolved
 
