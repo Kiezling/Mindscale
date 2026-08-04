@@ -1,6 +1,6 @@
 # MindScale Phase 11 — clinician summary and Profile foundation
 
-Status: **FROZEN — APPROVED**
+Status: **IMPLEMENTED — VERIFIED LOCALLY**
 
 Owner: Codex under the user's full Phase 11 delegation
 
@@ -234,18 +234,34 @@ On the intended API 36 emulator inspect empty and populated Profile/Report, vali
 ## Machine-checkable acceptance criteria
 
 - [x] SPEC: this complete spec and D-1 through D-12 are frozen in a documentation-only commit before application-code edits.
-- [ ] NAV: Profile/Report overlays and nested Back/restoration match the frozen stack; root navigation regressions pass.
-- [ ] PROFILE: optional name validation/privacy/targeted save and derived initials work with draft/conflict restoration.
-- [ ] SCORES: only validated, dated, explicitly external PHQ-8/GAD-7 totals persist; add/edit/delete/duplicate/stale paths are covered and no administration/calculation/interpretation UI exists.
-- [ ] REPORT: one immutable transaction snapshot produces exact bounded sections/caps/empty states and contains every required caveat and no banned grammar.
-- [ ] PRIVACY: data remains local until an explicit Copy/Share/Save; payload identity, cancellation, provider failure, and retry are covered.
-- [ ] MIGRATION: schema 5 and all 1→5 paths preserve prior data/settings and seed valid Profile state with no destructive fallback.
-- [ ] EXPORT: deterministic JSON v5 includes Profile/scores; existing records CSV is byte-compatible; report file is deterministic captured UTF-8 text.
-- [ ] ERASE: export-first erase/reset atomically removes Profile/scores with all existing records/settings and aborts on invariant failure.
-- [ ] RESTORATION: range, overlay stack, drafts, ids, confirmation, pending bytes, and concurrent/stale behavior satisfy the frozen contract.
-- [ ] ACCESSIBILITY: semantics, live regions, error association, 48 dp actions, large text, landscape, light/dark, and TalkBack reading order are verified.
-- [ ] ORACLES: JVM, lint, assemble, device discovery, full connected suite, and diff check pass from the verified implementation head.
-- [ ] REVIEW: one critical-path review covers medical grammar, provenance, schema/migration, exports/privacy, erase/reset, accessibility, restoration/concurrency, and rollback; every blocking finding is resolved.
+- [x] NAV: Profile/Report overlays and nested Back/restoration match the frozen stack; root navigation regressions pass.
+- [x] PROFILE: optional name validation/privacy/targeted save and derived initials work with draft/conflict restoration.
+- [x] SCORES: only validated, dated, explicitly external PHQ-8/GAD-7 totals persist; add/edit/delete/duplicate/stale paths are covered and no administration/calculation/interpretation UI exists.
+- [x] REPORT: one immutable transaction snapshot produces exact bounded sections/caps/empty states and contains every required caveat and no banned grammar.
+- [x] PRIVACY: data remains local until an explicit Copy/Share/Save; payload identity, cancellation, provider failure, and retry are covered.
+- [x] MIGRATION: schema 5 and all 1→5 paths preserve prior data/settings and seed valid Profile state with no destructive fallback.
+- [x] EXPORT: deterministic JSON v5 includes Profile/scores; existing records CSV is byte-compatible; report file is deterministic captured UTF-8 text.
+- [x] ERASE: export-first erase/reset atomically removes Profile/scores with all existing records/settings and aborts on invariant failure.
+- [x] RESTORATION: range, overlay stack, drafts, ids, confirmation, pending bytes, and concurrent/stale behavior satisfy the frozen contract.
+- [x] ACCESSIBILITY: semantics, live regions, error association, 48 dp actions, large text, landscape, light/dark, and TalkBack reading order are verified.
+- [x] ORACLES: JVM, lint, assemble, device discovery, full connected suite, and diff check pass from the verified implementation head.
+- [x] REVIEW: one critical-path review covers medical grammar, provenance, schema/migration, exports/privacy, erase/reset, accessibility, restoration/concurrency, and rollback; every blocking finding is resolved.
+
+## Verification evidence
+
+- Frozen documentation commit: `2019897655f9db5f143ef91c0707f16ba7c13cb8`.
+- Verified implementation commit: `cb469100b3b34fd3a8716428ff1448668af1cdcb`.
+- `.\gradlew.bat test`: 180/180 tests passed across 15 suites; 0 failures, errors, or skips.
+- `.\gradlew.bat lint`: passed with 0 errors and the unchanged 22-warning baseline.
+- `.\gradlew.bat assembleDebug`: passed.
+- `adb devices -l`: confirmed `emulator-5554`, `MindScale_API_36`, API 36.
+- `.\gradlew.bat connectedDebugAndroidTest`: 111/111 tests passed; 0 failures or skips.
+- `git diff --check` and the staged-diff check passed.
+- Installed-app inspection covered empty and populated Profile/Report states, external-total provenance and duplicate-field error association, light/dark, 200% font, landscape, IME, nested Back, rotation restoration, Copy/Share/Save, and export disclosure. A locally saved 1,535-byte report had SHA-256 `12068f72f3de6583731e192eb115e881d21b1950e2bfc96fc2ffc8e9de86a96a` and matched the displayed factual header/privacy footer.
+- Export-then-erase was exercised end to end after creating an unsaved sensitive name draft and retained report bytes. It returned to Track and reopened Profile with empty name, records, and scores; Room transaction tests cover rollback invariants.
+- Critical review initially blocked on retained UI state after erase, silent reuse of older Save bytes, a profile-name compare/write race, detached score-field errors, and missing records-CSV disclosure. The implementation now clears restorable sensitive state and overlay navigation on erase, visibly identifies/discards retained Save bytes, uses an atomic conditional name update, associates date/total errors with their fields, and discloses CSV exclusions plus JSON/report alternatives.
+
+Known coverage gaps: a real share recipient was deliberately not selected, and external document-provider open/write failure was exercised at the ViewModel boundary rather than by forcing DocumentsUI to fail. TalkBack semantics and reading order were inspected through Compose tests; spoken audio output was not manually audited. Saved JSON/report files are export evidence only until the separately scoped import/restore phase.
 
 ## Task decomposition
 
