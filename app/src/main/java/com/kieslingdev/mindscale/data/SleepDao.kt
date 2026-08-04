@@ -5,6 +5,7 @@ import androidx.room.Insert
 import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Update
+import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface SleepDao {
@@ -18,6 +19,20 @@ interface SleepDao {
 
     @Query("SELECT * FROM sleeps WHERE endTs IS NULL ORDER BY startTs DESC LIMIT 1")
     suspend fun openInterval(): SleepInterval?
+
+    @Query(
+        """SELECT * FROM sleeps
+           WHERE (:fromTs IS NULL OR startTs >= :fromTs)
+             AND (:toTsExclusive IS NULL OR startTs < :toTsExclusive)
+           ORDER BY startTs DESC, id DESC"""
+    )
+    fun observeBetween(fromTs: Long?, toTsExclusive: Long?): Flow<List<SleepInterval>>
+
+    @Query("SELECT COUNT(*) FROM sleeps")
+    fun observeCount(): Flow<Int>
+
+    @Query("DELETE FROM sleeps WHERE id = :id")
+    suspend fun deleteById(id: Long): Int
 
     /**
      * Atomic capture operations — the sole writers `TrackViewModel` calls for Sleep/Wake

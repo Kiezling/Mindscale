@@ -20,6 +20,14 @@ interface EntryDao {
     @Query("SELECT COUNT(*) FROM entries")
     fun observeCount(): Flow<Int>
 
+    @Query(
+        """SELECT * FROM entries
+           WHERE (:fromTs IS NULL OR ts >= :fromTs)
+             AND (:toTsExclusive IS NULL OR ts < :toTsExclusive)
+           ORDER BY ts DESC, id DESC"""
+    )
+    fun observeBetween(fromTs: Long?, toTsExclusive: Long?): Flow<List<Entry>>
+
     /**
      * The only query onset detection may use (Invariant 15 / D-3 of
      * SPEC-track-phase2-completeness.md). Deliberately scoped to `ts <= :ts` so a
@@ -40,4 +48,13 @@ interface EntryDao {
      */
     @Query("UPDATE entries SET chips = :chips WHERE id = :entryId")
     suspend fun updateChips(entryId: Long, chips: List<String>)
+
+    @Query("UPDATE entries SET ts = :ts, value = :value, chips = :chips WHERE id = :id")
+    suspend fun updateEditableFields(id: Long, ts: Long, value: Int, chips: List<String>): Int
+
+    @Query("UPDATE entries SET note = :note WHERE id = :id")
+    suspend fun updateNote(id: Long, note: String?): Int
+
+    @Query("DELETE FROM entries WHERE id = :id")
+    suspend fun deleteById(id: Long): Int
 }

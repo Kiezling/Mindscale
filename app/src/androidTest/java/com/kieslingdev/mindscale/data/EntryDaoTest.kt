@@ -159,4 +159,47 @@ class EntryDaoTest {
         assertEquals(6, row.value)
         assertEquals("unrelated note", row.note)
     }
+
+    @Test
+    fun observeBetween_usesHalfOpenBounds_andDeterministicTieOrder() = runBlocking {
+        val lowerExcluded = dao.insert(Entry(ts = 999L, value = 1))
+        val firstTie = dao.insert(Entry(ts = 1_000L, value = 2))
+        val secondTie = dao.insert(Entry(ts = 1_000L, value = 3))
+        val upperExcluded = dao.insert(Entry(ts = 2_000L, value = 4))
+
+        val bounded = dao.observeBetween(1_000L, 2_000L).first()
+        assertEquals(listOf(secondTie, firstTie), bounded.map { it.id })
+        assertEquals(listOf(upperExcluded, secondTie, firstTie), dao.observeBetween(1_000L, null).first().map { it.id })
+        assertEquals(setOf(lowerExcluded, firstTie, secondTie), dao.observeBetween(null, 2_000L).first().map { it.id }.toSet())
+        assertEquals(4, dao.observeBetween(null, null).first().size)
+    }
+
+    @Test
+    fun targetedMutations_preserveUnrelatedColumns_andMissingIdsReturnZero() = runBlocking {
+        val id = dao.insert(
+            Entry(
+                ts = 1_000L,
+                value = 4,
+                chips = listOf("flat"),
+                note = "keep me",
+                kind = EntryKind.SLEEP
+            )
+        )
+
+        assertEquals(1, dao.updateEditableFields(id, 2_000L, 7, listOf("wired")))
+        var row = dao.observeBetween(null, null).first().single()
+        assertEquals("keep me", row.note)
+        assertEquals(EntryKind.SLEEP, row.kind)
+
+        assertEquals(1, dao.updateNote(id, "changed"))
+        row = dao.observeBetween(null, null).first().single()
+        assertEquals(2_000L, row.ts)
+        assertEquals(7, row.value)
+        assertEquals(listOf("wired"), row.chips)
+        assertEquals(EntryKind.SLEEP, row.kind)
+
+        assertEquals(0, dao.updateNote(99_999L, "missing"))
+        assertEquals(1, dao.deleteById(id))
+        assertEquals(0, dao.deleteById(id))
+    }
 }

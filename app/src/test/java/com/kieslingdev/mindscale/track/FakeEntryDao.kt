@@ -19,6 +19,12 @@ class FakeEntryDao : EntryDao {
     val updateCalls = mutableListOf<Entry>()
     val deleteCalls = mutableListOf<Entry>()
     val updateChipsCalls = mutableListOf<Pair<Long, List<String>>>()
+    val updateEditableFieldsCalls = mutableListOf<Long>()
+    val updateNoteCalls = mutableListOf<Long>()
+    val deleteByIdCalls = mutableListOf<Long>()
+    var updateEditableFieldsError: Throwable? = null
+    var updateNoteError: Throwable? = null
+    var deleteByIdError: Throwable? = null
 
     override suspend fun insert(entry: Entry): Long {
         val id = nextId++
@@ -46,6 +52,12 @@ class FakeEntryDao : EntryDao {
 
     override fun observeCount(): Flow<Int> = entriesFlow.map { it.size }
 
+    override fun observeBetween(fromTs: Long?, toTsExclusive: Long?): Flow<List<Entry>> =
+        entriesFlow.map { list ->
+            list.filter { (fromTs == null || it.ts >= fromTs) && (toTsExclusive == null || it.ts < toTsExclusive) }
+                .sortedWith(compareByDescending<Entry> { it.ts }.thenByDescending { it.id })
+        }
+
     override suspend fun mostRecentAtOrBefore(ts: Long): Entry? =
         entriesFlow.value
             .filter { it.ts <= ts }
@@ -54,5 +66,39 @@ class FakeEntryDao : EntryDao {
     override suspend fun updateChips(entryId: Long, chips: List<String>) {
         updateChipsCalls += entryId to chips
         entriesFlow.value = entriesFlow.value.map { if (it.id == entryId) it.copy(chips = chips) else it }
+    }
+
+    override suspend fun updateEditableFields(
+        id: Long,
+        ts: Long,
+        value: Int,
+        chips: List<String>
+    ): Int {
+        updateEditableFieldsCalls += id
+        updateEditableFieldsError?.let { throw it }
+        val original = entriesFlow.value.firstOrNull { it.id == id } ?: return 0
+        val updated = original.copy(ts = ts, value = value, chips = chips)
+        updateCalls += updated
+        entriesFlow.value = entriesFlow.value.map { if (it.id == id) updated else it }
+        return 1
+    }
+
+    override suspend fun updateNote(id: Long, note: String?): Int {
+        updateNoteCalls += id
+        updateNoteError?.let { throw it }
+        val original = entriesFlow.value.firstOrNull { it.id == id } ?: return 0
+        val updated = original.copy(note = note)
+        updateCalls += updated
+        entriesFlow.value = entriesFlow.value.map { if (it.id == id) updated else it }
+        return 1
+    }
+
+    override suspend fun deleteById(id: Long): Int {
+        deleteByIdCalls += id
+        deleteByIdError?.let { throw it }
+        val original = entriesFlow.value.firstOrNull { it.id == id } ?: return 0
+        deleteCalls += original
+        entriesFlow.value = entriesFlow.value.filterNot { it.id == id }
+        return 1
     }
 }

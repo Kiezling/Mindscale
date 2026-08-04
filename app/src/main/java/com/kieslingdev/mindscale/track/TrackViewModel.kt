@@ -298,14 +298,16 @@ class TrackViewModel(
     private fun handleEditSaveConfirmed() {
         val dialog = _uiState.value.editDialog ?: return
         if (dialog.error != null) return
-
-        val updated = dialog.originalEntry.copy(
-            ts = dialog.timestampMillis,
-            value = dialog.value,
-            chips = dialog.chips.toList()
-        )
-        viewModelScope.launch { entryDao.update(updated) }
         _uiState.update { it.copy(editDialog = null) }
+        viewModelScope.launch {
+            val changed = entryDao.updateEditableFields(
+                id = dialog.entryId,
+                ts = dialog.timestampMillis,
+                value = dialog.value,
+                chips = dialog.chips.toList()
+            )
+            if (changed == 0) setToast("That record no longer exists")
+        }
     }
 
     private fun handleNoteRequested(entry: Entry) {
@@ -323,14 +325,20 @@ class TrackViewModel(
 
     private fun handleNoteSaveConfirmed() {
         val dialog = _uiState.value.noteDialog ?: return
-        viewModelScope.launch { entryDao.update(dialog.originalEntry.copy(note = dialog.text)) }
         _uiState.update { it.copy(noteDialog = null) }
+        viewModelScope.launch {
+            if (entryDao.updateNote(dialog.entryId, dialog.text.ifBlank { null }) == 0) {
+                setToast("That record no longer exists")
+            }
+        }
     }
 
     private fun handleDeleteConfirmed() {
         val entry = _uiState.value.pendingDelete
         if (entry != null) {
-            viewModelScope.launch { entryDao.delete(entry) }
+            viewModelScope.launch {
+                if (entryDao.deleteById(entry.id) == 0) setToast("That record no longer exists")
+            }
         }
         _uiState.update { it.copy(pendingDelete = null) }
     }

@@ -5,6 +5,7 @@ import androidx.sqlite.db.SimpleSQLiteQuery
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.flow.first
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
@@ -50,5 +51,21 @@ class MarkerDaoTest {
         val secondId = dao.insert(Marker(ts = 2_000L, text = "started therapy"))
 
         assertNotEquals(firstId, secondId)
+    }
+
+    @Test
+    fun observeBetween_countAndDelete_useHalfOpenBounds() = runBlocking {
+        val lowerExcluded = dao.insert(Marker(ts = 999L, text = "before"))
+        val firstTie = dao.insert(Marker(ts = 1_000L, text = "first"))
+        val secondTie = dao.insert(Marker(ts = 1_000L, text = "second"))
+        val upperExcluded = dao.insert(Marker(ts = 2_000L, text = "upper"))
+
+        assertEquals(listOf(secondTie, firstTie), dao.observeBetween(1_000L, 2_000L).first().map { it.id })
+        assertEquals(listOf(upperExcluded, secondTie, firstTie), dao.observeBetween(1_000L, null).first().map { it.id })
+        assertEquals(setOf(lowerExcluded, firstTie, secondTie), dao.observeBetween(null, 2_000L).first().map { it.id }.toSet())
+        assertEquals(4, dao.observeBetween(null, null).first().size)
+        assertEquals(4, dao.observeCount().first())
+        assertEquals(1, dao.deleteById(firstTie))
+        assertEquals(0, dao.deleteById(firstTie))
     }
 }

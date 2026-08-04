@@ -7,6 +7,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.flow.first
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -148,5 +149,21 @@ class SleepDaoTest {
         assertEquals(1, closedCount)
         assertEquals(callCount - 1, nothingOpenCount)
         assertNull(dao.openInterval())
+    }
+
+    @Test
+    fun observeBetween_countAndDelete_useStartTsAndHalfOpenBounds() = runBlocking {
+        val excludedLow = dao.insert(SleepInterval(startTs = 999L, endTs = 1_500L))
+        val firstTie = dao.insert(SleepInterval(startTs = 1_000L, endTs = 2_000L))
+        val secondTie = dao.insert(SleepInterval(startTs = 1_000L, endTs = 2_500L))
+        val excludedHigh = dao.insert(SleepInterval(startTs = 2_000L, endTs = 3_000L))
+
+        assertEquals(listOf(secondTie, firstTie), dao.observeBetween(1_000L, 2_000L).first().map { it.id })
+        assertEquals(listOf(excludedHigh, secondTie, firstTie), dao.observeBetween(1_000L, null).first().map { it.id })
+        assertEquals(setOf(excludedLow, firstTie, secondTie), dao.observeBetween(null, 2_000L).first().map { it.id }.toSet())
+        assertEquals(4, dao.observeCount().first())
+        assertEquals(1, dao.deleteById(firstTie))
+        assertEquals(0, dao.deleteById(firstTie))
+        assertEquals(setOf(excludedLow, secondTie, excludedHigh), dao.observeBetween(null, null).first().map { it.id }.toSet())
     }
 }
