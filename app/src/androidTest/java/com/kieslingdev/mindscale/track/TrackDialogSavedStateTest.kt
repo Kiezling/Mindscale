@@ -11,6 +11,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.ViewModelStoreOwner
+import androidx.lifecycle.viewModelScope
 import androidx.room.Room
 import androidx.savedstate.SavedStateRegistry
 import androidx.savedstate.SavedStateRegistryController
@@ -26,6 +27,7 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -39,6 +41,7 @@ class TrackDialogSavedStateTest {
 
     private lateinit var database: MindScaleDatabase
     private val restoredOwners = mutableListOf<TestOwner>()
+    private val viewModelJobs = mutableListOf<Job>()
 
     @Before
     fun createDatabase() {
@@ -53,6 +56,8 @@ class TrackDialogSavedStateTest {
     fun closeDatabase() {
         restoredOwners.forEach { owner -> onMain { owner.destroy() } }
         restoredOwners.clear()
+        runBlocking { viewModelJobs.forEach { it.join() } }
+        viewModelJobs.clear()
         val drained = CountDownLatch(2)
         database.queryExecutor.execute { drained.countDown() }
         database.transactionExecutor.execute { drained.countDown() }
@@ -131,7 +136,9 @@ class TrackDialogSavedStateTest {
                 zoneProvider = { ZoneId.of("UTC") }
             ) as T
         }
-        return ViewModelProvider(owner, factory)[TrackViewModel::class.java]
+        return ViewModelProvider(owner, factory)[TrackViewModel::class.java].also { viewModel ->
+            viewModelJobs += viewModel.viewModelScope.coroutineContext[Job]!!
+        }
     }
 
     private fun <T> onMain(block: () -> T): T {

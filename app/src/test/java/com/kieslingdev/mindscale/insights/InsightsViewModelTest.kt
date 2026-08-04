@@ -125,6 +125,60 @@ class InsightsViewModelTest {
     }
 
     @Test
+    fun onsetGapBucketSelectionRestoresClearsOnRangeAndRejectsSparseData() = runTest {
+        val handle = SavedStateHandle()
+        val source = FakeEpisodeSourceDao(episodeRows(listOf(0L, 2 * hour, 4 * hour, 6 * hour, 8 * hour, 10 * hour)))
+        val now = { Instant.ofEpochMilli(12 * hour) }
+        var vm = viewModel(source, FakeTrackSettingsDao(), handle, now)
+        runCurrent()
+
+        vm.selectOnsetGapBucket(3)
+        assertEquals(3, vm.uiState.value.selectedOnsetGapBucketIndex)
+
+        vm.viewModelScope.cancel()
+        vm = viewModel(source, FakeTrackSettingsDao(), handle, now)
+        runCurrent()
+        assertEquals(3, vm.uiState.value.selectedOnsetGapBucketIndex)
+
+        vm.selectOnsetGapBucket(10)
+        assertEquals(3, vm.uiState.value.selectedOnsetGapBucketIndex)
+
+        vm.selectRange(InsightRange.ONE_DAY)
+        assertNull(vm.uiState.value.selectedOnsetGapBucketIndex)
+        vm.viewModelScope.cancel()
+
+        val sparse = viewModel(
+            FakeEpisodeSourceDao(episodeRows(listOf(0L, 2 * hour, 4 * hour))),
+            FakeTrackSettingsDao(),
+            SavedStateHandle(mapOf("insights.selectedOnsetGapBucket" to 2)),
+            now
+        )
+        runCurrent()
+        assertNull(sparse.uiState.value.selectedOnsetGapBucketIndex)
+        sparse.selectOnsetGapBucket(2)
+        assertNull(sparse.uiState.value.selectedOnsetGapBucketIndex)
+        sparse.viewModelScope.cancel()
+    }
+
+    @Test
+    fun onsetGapSelectionSurvivesCountRefreshButClearsWhenEligibilityFalls() = runTest {
+        val source = FakeEpisodeSourceDao(episodeRows(listOf(0L, 2 * hour, 4 * hour, 6 * hour, 8 * hour, 10 * hour)))
+        val vm = viewModel(source, FakeTrackSettingsDao(), now = { Instant.ofEpochMilli(12 * hour) })
+        runCurrent()
+        vm.selectOnsetGapBucket(0)
+
+        source.rows.value = episodeRows(listOf(0L, hour, 3 * hour, 5 * hour, 7 * hour, 9 * hour, 11 * hour))
+        runCurrent()
+        assertEquals(0, vm.uiState.value.selectedOnsetGapBucketIndex)
+        assertEquals(6, vm.uiState.value.snapshot!!.onsetGapHistogram.buckets[0].count)
+
+        source.rows.value = episodeRows(listOf(0L, 2 * hour, 4 * hour))
+        runCurrent()
+        assertNull(vm.uiState.value.selectedOnsetGapBucketIndex)
+        vm.viewModelScope.cancel()
+    }
+
+    @Test
     fun scheduledHoldExpiry_recomputesOngoingEpisodeAsAssumed() = runTest {
         var nowMillis = 7 * hour
         val source = FakeEpisodeSourceDao(listOf(entry(1, 0, 5)))
@@ -182,6 +236,14 @@ class InsightsViewModelTest {
 
     private fun marker(id: Long, ts: Long, text: String) =
         EpisodeSourceRow("MARKER", id, ts, null, null, null, text = text)
+
+    private fun episodeRows(onsets: List<Long>): List<EpisodeSourceRow> = buildList {
+        var id = 1L
+        onsets.forEach { onset ->
+            add(entry(id++, onset, 5))
+            add(entry(id++, onset + hour / 2, 0))
+        }
+    }
 }
 
 private class FakeEpisodeSourceDao(

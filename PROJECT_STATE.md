@@ -8,7 +8,17 @@ Build MindScale as a native Android application using Kotlin, Jetpack Compose, M
 
 The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716ca7343`: `SPEC.md` is the rationale and `MindScale v2.dc.html` is the visual/behavioral reference for Track, Full Log, Insights, Report, Safety card, Profile, and Settings. A local exported handoff is available at `C:\Users\mckie\Downloads\MindScale-handoff\mindscale\project\`; its `MindScale v2.dc.html` is the primary implementation reference. Repository specs under `docs/specs/` govern native implementation after human approval.
 
-## Current phase: Phase 7 Track dialog restoration implemented and verified locally
+## Current phase: Phase 8 Insights onset-gap histogram implemented and verified — publication ready
+
+- Branch: `agent/phase8-onset-gap-histogram`, created from synchronized `main` at `86bd313e47515bd81eded5e03796195a3b389bff`
+- Local `main`, local `origin/main`, and live GitHub `refs/heads/main` were verified at `86bd313e47515bd81eded5e03796195a3b389bff` before branch creation
+- Phase 8 spec: `docs/specs/SPEC-insights-onset-gap-histogram.md` — `IMPLEMENTED — VERIFIED LOCALLY`; D-1 through D-10 were frozen on 2026-08-04 before application-code edits
+- Phase 8 reconciled boundary: one six-onset-minimum, ten-bucket, elapsed onset-to-onset gap histogram derived from the existing Phase 5 episode model; onset-time and sleep views remain deferred
+- Approval gate satisfied: the user reiterated full project ownership and authorized all decisions, implementation, commits, pushes, and PRs without further approval
+- Phase 8 implementation commit: `d2d546686d6ced87e98eea5c2e73ed66ee41138e`; complete local JVM, lint, build, connected, and installed-app verification passed
+- Expected untracked paths remain `.agents/` and `.codex/`; they are excluded from product/documentation scope
+
+### Prior phase publication
 
 - Branch: `agent/phase7-track-dialog-restoration`, created from synchronized `main` at `372d1d3d91f7308ad35b8824c996bce641b0ce57`
 - Local `main`, its tracking ref, and live `origin/main` were verified at `372d1d3d91f7308ad35b8824c996bce641b0ce57` before the branch was created
@@ -102,9 +112,18 @@ The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716c
 - Added independent chart selection restoration, touch and horizontal-drag exploration, event snapping, visible/live source-rating readout, note-preview privacy, and six TalkBack navigation actions.
 - Added pure engine, ViewModel, Room, Compose, gesture-ownership, semantics, and privacy coverage; final manual inspection covered touch readout, event discovery, light/dark rendering, and 150% font scaling.
 
+### Phase 8 — Insights onset-gap histogram
+
+- Added one native `Days between onsets` section derived from the existing Phase 5 episode snapshot, with a fixed six-onset threshold and exact 0–5 sparse refusal copy.
+- Added ten fixed lower-inclusive/upper-exclusive elapsed-day buckets from `<1d` through `14+d`, exact denominators and selected-boundary readouts, and strict cycle/cause/prediction disclaimers.
+- Added horizontally reachable, individually selectable native Compose cells with visible count/label geometry, redundant border selection, 48 dp-plus semantics, a polite live readout, and parent vertical-scroll ownership.
+- Added primitive validated `SavedStateHandle` selection, range/ineligibility clearing, and retention across eligible re-derivation without changing the existing single Room/settings Flow or immutable snapshot publication.
+- Kept Room/schema/JSON at version 4 and left CSV, backup, permissions, dependencies, toolchain, manual DI, navigation shell, and local-only architecture unchanged.
+- Expanded pure engine, ViewModel, and Compose coverage for every range, 0–5 refusal arithmetic, all ten exact boundaries, fractional/DST/extreme gaps, selection restoration/refresh, semantics, horizontal reachability, and vertical gesture ownership.
+
 ## Active blocker
 
-No active blocker. Phase 7 is implemented, fully verified locally, and merged into synchronized `main`.
+No active blocker. Phase 8 is implemented, verified, and ready to publish and merge.
 
 ## Known decisions
 
@@ -118,10 +137,30 @@ No active blocker. Phase 7 is implemented, fully verified locally, and merged in
 
 ## Next tasks
 
-1. Draft and approve the next bounded Insights specification from the remaining backlog; the likely Phase 8 candidate is an onset-gap histogram, but its sample refusal, bucket semantics, descriptive grammar, accessibility, and no-inference boundaries must be reconciled before implementation.
-2. Create the Phase 8 feature branch only after confirming clean synchronized `main`; continue excluding `.agents/` and `.codex/`.
+1. Publish `agent/phase8-onset-gap-histogram`, open and merge the Phase 8 pull request into synchronized `main`.
+2. Record the Phase 8 merge checkpoint on `main`; continue excluding `.agents/` and `.codex/`.
 
 ## Last verification
+
+Phase 8 final local verification completed 2026-08-04 for implementation commit `d2d546686d6ced87e98eea5c2e73ed66ee41138e` on `agent/phase8-onset-gap-histogram`:
+
+- `test`: 147/147 JVM tests passed; 0 failures, 0 errors, 0 skipped across 12 suites.
+- `lint`: passed with 0 errors and the existing 22 warnings.
+- `assembleDebug`: passed.
+- `adb devices -l`: `emulator-5554`, `MindScale_API_36` (API 36).
+- `connectedDebugAndroidTest`: 91/91 passed; 0 failures or skips. The focused 14-test Insights screen class also passed after adding horizontal reachability coverage.
+- Installed-app API 36 inspection used eight local episode starts and verified the eligible histogram, exact denominator and selected readout, caveat, parent vertical scrolling, horizontal reachability through `14+d`, light/dark rendering, and 150% font scaling. Emulator font scale and night mode were restored to `1.0` and `no`.
+- Critical review covered range attribution, episode-model reuse, exact bucket arithmetic, DST/extremes, refusal grammar, accessibility, selection lifecycle, single-snapshot concurrency, and unchanged persistence/architecture. It added explicit 0–5 refusal, all-six-range, hold-limit, and horizontal reachability assertions; the full oracles then passed.
+- Two recurring connected-suite harness races were resolved without production changes: close the restored edit-dialog IME before Back, and join destroyed Track ViewModel scopes before closing the in-memory Room database. `FAILED_PATHS.md` records the signals and remedies.
+- `git diff --check` passed. No Room/schema, JSON/CSV, backup, manifest/permission, dependency/toolchain, WebView/JavaScript, account/server/analytics, or background-work file changed.
+
+Phase 8 starting-state verification completed 2026-08-04 before specification edits:
+
+- `git status --short --branch` showed synchronized `main` with only the expected untracked `.agents/` and `.codex/` directories.
+- `HEAD`, local `main`, local `origin/main`, and live `git ls-remote origin refs/heads/main` all resolved to `86bd313e47515bd81eded5e03796195a3b389bff`.
+- A sandboxed `git fetch origin --prune` could not update `.git/FETCH_HEAD` because the sandbox exposes `.git` read-only, but the independent live `git ls-remote` check succeeded and matched every local ref.
+- Branch `agent/phase8-onset-gap-histogram` was created from that exact head.
+- No Gradle oracle was rerun because this approval-gated step changes documentation only; the merged Phase 7 application tree and its verification evidence below remain unchanged.
 
 Repository synchronization verified 2026-08-04 after Phase 7 publication:
 

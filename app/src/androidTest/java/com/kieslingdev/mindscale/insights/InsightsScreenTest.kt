@@ -2,10 +2,12 @@ package com.kieslingdev.mindscale.insights
 
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertHeightIsAtLeast
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
@@ -13,10 +15,12 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.swipe
+import androidx.compose.ui.test.swipeDown
 import androidx.compose.ui.test.swipeUp
 import androidx.compose.ui.unit.dp
 import com.kieslingdev.mindscale.data.EpisodeSourceRow
@@ -202,6 +206,73 @@ class InsightsScreenTest {
     }
 
     @Test
+    fun onsetGapHistogramRefusesSparseRangeWithoutRenderingBars() {
+        val state = InsightsUiState(
+            loading = false,
+            snapshot = snapshot(episodeRows(listOf(0L, 2 * HOUR, 4 * HOUR, 6 * HOUR, 8 * HOUR)))
+        )
+        setContent(state)
+
+        composeTestRule.onNodeWithTag("insights_screen")
+            .performScrollToNode(hasTestTag("onset_gap_refusal"))
+        composeTestRule.onNodeWithText(
+            "Needs 1 more recorded start in this range before this chart is shown. " +
+                "These starts make 4 onset-to-onset gaps."
+        ).assertExists()
+        composeTestRule.onNodeWithTag("onset_gap_bars").assertDoesNotExist()
+    }
+
+    @Test
+    fun onsetGapHistogramExposesTenSelectableCountedBucketsAndLiveReadout() {
+        var selected: Int? = null
+        val state = InsightsUiState(
+            loading = false,
+            selectedOnsetGapBucketIndex = 0,
+            snapshot = snapshot(episodeRows(listOf(0L, 2 * HOUR, 4 * HOUR, 6 * HOUR, 8 * HOUR, 10 * HOUR)))
+        )
+        setContent(state, onSelectOnsetGapBucket = { selected = it })
+
+        composeTestRule.onNodeWithTag("insights_screen")
+            .performScrollToNode(hasTestTag("onset_gap_bars"))
+        composeTestRule.onNodeWithText("5 onset-to-onset gaps from 6 recorded starts in this range.").assertExists()
+        (0 until 10).forEach { index ->
+            composeTestRule.onNodeWithTag("onset_gap_bucket_$index").assertExists().assertHeightIsAtLeast(48.dp)
+        }
+        composeTestRule.onNodeWithTag("onset_gap_bucket_0")
+            .assertIsSelected()
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
+            .assert(
+                SemanticsMatcher.expectValue(
+                    SemanticsProperties.ContentDescription,
+                    listOf("<1d bucket, 5 of 5 onset-to-onset gaps, under 1 elapsed day")
+                )
+            )
+            .performClick()
+
+        assertEquals(0, selected)
+        composeTestRule.onNodeWithText("5 of 5 onset-to-onset gaps were under 1 elapsed day.").assertExists()
+        composeTestRule.onNodeWithText(ONSET_GAP_CAVEAT).assertExists()
+        composeTestRule.onNodeWithTag("onset_gap_bucket_9").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun verticalSwipeOnOnsetGapBucketScrollsParentList() {
+        val state = InsightsUiState(
+            loading = false,
+            snapshot = snapshot(episodeRows(listOf(0L, 2 * HOUR, 4 * HOUR, 6 * HOUR, 8 * HOUR, 10 * HOUR)))
+        )
+        setContent(state)
+
+        val list = composeTestRule.onNodeWithTag("insights_screen")
+        list.performScrollToNode(hasTestTag("onset_gap_bars"))
+        val before = list.fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange].value()
+        composeTestRule.onNodeWithTag("onset_gap_bucket_0").performTouchInput { swipeDown() }
+        val after = list.fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange].value()
+
+        assertTrue(after < before)
+    }
+
+    @Test
     fun staleSnapshotShowsErrorAndWorkingRetry() {
         var retries = 0
         setContent(
@@ -243,6 +314,7 @@ class InsightsScreenTest {
         onEarlierHour: () -> Boolean = { true },
         onExploreChart: (Long) -> Unit = {},
         onPreviousEvent: () -> Boolean = { true },
+        onSelectOnsetGapBucket: (Int) -> Unit = {},
         onRetry: () -> Unit = {}
     ) {
         composeTestRule.setContent {
@@ -262,6 +334,7 @@ class InsightsScreenTest {
                     onNextRating = { true },
                     onPreviousEvent = onPreviousEvent,
                     onNextEvent = { true },
+                    onSelectOnsetGapBucket = onSelectOnsetGapBucket,
                     onRetry = onRetry,
                     zoneId = ZoneOffset.UTC
                 )
@@ -290,6 +363,14 @@ class InsightsScreenTest {
 
     private fun marker(id: Long, ts: Long, text: String) =
         EpisodeSourceRow("MARKER", id, ts, null, null, null, text = text)
+
+    private fun episodeRows(onsets: List<Long>): List<EpisodeSourceRow> = buildList {
+        var id = 1L
+        onsets.forEach { onset ->
+            add(entry(id++, onset, 5))
+            add(entry(id++, onset + HOUR / 2, 0))
+        }
+    }
 
     private companion object { const val HOUR = 3_600_000L }
 }

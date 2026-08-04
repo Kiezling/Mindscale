@@ -14,6 +14,7 @@ import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
 import androidx.test.espresso.Espresso.pressBack
+import androidx.test.espresso.Espresso.closeSoftKeyboard
 import org.junit.Rule
 import org.junit.Test
 
@@ -75,6 +76,7 @@ class NavigationTest {
         composeTestRule.onNodeWithText("Edit entry").assertExists()
         composeTestRule.onNodeWithTag("track_dialog_date").assertTextContains("2026-0")
         composeTestRule.onNodeWithTag("track_dialog_time").assertTextContains("1")
+        closeSoftKeyboard()
         pressBack()
         composeTestRule.waitUntil(timeoutMillis = 5_000) {
             composeTestRule.onAllNodesWithTag("track_dialog_date")

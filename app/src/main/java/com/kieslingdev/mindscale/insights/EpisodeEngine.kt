@@ -10,6 +10,27 @@ import kotlin.math.max
 import kotlin.math.min
 
 private const val HOUR_MILLIS = 3_600_000L
+private const val DAY_MILLIS = 24 * HOUR_MILLIS
+
+private data class OnsetGapBucketDefinition(
+    val lowerBoundMillisInclusive: Long,
+    val upperBoundMillisExclusive: Long?,
+    val visibleLabel: String,
+    val spokenBoundary: String
+)
+
+private val ONSET_GAP_BUCKETS = listOf(
+    OnsetGapBucketDefinition(0, 1 * DAY_MILLIS, "<1d", "under 1 elapsed day"),
+    OnsetGapBucketDefinition(1 * DAY_MILLIS, 2 * DAY_MILLIS, "1d", "at least 1 and under 2 elapsed days"),
+    OnsetGapBucketDefinition(2 * DAY_MILLIS, 3 * DAY_MILLIS, "2d", "at least 2 and under 3 elapsed days"),
+    OnsetGapBucketDefinition(3 * DAY_MILLIS, 4 * DAY_MILLIS, "3d", "at least 3 and under 4 elapsed days"),
+    OnsetGapBucketDefinition(4 * DAY_MILLIS, 5 * DAY_MILLIS, "4d", "at least 4 and under 5 elapsed days"),
+    OnsetGapBucketDefinition(5 * DAY_MILLIS, 6 * DAY_MILLIS, "5d", "at least 5 and under 6 elapsed days"),
+    OnsetGapBucketDefinition(6 * DAY_MILLIS, 7 * DAY_MILLIS, "6d", "at least 6 and under 7 elapsed days"),
+    OnsetGapBucketDefinition(7 * DAY_MILLIS, 10 * DAY_MILLIS, "7–9d", "at least 7 and under 10 elapsed days"),
+    OnsetGapBucketDefinition(10 * DAY_MILLIS, 14 * DAY_MILLIS, "10–13d", "at least 10 and under 14 elapsed days"),
+    OnsetGapBucketDefinition(14 * DAY_MILLIS, null, "14+d", "at least 14 elapsed days")
+)
 
 private data class EntryFact(
     val id: Long,
@@ -148,6 +169,7 @@ fun deriveInsights(
         intensitySegments = model.segments,
         markers = model.markers
     )
+    val onsetGapHistogram = buildOnsetGapHistogram(model.episodes, rangeStart, nowMillis)
     val nextMidnight = today.plusDays(1).atStartOfDay(zoneId).toInstant().toEpochMilli()
     val candidates = listOfNotNull(model.futureBoundary, model.nextHoldExpiry, nextMidnight)
         .filter { it > nowMillis }
@@ -167,7 +189,49 @@ fun deriveInsights(
         recentEpisodes = intersecting.sortedByDescending { it.onsetMillis }.take(8),
         rasterDays = raster,
         entryChart = entryChart,
+        onsetGapHistogram = onsetGapHistogram,
         nextInvalidationMillis = candidates.minOrNull()
+    )
+}
+
+private fun buildOnsetGapHistogram(
+    episodes: List<DerivedEpisode>,
+    rangeStartMillis: Long,
+    nowMillis: Long
+): OnsetGapHistogram {
+    val onsets = episodes.asSequence()
+        .map(DerivedEpisode::onsetMillis)
+        .filter { it >= rangeStartMillis && it < nowMillis }
+        .sorted()
+        .toList()
+    val gaps = onsets.zipWithNext { earlier, later ->
+        Math.subtractExact(later, earlier).also { gap ->
+            require(gap > 0) { "Episode onsets must be strictly increasing" }
+        }
+    }
+    val counts = IntArray(ONSET_GAP_BUCKETS.size)
+    gaps.forEach { gap ->
+        val index = ONSET_GAP_BUCKETS.indexOfFirst { definition ->
+            gap >= definition.lowerBoundMillisInclusive &&
+                (definition.upperBoundMillisExclusive == null || gap < definition.upperBoundMillisExclusive)
+        }
+        require(index >= 0) { "No onset-gap bucket for $gap milliseconds" }
+        counts[index]++
+    }
+    require(counts.sum() == gaps.size) { "Onset-gap bucket count mismatch" }
+    return OnsetGapHistogram(
+        eligibleOnsetCount = onsets.size,
+        gapCount = gaps.size,
+        buckets = ONSET_GAP_BUCKETS.mapIndexed { index, definition ->
+            OnsetGapBucket(
+                index = index,
+                lowerBoundMillisInclusive = definition.lowerBoundMillisInclusive,
+                upperBoundMillisExclusive = definition.upperBoundMillisExclusive,
+                visibleLabel = definition.visibleLabel,
+                spokenBoundary = definition.spokenBoundary,
+                count = counts[index]
+            )
+        }
     )
 }
 

@@ -50,3 +50,10 @@ Record stable decisions that should survive chat resets and model/provider chang
 - Decision: restore Track Backdate/Edit/Note as one versioned, primitive `SavedStateHandle` dialog envelope; revalidate Entry ids reactively from Room, retain and warn on same-field conflicts, keep targeted affected-row-count mutations, and clear drafts only on cancel, success, or definitive stale outcomes. Delete joins the live mutually exclusive modal model but is not restored. Room/schema/backup/export/dependencies remain version 4/unchanged. See `docs/specs/SPEC-track-dialog-restoration.md`, D-1 through D-10.
 - Reason: Compose-only field buffers cannot restore when a rebuilt `TrackViewModel` forgets the owning dialog, and full Room entities or stale snapshots do not belong in saved instance state.
 - Supersedes: Phase 1's overbroad claim that its Compose-only dialog buffers covered low-memory process death; preserves Phase 2's marker restoration precedent and Phase 3's targeted mutation contracts.
+
+## D-008 — Phase 8 onset-gap histogram
+
+- Date: 2026-08-04
+- Decision: add one native onset-to-onset elapsed-gap histogram derived from the existing Phase 5 episode model. Require six onsets/five gaps with both onsets inside the selected half-open range; use ten frozen elapsed-day buckets, exact denominators/boundary readouts, and no periodicity or inference claim. Use accessible 48 dp Compose bucket cells and primitive SavedStateHandle selection while keeping the single Room/StateFlow derivation and Room/schema/JSON version 4, CSV, backup rules, permissions, dependencies, and architecture unchanged. See `docs/specs/SPEC-insights-onset-gap-histogram.md`, D-1 through D-10.
+- Reason: this is the next product-defined episode-level view and can reuse the reviewed episode engine without adding storage or a competing onset interpretation; sparse refusal and exact language constrain apophenia risk.
+- Supersedes: none; narrows the onset-gap portion deferred by Phase 5 D-1 and Phase 6 D-1.

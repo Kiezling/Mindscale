@@ -12,6 +12,7 @@ import org.junit.Test
 
 class EpisodeEngineTest {
     private val hour = 3_600_000L
+    private val day = 24 * hour
 
     @Test
     fun explicitZero_sleepPausesAwakeDurationAndAuc() {
@@ -319,6 +320,218 @@ class EpisodeEngineTest {
     }
 
     @Test
+    fun onsetGapHistogramRefusesUntilSixOnsetsWithExactSparseCopy() {
+        val expectedCopy = listOf(
+            "Needs 6 more recorded starts in this range before this chart is shown. " +
+                "There are 0 onset-to-onset gaps to count.",
+            "Needs 5 more recorded starts in this range before this chart is shown. " +
+                "There are 0 onset-to-onset gaps to count.",
+            "Needs 4 more recorded starts in this range before this chart is shown. " +
+                "These starts make 1 onset-to-onset gap.",
+            "Needs 3 more recorded starts in this range before this chart is shown. " +
+                "These starts make 2 onset-to-onset gaps.",
+            "Needs 2 more recorded starts in this range before this chart is shown. " +
+                "These starts make 3 onset-to-onset gaps.",
+            "Needs 1 more recorded start in this range before this chart is shown. " +
+                "These starts make 4 onset-to-onset gaps."
+        )
+        expectedCopy.indices.forEach { onsetCount ->
+            val onsets = List(onsetCount) { it * day }
+            val sparse = derive(episodeRows(onsets), now = 6 * day).onsetGapHistogram
+
+            assertFalse(sparse.isEligible)
+            assertEquals(onsetCount, sparse.eligibleOnsetCount)
+            assertEquals((onsetCount - 1).coerceAtLeast(0), sparse.gapCount)
+            assertEquals(expectedCopy[onsetCount], onsetGapRefusalText(sparse))
+        }
+
+        val eligible = derive(episodeRows(List(6) { it * day }), now = 6 * day).onsetGapHistogram
+        assertTrue(eligible.isEligible)
+        assertEquals(5, eligible.gapCount)
+        assertEquals(5, eligible.buckets[1].count)
+        assertEquals(eligible.gapCount, eligible.buckets.sumOf(OnsetGapBucket::count))
+    }
+
+    @Test
+    fun onsetGapHistogramUsesEachExistingRangeSelection() {
+        val now = Instant.parse("2026-06-15T18:00:00Z")
+        val onsets = List(6) { index -> now.toEpochMilli() - (12L - index * 2L) * hour }
+
+        InsightRange.entries.forEach { range ->
+            val histogram = deriveInsights(
+                rows = episodeRows(onsets, zeroAfterMillis = hour),
+                hold = HoldDuration.SIXTEEN,
+                now = now,
+                zoneId = ZoneOffset.UTC,
+                range = range
+            ).onsetGapHistogram
+
+            assertEquals(range.name, 6, histogram.eligibleOnsetCount)
+            assertEquals(range.name, 5, histogram.gapCount)
+        }
+    }
+
+    @Test
+    fun onsetGapHistogramReusesHoldDurationEpisodeSplits() {
+        val rows = List(6) { index -> entry(index.toLong() + 1, index * 10L * hour, 5) }
+        val now = 59 * hour
+
+        val eightHourHold = derive(rows, hold = HoldDuration.EIGHT, now = now).onsetGapHistogram
+        val sixteenHourHold = derive(rows, hold = HoldDuration.SIXTEEN, now = now).onsetGapHistogram
+
+        assertTrue(eightHourHold.isEligible)
+        assertEquals(5, eightHourHold.gapCount)
+        assertFalse(sixteenHourHold.isEligible)
+        assertEquals(1, sixteenHourHold.eligibleOnsetCount)
+    }
+
+    @Test
+    fun onsetGapHistogramUsesFrozenLowerInclusiveBucketsWithoutRounding() {
+        val gaps = listOf(
+            day / 2,
+            day,
+            2 * day,
+            3 * day,
+            4 * day,
+            5 * day,
+            6 * day,
+            7 * day,
+            10 * day,
+            14 * day
+        )
+        val onsets = buildList {
+            var onset = 0L
+            add(onset)
+            gaps.forEach { gap -> onset += gap; add(onset) }
+        }
+        val now = onsets.last() + day
+        val snapshot = deriveInsights(
+            rows = episodeRows(onsets),
+            hold = HoldDuration.SIXTEEN,
+            now = Instant.ofEpochMilli(now),
+            zoneId = ZoneOffset.UTC,
+            range = InsightRange.SIX_MONTHS
+        )
+
+        assertEquals(List(10) { 1 }, snapshot.onsetGapHistogram.buckets.map(OnsetGapBucket::count))
+        assertEquals(
+            listOf("<1d", "1d", "2d", "3d", "4d", "5d", "6d", "7–9d", "10–13d", "14+d"),
+            snapshot.onsetGapHistogram.buckets.map(OnsetGapBucket::visibleLabel)
+        )
+        assertEquals(
+            "1 of 10 onset-to-onset gaps were at least 14 elapsed days.",
+            onsetGapBucketReadout(snapshot.onsetGapHistogram, 9)
+        )
+    }
+
+    @Test
+    fun onsetGapHistogramKeepsValuesBelowBoundariesInThePreviousBucket() {
+        val gaps = listOf(1, 2, 3, 4, 5, 6, 7, 10, 14).map { it * day - 1L }
+        val onsets = buildList {
+            var onset = 0L
+            add(onset)
+            gaps.forEach { gap -> onset += gap; add(onset) }
+        }
+        val histogram = deriveInsights(
+            rows = episodeRows(onsets),
+            hold = HoldDuration.SIXTEEN,
+            now = Instant.ofEpochMilli(onsets.last() + day),
+            zoneId = ZoneOffset.UTC,
+            range = InsightRange.SIX_MONTHS
+        ).onsetGapHistogram
+
+        assertEquals(List(9) { 1 } + 0, histogram.buckets.map(OnsetGapBucket::count))
+    }
+
+    @Test
+    fun onsetGapHistogramRequiresBothOnsetsInsideHalfOpenRange() {
+        val rangeStart = Instant.parse("2026-01-31T00:00:00Z").toEpochMilli()
+        val now = Instant.parse("2026-01-31T23:00:00Z").toEpochMilli()
+        val onsets = listOf(
+            rangeStart - hour,
+            rangeStart,
+            rangeStart + 3 * hour,
+            rangeStart + 6 * hour,
+            rangeStart + 9 * hour,
+            rangeStart + 12 * hour,
+            rangeStart + 15 * hour,
+            now
+        )
+        val histogram = deriveInsights(
+            rows = episodeRows(onsets, zeroAfterMillis = 30 * 60_000L),
+            hold = HoldDuration.SIXTEEN,
+            now = Instant.ofEpochMilli(now),
+            zoneId = ZoneOffset.UTC,
+            range = InsightRange.ONE_DAY
+        ).onsetGapHistogram
+
+        assertEquals(6, histogram.eligibleOnsetCount)
+        assertEquals(5, histogram.gapCount)
+        assertEquals(5, histogram.buckets[0].count)
+    }
+
+    @Test
+    fun onsetGapHistogramUsesElapsedTimeAcrossDst() {
+        val zone = ZoneId.of("America/Chicago")
+        val springOnsets = listOf(
+            "2026-03-07T12:00:00-06:00",
+            "2026-03-08T12:00:00-05:00",
+            "2026-03-09T12:00:00-05:00",
+            "2026-03-10T12:00:00-05:00",
+            "2026-03-11T12:00:00-05:00",
+            "2026-03-12T12:00:00-05:00"
+        ).map { Instant.parse(it).toEpochMilli() }
+        val histogram = deriveInsights(
+            rows = episodeRows(springOnsets),
+            hold = HoldDuration.SIXTEEN,
+            now = Instant.parse("2026-03-13T12:00:00-05:00"),
+            zoneId = zone,
+            range = InsightRange.THIRTY_DAYS
+        ).onsetGapHistogram
+
+        assertEquals(1, histogram.buckets[0].count)
+        assertEquals(4, histogram.buckets[1].count)
+    }
+
+    @Test
+    fun onsetGapHistogramUsesTwentyFiveElapsedHoursAcrossFallBack() {
+        val zone = ZoneId.of("America/Chicago")
+        val fallOnsets = listOf(
+            "2026-10-31T12:00:00-05:00",
+            "2026-11-01T12:00:00-06:00",
+            "2026-11-02T12:00:00-06:00",
+            "2026-11-03T12:00:00-06:00",
+            "2026-11-04T12:00:00-06:00",
+            "2026-11-05T12:00:00-06:00"
+        ).map { Instant.parse(it).toEpochMilli() }
+        val histogram = deriveInsights(
+            rows = episodeRows(fallOnsets),
+            hold = HoldDuration.SIXTEEN,
+            now = Instant.parse("2026-11-06T12:00:00-06:00"),
+            zoneId = zone,
+            range = InsightRange.THIRTY_DAYS
+        ).onsetGapHistogram
+
+        assertEquals(0, histogram.buckets[0].count)
+        assertEquals(5, histogram.buckets[1].count)
+    }
+
+    @Test
+    fun onsetGapHistogramRetainsExtremeGapInOpenEndedBucket() {
+        val onsets = listOf(0L, day, 2 * day, 3 * day, 4 * day, 94 * day)
+        val histogram = deriveInsights(
+            rows = episodeRows(onsets),
+            hold = HoldDuration.SIXTEEN,
+            now = Instant.ofEpochMilli(95 * day),
+            zoneId = ZoneOffset.UTC,
+            range = InsightRange.SIX_MONTHS
+        ).onsetGapHistogram
+
+        assertEquals(1, histogram.buckets[9].count)
+        assertEquals(5, histogram.buckets.sumOf(OnsetGapBucket::count))
+    }
+
+    @Test
     fun entryChartUsesStepStatesSourceMetadataAndSleepGaps() {
         val snapshot = deriveInsights(
             rows = listOf(
@@ -421,4 +634,13 @@ class EpisodeEngineTest {
 
     private fun marker(id: Long, ts: Long, text: String) =
         EpisodeSourceRow("MARKER", id, ts, null, null, null, text = text)
+
+    private fun episodeRows(onsets: List<Long>, zeroAfterMillis: Long = hour): List<EpisodeSourceRow> =
+        buildList {
+            var id = 1L
+            onsets.forEach { onset ->
+                add(entry(id++, onset, 5))
+                add(entry(id++, onset + zeroAfterMillis, 0))
+            }
+        }
 }

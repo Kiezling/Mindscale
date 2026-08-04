@@ -30,6 +30,7 @@ import kotlin.math.max
 private const val RANGE_KEY = "insights.range"
 private const val EXPLORED_KEY = "insights.exploredInstant"
 private const val CHART_EXPLORED_KEY = "insights.chartExploredInstant"
+private const val ONSET_GAP_BUCKET_KEY = "insights.selectedOnsetGapBucket"
 private const val HOUR_MILLIS = 3_600_000L
 
 data class InsightsUiState(
@@ -38,6 +39,7 @@ data class InsightsUiState(
     val snapshot: InsightsSnapshot? = null,
     val exploredInstantMillis: Long? = null,
     val chartExploredInstantMillis: Long? = null,
+    val selectedOnsetGapBucketIndex: Int? = null,
     val hourFormat: HourFormat = HourFormat.TWELVE,
     val holdDuration: HoldDuration = HoldDuration.SIXTEEN,
     val hideNotes: Boolean = false,
@@ -70,7 +72,9 @@ class InsightsViewModel(
         InsightsUiState(
             range = initialRange,
             exploredInstantMillis = savedStateHandle[EXPLORED_KEY],
-            chartExploredInstantMillis = savedStateHandle[CHART_EXPLORED_KEY]
+            chartExploredInstantMillis = savedStateHandle[CHART_EXPLORED_KEY],
+            selectedOnsetGapBucketIndex = savedStateHandle.get<Int>(ONSET_GAP_BUCKET_KEY)
+                ?.takeIf { it in 0 until 10 }
         )
     )
     val uiState: StateFlow<InsightsUiState> = _uiState.asStateFlow()
@@ -111,10 +115,15 @@ class InsightsViewModel(
                 ?.coerceIn(snapshot.rangeStartMillis, snapshot.nowMillis)
             val chartExplored = _uiState.value.chartExploredInstantMillis
                 ?.coerceIn(snapshot.rangeStartMillis, snapshot.nowMillis)
+            val selectedOnsetGapBucket = _uiState.value.selectedOnsetGapBucketIndex
+                ?.takeIf { snapshot.onsetGapHistogram.isEligible }
+                ?.takeIf { it in snapshot.onsetGapHistogram.buckets.indices }
             if (explored == null) savedStateHandle.remove<Long>(EXPLORED_KEY)
             else savedStateHandle[EXPLORED_KEY] = explored
             if (chartExplored == null) savedStateHandle.remove<Long>(CHART_EXPLORED_KEY)
             else savedStateHandle[CHART_EXPLORED_KEY] = chartExplored
+            if (selectedOnsetGapBucket == null) savedStateHandle.remove<Int>(ONSET_GAP_BUCKET_KEY)
+            else savedStateHandle[ONSET_GAP_BUCKET_KEY] = selectedOnsetGapBucket
             _uiState.update {
                 it.copy(
                     range = range,
@@ -122,6 +131,7 @@ class InsightsViewModel(
                     snapshot = snapshot,
                     exploredInstantMillis = explored,
                     chartExploredInstantMillis = chartExplored,
+                    selectedOnsetGapBucketIndex = selectedOnsetGapBucket,
                     hourFormat = read.settings.hourFormat,
                     holdDuration = read.settings.holdDuration,
                     hideNotes = read.settings.hideNotes,
@@ -154,11 +164,13 @@ class InsightsViewModel(
         savedStateHandle[RANGE_KEY] = range.name
         savedStateHandle.remove<Long>(EXPLORED_KEY)
         savedStateHandle.remove<Long>(CHART_EXPLORED_KEY)
+        savedStateHandle.remove<Int>(ONSET_GAP_BUCKET_KEY)
         _uiState.update {
             it.copy(
                 range = range,
                 exploredInstantMillis = null,
                 chartExploredInstantMillis = null,
+                selectedOnsetGapBucketIndex = null,
                 loading = it.snapshot == null
             )
         }
@@ -208,6 +220,13 @@ class InsightsViewModel(
 
     fun moveChartMarker(delta: Int): Boolean = moveChartTarget(delta) { snapshot ->
         snapshot.entryChart.markers.map(EntryChartMarker::atMillis).distinct().sorted()
+    }
+
+    fun selectOnsetGapBucket(index: Int) {
+        val histogram = _uiState.value.snapshot?.onsetGapHistogram ?: return
+        if (!histogram.isEligible || index !in histogram.buckets.indices) return
+        savedStateHandle[ONSET_GAP_BUCKET_KEY] = index
+        _uiState.update { it.copy(selectedOnsetGapBucketIndex = index) }
     }
 
     private fun moveChartTarget(
