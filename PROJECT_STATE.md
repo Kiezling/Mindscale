@@ -8,7 +8,7 @@ Build MindScale as a native Android application using Kotlin, Jetpack Compose, M
 
 The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716ca7343`: `SPEC.md` is the rationale and `MindScale v2.dc.html` is the visual/behavioral reference for Track, Full Log, Insights, Report, Safety card, Profile, and Settings. A local exported handoff is available at `C:\Users\mckie\Downloads\MindScale-handoff\mindscale\project\`; its `MindScale v2.dc.html` is the primary implementation reference. Repository specs under `docs/specs/` govern native implementation after human approval.
 
-## Current phase: Phase 9 Insights onset-time counts verified; publication in progress
+## Current phase: Phase 9 Insights onset-time counts merged and complete
 
 - Phase 9 branch: `agent/phase9-onset-time-counts`, created from synchronized `main` at `76880a978e68e79348941de891a0bc6251986188`
 - Before branch creation, local `main`, local `origin/main`, and live GitHub `refs/heads/main` all resolved to `76880a978e68e79348941de891a0bc6251986188`; the GitHub connector confirmed `Kiezling/Mindscale` is accessible with push/admin permission and default branch `main`
@@ -17,7 +17,10 @@ The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716c
 - Selection rationale: onset-time counts are the next product-ordered Insights view and need no new source/cohort rules; descriptive sleep counts remain deferred because their night/nap, boundary, incomplete-sleep, and post-wake semantics require a separate spec
 - Approval gate satisfied: the user granted full ownership and authorized decisions, implementation, commits, pushes, PR readiness, merge, and synchronization without another review pause
 - Frozen documentation commit: `1846598`; verified implementation commit: `338a4fe`
-- Exact next action: commit this verification evidence, push the branch, open and ready the PR, merge it, synchronize `main`, and record the phase boundary on `main`
+- Verification-state commit: `ecb98d6c30d8a66efde80bfde97837400ef2f33f`
+- Phase 9 PR #6 was opened as draft, marked ready, and merged into `main` as `6e000bd3126b79aa930357c14b7987917e7b9268` on 2026-08-04 (`2026-08-04T20:10:15Z`)
+- Local `main` and `origin/main` were synchronized at the merge commit before this requested phase-boundary documentation commit
+- Exact next action after the phase boundary: freeze a separate bounded spec before any descriptive sleep-count implementation
 - Expected untracked paths remain `.agents/` and `.codex/`; they are excluded from product/documentation scope
 
 ### Phase 8 publication checkpoint
@@ -145,7 +148,7 @@ The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716c
 
 ## Active blocker
 
-No active blocker. Phase 9 is verified locally and moving through publication.
+No active blocker. Phase 9 is merged and complete.
 
 ## Known decisions
 
@@ -159,10 +162,18 @@ No active blocker. Phase 9 is verified locally and moving through publication.
 
 ## Next tasks
 
-1. Publish the verified Phase 9 branch through a ready PR, merge it, synchronize local `main`, and add the requested phase-boundary documentation commit on `main`.
-2. Next unstarted product work is the separately specified descriptive sleep-count slice; continue excluding `.agents/` and `.codex/`.
+1. Reconcile and freeze a separate spec for the descriptive sleep-count slice before implementation; resolve night/nap, range/open-sleep attribution, minimum-sample, and post-wake semantics.
+2. Keep Report/Profile, import/restore, Safety, and breathing work in `docs/specs/BACKLOG.md`; continue excluding `.agents/` and `.codex/`.
 
 ## Last verification
+
+Phase 9 publication checkpoint completed 2026-08-04:
+
+- Pushed `agent/phase9-onset-time-counts` through verification-state commit `ecb98d6c30d8a66efde80bfde97837400ef2f33f`.
+- GitHub PR #6 was opened as draft, marked ready, verified `CLEAN`/`MERGEABLE` at that exact head, and merged with the guarded expected-head SHA.
+- PR #6 merged into `main` as `6e000bd3126b79aa930357c14b7987917e7b9268` at `2026-08-04T20:10:15Z`.
+- Local `main` fast-forwarded from `76880a9` to `6e000bd`; no Android oracle was rerun for the merge or this documentation-only checkpoint because the application tree is the exact verified PR head plus GitHub's merge commit.
+- Expected untracked `.agents/` and `.codex/` remain excluded; no other local change was present.
 
 Phase 9 final local verification completed 2026-08-04 for implementation commit `338a4fe` on `agent/phase9-onset-time-counts`:
 

@@ -338,7 +338,8 @@ Install and launch the debug app on `MindScale_API_36`. Manually inspect sparse 
 - `git diff --check`: passed; only configured LF-to-CRLF notices were emitted.
 - Installed-app inspection verified the exact one-start refusal, the six-start eligible denominator and four-hour sentence, 24 accessible/selectable cells, zero-count selection/live readout, horizontal reachability and selection through hour 23, parent vertical scrolling, light/dark rendering, 150% font scaling, and landscape scrolling. Emulator font, theme, and rotation settings were restored to their starting values.
 - Critical review found no blocking issue after checking source/range attribution, current-zone and DST rules, hold/sleep reuse, four-hour arithmetic/ties, deterministic grammar, selection restoration, accessibility, one-snapshot concurrency, privacy, unchanged version-4 persistence, and rollback safety.
-- No reusable failed implementation path was introduced, so `FAILED_PATHS.md` was not changed. Publication was the next action when this evidence was recorded.
+- No reusable failed implementation path was introduced, so `FAILED_PATHS.md` was not changed.
+- Verification-state commit `ecb98d6c30d8a66efde80bfde97837400ef2f33f` was pushed on `agent/phase9-onset-time-counts`. GitHub PR #6 was opened as draft, marked ready, and merged into `main` as `6e000bd3126b79aa930357c14b7987917e7b9268` at `2026-08-04T20:10:15Z`.
 
 ## Task decomposition after approval
 
