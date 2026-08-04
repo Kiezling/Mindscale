@@ -9,7 +9,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.CreationExtras
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.runtime.getValue
 import com.kieslingdev.mindscale.log.LogViewModel
+import com.kieslingdev.mindscale.settings.SettingsViewModel
 import com.kieslingdev.mindscale.track.TrackViewModel
 import com.kieslingdev.mindscale.ui.theme.MindScaleTheme
 
@@ -40,6 +43,20 @@ class MainActivity : ComponentActivity() {
                     entryDao = database.entryDao(),
                     sleepDao = database.sleepDao(),
                     markerDao = database.markerDao(),
+                    savedStateHandle = extras.createSavedStateHandle(),
+                    settingsDao = database.trackSettingsDao()
+                ) as T
+            }
+        }
+    }
+
+    private val settingsViewModel: SettingsViewModel by viewModels {
+        object : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
+                return SettingsViewModel(
+                    settingsDao = database.trackSettingsDao(),
+                    dataControlDao = database.dataControlDao(),
                     savedStateHandle = extras.createSavedStateHandle()
                 ) as T
             }
@@ -50,8 +67,13 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            MindScaleTheme {
-                MindScaleApp(trackViewModel = trackViewModel, logViewModel = logViewModel)
+            val settingsState by settingsViewModel.uiState.collectAsStateWithLifecycle()
+            MindScaleTheme(themeMode = settingsState.settings.themeMode) {
+                MindScaleApp(
+                    trackViewModel = trackViewModel,
+                    logViewModel = logViewModel,
+                    settingsViewModel = settingsViewModel
+                )
             }
         }
     }

@@ -10,5 +10,13 @@ data class TrackSettings(
     val askChips: Boolean = false,
     val paused: Boolean = false,
     val checkinAt: Long = 0L,
-    val sleepIntroShown: Boolean = false
+    val sleepIntroShown: Boolean = false,
+    val themeMode: ThemeMode = ThemeMode.SYSTEM,
+    val hourFormat: HourFormat = HourFormat.TWELVE,
+    val anchor2: String = "",
+    val anchor5: String = "",
+    val anchor8: String = "",
+    val onsetChips: List<String> = DEFAULT_ONSET_CHIPS,
+    val hideNotes: Boolean = false,
+    val anchorPromptDone: Boolean = false
 )

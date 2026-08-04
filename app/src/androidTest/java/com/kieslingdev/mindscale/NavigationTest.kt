@@ -31,4 +31,27 @@ class NavigationTest {
 
         composeTestRule.onNodeWithTag("full_log_screen").assertExists()
     }
+
+    @Test
+    fun settingsOpens_hidesBottomNavigation_andBackReturnsToPriorDestination() {
+        composeTestRule.onNodeWithText("Log").performClick()
+        composeTestRule.onNodeWithTag("settings_action").performClick()
+        composeTestRule.onNodeWithTag("settings_screen").assertExists()
+        composeTestRule.onNodeWithTag("main_navigation").assertDoesNotExist()
+
+        composeTestRule.onNodeWithTag("settings_back").performClick()
+
+        composeTestRule.onNodeWithTag("full_log_screen").assertExists()
+        composeTestRule.onNodeWithTag("main_navigation").assertExists()
+    }
+
+    @Test
+    fun settingsDestination_survivesActivityRecreation() {
+        composeTestRule.onNodeWithTag("settings_action").performClick()
+        composeTestRule.onNodeWithTag("settings_screen").assertExists()
+
+        composeTestRule.activityRule.scenario.recreate()
+
+        composeTestRule.onNodeWithTag("settings_screen").assertExists()
+    }
 }

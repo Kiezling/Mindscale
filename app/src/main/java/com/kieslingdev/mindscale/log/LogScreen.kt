@@ -40,14 +40,16 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kieslingdev.mindscale.data.Entry
 import com.kieslingdev.mindscale.data.EntryKind
-import com.kieslingdev.mindscale.track.DEFAULT_ONSET_CHIPS
+import com.kieslingdev.mindscale.data.HourFormat
+import com.kieslingdev.mindscale.settings.vocabularyForEntry
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 
-private val RowTimeFormatter = DateTimeFormatter.ofPattern("h:mm a")
+private val RowTimeTwelveHourFormatter = DateTimeFormatter.ofPattern("h:mm a")
+private val RowTimeTwentyFourHourFormatter = DateTimeFormatter.ofPattern("HH:mm")
 private val DayFormatter = DateTimeFormatter.ofPattern("EEEE, MMM d")
 private val FilterDateFormatter = DateTimeFormatter.ofPattern("MMM d, yyyy")
 
@@ -127,6 +129,7 @@ fun LogScreen(
                         item = item,
                         editDraft = uiState.editDraft?.takeIf { item is LogItem.Rating && it.entryId == item.id },
                         noteDraft = uiState.noteDraft?.takeIf { item is LogItem.Rating && it.entryId == item.id },
+                        settings = uiState.settings,
                         onEvent = onEvent
                     )
                 }
@@ -262,6 +265,7 @@ private fun LogItemRow(
     item: LogItem,
     editDraft: LogEditDraft?,
     noteDraft: LogNoteDraft?,
+    settings: com.kieslingdev.mindscale.data.TrackSettings,
     onEvent: (LogEvent) -> Unit
 ) {
     Column(modifier = Modifier.fillMaxWidth().testTag("log_row_${item.stableKey}")) {
@@ -284,10 +288,10 @@ private fun LogItemRow(
             Column(
                 modifier = Modifier.weight(1f)
                     .semantics(mergeDescendants = true) {
-                        contentDescription = itemDescription(item)
+                        contentDescription = itemDescription(item, settings.hourFormat, settings.hideNotes)
                     }
             ) {
-                Text(formatTime(item.timestamp), style = MaterialTheme.typography.bodyMedium)
+                Text(formatTime(item.timestamp, settings.hourFormat), style = MaterialTheme.typography.bodyMedium)
                 val meta = itemMeta(item)
                 if (meta.isNotBlank()) {
                     Text(
@@ -314,20 +318,30 @@ private fun LogItemRow(
                 modifier = Modifier.semantics { contentDescription = "Delete ${deleteType(item)}" }
             ) { Text("Delete") }
         }
-        if (item is LogItem.Rating && !item.entry.note.isNullOrBlank()) {
+        if (item is LogItem.Rating && !settings.hideNotes && !item.entry.note.isNullOrBlank()) {
             Text(
                 item.entry.note.orEmpty(),
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.padding(start = 38.dp, bottom = 8.dp).testTag("log_note_${item.id}")
             )
         }
-        if (editDraft != null) InlineEditPanel(editDraft, onEvent)
+        if (editDraft != null) {
+            InlineEditPanel(
+                editDraft,
+                vocabularyForEntry(settings, editDraft.chips),
+                onEvent
+            )
+        }
         if (noteDraft != null) InlineNotePanel(noteDraft, onEvent)
     }
 }
 
 @Composable
-private fun InlineEditPanel(draft: LogEditDraft, onEvent: (LogEvent) -> Unit) {
+private fun InlineEditPanel(
+    draft: LogEditDraft,
+    vocabulary: List<String>,
+    onEvent: (LogEvent) -> Unit
+) {
     Column(
         modifier = Modifier.fillMaxWidth().padding(start = 38.dp, bottom = 12.dp)
             .testTag("log_inline_edit_${draft.entryId}"),
@@ -344,7 +358,7 @@ private fun InlineEditPanel(draft: LogEditDraft, onEvent: (LogEvent) -> Unit) {
             }
         }
         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            DEFAULT_ONSET_CHIPS.forEach { chip ->
+            vocabulary.forEach { chip ->
                 FilterChip(
                     selected = chip in draft.chips,
                     onClick = { onEvent(LogEvent.EditChipToggled(chip)) },
@@ -402,8 +416,11 @@ private fun LogEmptyState(filtered: Boolean) {
     }
 }
 
-private fun formatTime(timestamp: Long): String =
-    Instant.ofEpochMilli(timestamp).atZone(ZoneId.systemDefault()).format(RowTimeFormatter)
+private fun formatTime(timestamp: Long, hourFormat: HourFormat): String =
+    Instant.ofEpochMilli(timestamp).atZone(ZoneId.systemDefault()).format(
+        if (hourFormat == HourFormat.TWENTY_FOUR) RowTimeTwentyFourHourFormatter
+        else RowTimeTwelveHourFormatter
+    )
 
 private fun itemMeta(item: LogItem): String = when (item) {
     is LogItem.Rating -> buildList {
@@ -418,15 +435,15 @@ private fun itemMeta(item: LogItem): String = when (item) {
     is LogItem.Event -> item.marker.text
 }
 
-private fun itemDescription(item: LogItem): String = when (item) {
+private fun itemDescription(item: LogItem, hourFormat: HourFormat, hideNotes: Boolean): String = when (item) {
     is LogItem.Rating -> buildString {
-        append("Rating ${item.entry.value}, ${formatTime(item.timestamp)}")
+        append("Rating ${item.entry.value}, ${formatTime(item.timestamp, hourFormat)}")
         val meta = itemMeta(item)
         if (meta.isNotBlank()) append(", $meta")
-        item.entry.note?.takeIf { it.isNotBlank() }?.let { append(", note $it") }
+        if (!hideNotes) item.entry.note?.takeIf { it.isNotBlank() }?.let { append(", note $it") }
     }
-    is LogItem.Sleep -> "Sleep interval, ${formatTime(item.timestamp)}, ${itemMeta(item)}"
-    is LogItem.Event -> "Event, ${formatTime(item.timestamp)}, ${item.marker.text}"
+    is LogItem.Sleep -> "Sleep interval, ${formatTime(item.timestamp, hourFormat)}, ${itemMeta(item)}"
+    is LogItem.Event -> "Event, ${formatTime(item.timestamp, hourFormat)}, ${item.marker.text}"
 }
 
 private fun deleteType(item: LogItem): String = when (item) {

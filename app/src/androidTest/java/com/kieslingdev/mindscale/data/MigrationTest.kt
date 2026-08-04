@@ -67,4 +67,58 @@ class MigrationTest {
             assertTrue("exactly one settings row after migration", !c.moveToNext())
         }
     }
+
+    @Test
+    fun migrate2To3_preservesRecordsAndAddsFrozenSettingsDefaults() {
+        var db = helper.createDatabase(TEST_DB, 2)
+        db.execSQL("INSERT INTO entries (id, ts, value, chips, note, kind) VALUES (7, 1000, 8, 'work', 'keep me', 'SLEEP')")
+        db.execSQL("INSERT INTO sleeps (id, startTs, endTs) VALUES (8, 900, 1200)")
+        db.execSQL("INSERT INTO markers (id, ts, text) VALUES (9, 1100, 'dose change')")
+        db.execSQL("INSERT INTO track_settings (id, sleepOn, askChips, paused, checkinAt, sleepIntroShown) VALUES (0, 0, 1, 1, 77, 1)")
+        db.close()
+
+        db = helper.runMigrationsAndValidate(TEST_DB, 3, true, MIGRATION_2_3)
+
+        db.query("SELECT ts, value, chips, note, kind FROM entries WHERE id = 7").use { c ->
+            assertTrue(c.moveToFirst())
+            assertEquals(1000L, c.getLong(0))
+            assertEquals(8, c.getInt(1))
+            assertEquals("work", c.getString(2))
+            assertEquals("keep me", c.getString(3))
+            assertEquals("SLEEP", c.getString(4))
+        }
+        db.query("SELECT themeMode, hourFormat, anchor2, anchor5, anchor8, onsetChips, hideNotes, anchorPromptDone, sleepOn, askChips, paused FROM track_settings WHERE id = 0").use { c ->
+            assertTrue(c.moveToFirst())
+            assertEquals("SYSTEM", c.getString(0))
+            assertEquals("TWELVE", c.getString(1))
+            assertEquals("", c.getString(2))
+            assertEquals("", c.getString(3))
+            assertEquals("", c.getString(4))
+            assertEquals(DEFAULT_ONSET_CHIPS, ChipsConverter().toChips(c.getString(5)))
+            assertEquals(0, c.getInt(6))
+            assertEquals(0, c.getInt(7))
+            assertEquals(0, c.getInt(8))
+            assertEquals(1, c.getInt(9))
+            assertEquals(1, c.getInt(10))
+        }
+    }
+
+    @Test
+    fun migrate1To3_runsBothAdditiveSteps() {
+        var db = helper.createDatabase(TEST_DB, 1)
+        db.execSQL("INSERT INTO entries (id, ts, value, chips, note) VALUES (3, 44, 5, '', NULL)")
+        db.close()
+
+        db = helper.runMigrationsAndValidate(TEST_DB, 3, true, MIGRATION_1_2, MIGRATION_2_3)
+        db.query("SELECT value, kind FROM entries WHERE id = 3").use { c ->
+            assertTrue(c.moveToFirst())
+            assertEquals(5, c.getInt(0))
+            assertTrue(c.isNull(1))
+        }
+        db.query("SELECT themeMode, onsetChips FROM track_settings WHERE id = 0").use { c ->
+            assertTrue(c.moveToFirst())
+            assertEquals("SYSTEM", c.getString(0))
+            assertEquals(DEFAULT_ONSET_CHIPS, ChipsConverter().toChips(c.getString(1)))
+        }
+    }
 }

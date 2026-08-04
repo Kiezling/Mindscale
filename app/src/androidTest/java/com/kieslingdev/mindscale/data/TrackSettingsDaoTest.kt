@@ -43,6 +43,11 @@ class TrackSettingsDaoTest {
         assertFalse(settings.paused)
         assertEquals(0L, settings.checkinAt)
         assertFalse(settings.sleepIntroShown)
+        assertEquals(ThemeMode.SYSTEM, settings.themeMode)
+        assertEquals(HourFormat.TWELVE, settings.hourFormat)
+        assertEquals(DEFAULT_ONSET_CHIPS, settings.onsetChips)
+        assertFalse(settings.hideNotes)
+        assertFalse(settings.anchorPromptDone)
     }
 
     @Test
@@ -57,5 +62,31 @@ class TrackSettingsDaoTest {
         assertTrue(updated.sleepIntroShown)
         // sleepOn untouched by this update.
         assertTrue(updated.sleepOn)
+    }
+
+    @Test
+    fun targetedUpdates_preserveUnrelatedFields() = runBlocking {
+        assertEquals(1, dao.setAnchors("low", "middle", "high"))
+        assertEquals(1, dao.setAppearance(ThemeMode.DARK))
+        assertEquals(1, dao.setHideNotes(true))
+
+        val updated = dao.current()
+        assertEquals("low", updated.anchor2)
+        assertEquals("middle", updated.anchor5)
+        assertEquals("high", updated.anchor8)
+        assertEquals(ThemeMode.DARK, updated.themeMode)
+        assertTrue(updated.hideNotes)
+        assertTrue(updated.sleepOn)
+        assertFalse(updated.askChips)
+    }
+
+    @Test
+    fun disablingSleep_isRejectedWhileAnIntervalIsOpen() = runBlocking {
+        database.sleepDao().insert(SleepInterval(startTs = 100L))
+        assertEquals(SleepSettingOutcome.OpenInterval, dao.setSleepOnSafely(false))
+        assertTrue(dao.current().sleepOn)
+        database.sleepDao().captureWake(200L)
+        assertEquals(SleepSettingOutcome.Updated, dao.setSleepOnSafely(false))
+        assertFalse(dao.current().sleepOn)
     }
 }
