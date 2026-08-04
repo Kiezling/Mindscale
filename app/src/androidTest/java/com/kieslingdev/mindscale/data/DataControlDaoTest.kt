@@ -33,12 +33,23 @@ class DataControlDaoTest {
         database.sleepDao().insert(SleepInterval(startTs = 30, endTs = 40))
         database.markerDao().insert(Marker(ts = 50, text = "event"))
         database.trackSettingsDao().setAnchors("low", "mid", "high")
+        database.profileDao().setDisplayName("Ada")
+        database.profileDao().insertScore(
+            ExternalScore(
+                instrument = ExternalInstrument.PHQ_8,
+                total = 8,
+                assessedEpochDay = 20,
+                enteredAt = 60
+            )
+        )
 
         val snapshot = database.dataControlDao().snapshot()
         assertEquals(listOf(20L, 10L), snapshot.entries.map(Entry::ts))
         assertEquals(1, snapshot.sleeps.size)
         assertEquals(1, snapshot.markers.size)
         assertEquals("mid", snapshot.settings.anchor5)
+        assertEquals("Ada", snapshot.profile.displayName)
+        assertEquals(listOf(8), snapshot.externalScores.map(ExternalScore::total))
     }
 
     @Test
@@ -49,8 +60,17 @@ class DataControlDaoTest {
         database.trackSettingsDao().setPaused(true)
         database.trackSettingsDao().setAppearance(ThemeMode.DARK)
         database.trackSettingsDao().setHoldDuration(HoldDuration.TWENTY_FOUR)
+        database.profileDao().setDisplayName("Ada")
+        database.profileDao().insertScore(
+            ExternalScore(
+                instrument = ExternalInstrument.GAD_7,
+                total = 9,
+                assessedEpochDay = 20,
+                enteredAt = 60
+            )
+        )
 
-        assertEquals(EraseCounts(1, 1, 1), database.dataControlDao().eraseEverythingAndResetSettings())
+        assertEquals(EraseCounts(1, 1, 1, 1), database.dataControlDao().eraseEverythingAndResetSettings())
         val snapshot = database.dataControlDao().snapshot()
         assertEquals(0, snapshot.entries.size)
         assertEquals(0, snapshot.sleeps.size)
@@ -58,5 +78,7 @@ class DataControlDaoTest {
         assertEquals(ThemeMode.SYSTEM, snapshot.settings.themeMode)
         assertEquals(HoldDuration.SIXTEEN, snapshot.settings.holdDuration)
         assertFalse(snapshot.settings.paused)
+        assertEquals("", snapshot.profile.displayName)
+        assertEquals(0, snapshot.externalScores.size)
     }
 }

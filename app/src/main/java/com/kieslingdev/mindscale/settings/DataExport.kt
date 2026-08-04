@@ -2,6 +2,7 @@ package com.kieslingdev.mindscale.settings
 
 import com.kieslingdev.mindscale.data.DataSnapshot
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 
@@ -14,7 +15,7 @@ fun recordsFilename(at: Instant): String = "mindscale-records-${FilenameFormatte
 fun encodeBackup(snapshot: DataSnapshot, exportedAt: Instant): String = buildString {
     append("{\n")
     append("  \"format\": \"mindscale-backup\",\n")
-    append("  \"version\": 4,\n")
+    append("  \"version\": 5,\n")
     append("  \"exportedAt\": ").appendJson(exportedAt.toString()).append(",\n")
     append("  \"entries\": [")
     snapshot.entries.forEachIndexed { index, entry ->
@@ -57,7 +58,25 @@ fun encodeBackup(snapshot: DataSnapshot, exportedAt: Instant): String = buildStr
     append("\n    \"hideNotes\": ${s.hideNotes},")
     append("\n    \"paused\": ${s.paused},")
     append("\n    \"holdHours\": ${s.holdDuration.hours}")
-    append("\n  }\n}")
+    append("\n  },\n")
+    append("  \"profile\": {\"displayName\": ").appendJson(snapshot.profile.displayName).append("},\n")
+    append("  \"externalScores\": [")
+    snapshot.externalScores
+        .sortedWith(compareByDescending<com.kieslingdev.mindscale.data.ExternalScore> { it.assessedEpochDay }
+            .thenByDescending { it.id })
+        .forEachIndexed { index, score ->
+            if (index > 0) append(',')
+            append("\n    {\"id\": ${score.id}, \"instrument\": ")
+                .appendJson(score.instrument.name)
+                .append(", \"total\": ${score.total}, \"assessedDate\": ")
+                .appendJson(LocalDate.ofEpochDay(score.assessedEpochDay).toString())
+                .append(", \"provenance\": ").appendJson(score.provenance.name)
+                .append(", \"enteredAt\": ")
+                .appendJson(Instant.ofEpochMilli(score.enteredAt).toString())
+                .append('}')
+        }
+    if (snapshot.externalScores.isNotEmpty()) append('\n').append("  ")
+    append("]\n}")
 }
 
 fun encodeRecordsCsv(snapshot: DataSnapshot): String = buildString {

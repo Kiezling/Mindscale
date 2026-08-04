@@ -139,7 +139,8 @@ data class InsightSummary(
     val typicalLengthMillis: Long?,
     val clearDays: Int,
     val eligibleDays: Int,
-    val peak: Int?
+    val peak: Int?,
+    val intensityHours: Double = 0.0
 )
 
 data class OnsetGapBucket(

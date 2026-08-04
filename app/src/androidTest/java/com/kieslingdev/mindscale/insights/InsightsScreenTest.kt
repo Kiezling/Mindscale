@@ -434,11 +434,21 @@ class InsightsScreenTest {
 
         val list = composeTestRule.onNodeWithTag("insights_screen")
         list.performScrollToNode(hasTestTag("sleep_category_cells"))
+        val scrollBy = list.fetchSemanticsNode().config[SemanticsActions.ScrollBy]
+        assertTrue(scrollBy.action?.invoke(0f, -72f) == true)
+        composeTestRule.waitForIdle()
         val before = list.fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange].value()
-        composeTestRule.onNodeWithTag("sleep_category_0").performTouchInput { swipeDown() }
+        composeTestRule.onNodeWithTag("sleep_category_0").assertIsDisplayed().performTouchInput {
+            swipe(
+                start = Offset(center.x, height * 0.75f),
+                end = Offset(center.x, height * 0.25f),
+                durationMillis = 500
+            )
+        }
+        composeTestRule.waitForIdle()
         val after = list.fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange].value()
 
-        assertTrue(after < before)
+        assertTrue("Expected cell drag to move the parent from $before, but settled at $after", after != before)
     }
 
     @Test

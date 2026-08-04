@@ -8,11 +8,23 @@ import androidx.room.TypeConverters
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
-    entities = [Entry::class, SleepInterval::class, Marker::class, TrackSettings::class],
-    version = 4,
+    entities = [
+        Entry::class,
+        SleepInterval::class,
+        Marker::class,
+        TrackSettings::class,
+        UserProfile::class,
+        ExternalScore::class
+    ],
+    version = 5,
     exportSchema = true
 )
-@TypeConverters(ChipsConverter::class, EntryKindConverter::class, SettingsConverters::class)
+@TypeConverters(
+    ChipsConverter::class,
+    EntryKindConverter::class,
+    SettingsConverters::class,
+    ExternalScoreConverters::class
+)
 abstract class MindScaleDatabase : RoomDatabase() {
     abstract fun entryDao(): EntryDao
     abstract fun sleepDao(): SleepDao
@@ -20,6 +32,7 @@ abstract class MindScaleDatabase : RoomDatabase() {
     abstract fun trackSettingsDao(): TrackSettingsDao
     abstract fun dataControlDao(): DataControlDao
     abstract fun episodeSourceDao(): EpisodeSourceDao
+    abstract fun profileDao(): ProfileDao
 
     companion object {
         const val NAME = "mindscale.db"
@@ -40,13 +53,14 @@ abstract class MindScaleDatabase : RoomDatabase() {
                         "VALUES (0, 1, 0, 0, 0, 0, 'SYSTEM', 'TWELVE', '', '', '', " +
                         "'${DEFAULT_ONSET_CHIPS.joinToString("\u001F").replace("'", "''")}', 0, 0, 'SIXTEEN')"
                 )
+                db.execSQL("INSERT INTO user_profile (id, displayName) VALUES (0, '')")
             }
         }
 
         /** Manual singleton construction (no DI framework, per Invariant 11 / D-3). */
         fun build(context: Context): MindScaleDatabase =
             Room.databaseBuilder(context.applicationContext, MindScaleDatabase::class.java, NAME)
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                 .addCallback(seedSettingsCallback)
                 .build()
     }

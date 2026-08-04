@@ -2,12 +2,14 @@ package com.kieslingdev.mindscale
 
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.longClick
@@ -121,10 +123,13 @@ class NavigationTest {
     @Test
     fun settingsOpenedFromInsights_returnsToInsights() {
         composeTestRule.onNodeWithTag("insights_tab").performClick()
-        composeTestRule.onNodeWithTag("settings_action").performClick()
+        composeTestRule.onNodeWithTag("profile_action").performClick()
+        composeTestRule.onNodeWithTag("profile_open_settings").performClick()
         composeTestRule.onNodeWithTag("settings_screen").assertExists()
 
-        composeTestRule.onNodeWithTag("settings_back").performClick()
+        composeTestRule.onNodeWithTag("overlay_back").performClick()
+        composeTestRule.onNodeWithTag("profile_screen").assertExists()
+        composeTestRule.onNodeWithTag("overlay_back").performClick()
 
         composeTestRule.onNodeWithTag("insights_screen").assertExists()
     }
@@ -132,11 +137,14 @@ class NavigationTest {
     @Test
     fun settingsOpens_hidesBottomNavigation_andBackReturnsToPriorDestination() {
         composeTestRule.onNodeWithText("Log").performClick()
-        composeTestRule.onNodeWithTag("settings_action").performClick()
+        composeTestRule.onNodeWithTag("profile_action").performClick()
+        composeTestRule.onNodeWithTag("profile_open_settings").performClick()
         composeTestRule.onNodeWithTag("settings_screen").assertExists()
         composeTestRule.onNodeWithTag("main_navigation").assertDoesNotExist()
 
-        composeTestRule.onNodeWithTag("settings_back").performClick()
+        composeTestRule.onNodeWithTag("overlay_back").performClick()
+        composeTestRule.onNodeWithTag("profile_screen").assertExists()
+        composeTestRule.onNodeWithTag("overlay_back").performClick()
 
         composeTestRule.onNodeWithTag("full_log_screen").assertExists()
         composeTestRule.onNodeWithTag("main_navigation").assertExists()
@@ -144,7 +152,8 @@ class NavigationTest {
 
     @Test
     fun settingsDestination_survivesActivityRecreation() {
-        composeTestRule.onNodeWithTag("settings_action").performClick()
+        composeTestRule.onNodeWithTag("profile_action").performClick()
+        composeTestRule.onNodeWithTag("profile_open_settings").performClick()
         composeTestRule.onNodeWithTag("settings_screen").assertExists()
 
         composeTestRule.activityRule.scenario.recreate()
@@ -154,7 +163,8 @@ class NavigationTest {
 
     @Test
     fun holdSettingIsReachableAndPersistsAcrossRecreation() {
-        composeTestRule.onNodeWithTag("settings_action").performClick()
+        composeTestRule.onNodeWithTag("profile_action").performClick()
+        composeTestRule.onNodeWithTag("profile_open_settings").performClick()
         composeTestRule.onNodeWithText("An entry ends after").performScrollTo()
         composeTestRule.onNodeWithText("24h").performClick()
         composeTestRule.onNodeWithContentDescription("24h, selected").assertExists()
@@ -163,5 +173,35 @@ class NavigationTest {
 
         composeTestRule.onNodeWithText("An entry ends after").performScrollTo()
         composeTestRule.onNodeWithContentDescription("24h, selected").assertExists()
+    }
+
+    @Test
+    fun profileAndReportNestedBackStackSurvivesRecreation() {
+        composeTestRule.onNodeWithTag("insights_tab").performClick()
+        composeTestRule.onNodeWithTag("profile_action").performClick()
+        composeTestRule.onNodeWithTag("profile_open_report").performClick()
+        composeTestRule.onNodeWithTag("report_screen").assertExists()
+        composeTestRule.onNodeWithTag("main_navigation").assertDoesNotExist()
+
+        composeTestRule.activityRule.scenario.recreate()
+
+        composeTestRule.onNodeWithTag("report_screen").assertExists()
+        composeTestRule.onNodeWithTag("overlay_back").performClick()
+        composeTestRule.onNodeWithTag("profile_screen").assertExists()
+        composeTestRule.onNodeWithTag("overlay_back").performClick()
+        composeTestRule.onNodeWithTag("insights_screen").assertExists()
+    }
+
+    @Test
+    fun insightsClinicianSummaryReturnsDirectlyToInsights() {
+        composeTestRule.onNodeWithTag("insights_tab").performClick()
+        composeTestRule.onNodeWithTag("insights_screen")
+            .performScrollToNode(hasTestTag("insights_open_report"))
+        composeTestRule.onNodeWithTag("insights_open_report").performClick()
+        composeTestRule.onNodeWithTag("report_screen").assertExists()
+
+        composeTestRule.onNodeWithTag("overlay_back").performClick()
+
+        composeTestRule.onNodeWithTag("insights_screen").assertExists()
     }
 }
