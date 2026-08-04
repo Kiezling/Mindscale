@@ -83,6 +83,7 @@ fun InsightsRoute(viewModel: InsightsViewModel, modifier: Modifier = Modifier) {
         onNextEvent = { viewModel.moveChartMarker(1) },
         onSelectOnsetGapBucket = viewModel::selectOnsetGapBucket,
         onSelectOnsetHour = viewModel::selectOnsetHour,
+        onSelectSleepCategory = viewModel::selectSleepCategory,
         onRetry = viewModel::retry,
         modifier = modifier
     )
@@ -106,6 +107,7 @@ fun InsightsScreen(
     onNextEvent: () -> Boolean,
     onSelectOnsetGapBucket: (Int) -> Unit,
     onSelectOnsetHour: (Int) -> Unit,
+    onSelectSleepCategory: (Int) -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
     zoneId: ZoneId = ZoneId.systemDefault()
@@ -269,7 +271,121 @@ fun InsightsScreen(
                     onSelectHour = onSelectOnsetHour
                 )
             }
+            item(key = "sleep_counts") {
+                SleepCountsSection(
+                    counts = snapshot.sleepCounts,
+                    selectedCategoryIndex = uiState.selectedSleepCategoryIndex,
+                    onSelectCategory = onSelectSleepCategory
+                )
+            }
         }
+    }
+}
+
+@Composable
+private fun SleepCountsSection(
+    counts: SleepCounts,
+    selectedCategoryIndex: Int?,
+    onSelectCategory: (Int) -> Unit
+) {
+    Column(
+        modifier = Modifier.testTag("sleep_counts_section"),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text("Sleep you recorded", style = MaterialTheme.typography.titleMedium)
+        if (!counts.isEligible) {
+            Surface(
+                tonalElevation = 1.dp,
+                shape = MaterialTheme.shapes.medium,
+                modifier = Modifier.fillMaxWidth().testTag("sleep_counts_refusal")
+            ) {
+                Text(
+                    "No completed sleep periods woke in this range.",
+                    modifier = Modifier.padding(16.dp),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        } else {
+            Text(sleepCountsDenominator(counts), style = MaterialTheme.typography.bodySmall)
+            Row(
+                modifier = Modifier.fillMaxWidth().testTag("sleep_category_cells"),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                counts.categories.forEachIndexed { index, category ->
+                    val isSelected = selectedCategoryIndex == index
+                    val periodWord = if (counts.completedCount == 1) "period" else "periods"
+                    val description = "${sleepCategoryVisibleLabel(category.category)}, " +
+                        "${category.count} of ${counts.completedCount} completed sleep $periodWord, " +
+                        sleepCategoryBoundary(category.category)
+                    Surface(
+                        onClick = { onSelectCategory(index) },
+                        shape = MaterialTheme.shapes.small,
+                        color = if (isSelected) {
+                            MaterialTheme.colorScheme.secondaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.surfaceVariant
+                        },
+                        border = BorderStroke(
+                            width = if (isSelected) 2.dp else 1.dp,
+                            color = if (isSelected) {
+                                MaterialTheme.colorScheme.onSecondaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.outlineVariant
+                            }
+                        ),
+                        modifier = Modifier
+                            .weight(1f)
+                            .heightIn(min = 96.dp)
+                            .testTag("sleep_category_$index")
+                            .semantics(mergeDescendants = true) {
+                                role = Role.Button
+                                selected = isSelected
+                                contentDescription = description
+                            }
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(12.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text(category.count.toString(), style = MaterialTheme.typography.titleLarge)
+                            Text(
+                                sleepCategoryVisibleLabel(category.category),
+                                style = MaterialTheme.typography.labelLarge,
+                                textAlign = TextAlign.Center
+                            )
+                            Text(
+                                if (category.category == SleepCategory.NIGHT) ">3h" else "≤3h",
+                                style = MaterialTheme.typography.labelMedium,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
+                }
+            }
+            Text(
+                selectedCategoryIndex?.let { sleepCategoryReadout(counts, it) }
+                    ?: "Select nights or naps to read the exact durations.",
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.testTag("sleep_counts_readout").semantics {
+                    liveRegion = LiveRegionMode.Polite
+                }
+            )
+        }
+        sleepIncompleteText(counts)?.let { text ->
+            Text(
+                text,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.testTag("sleep_incomplete_text")
+            )
+        }
+        Text(
+            SLEEP_COUNTS_CAVEAT,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 

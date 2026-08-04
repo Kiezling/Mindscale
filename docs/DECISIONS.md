@@ -64,3 +64,10 @@ Record stable decisions that should survive chat resets and model/provider chang
 - Decision: add one native 24-bucket local-clock onset-time count view derived from existing Phase 5 episodes. Require six in-range starts; use the current device zone, explicit recording-displacement/current-zone caveats, exact denominators and half-open hour readouts, and one deterministic wrapping four-hour count sentence with earliest-hour tie-breaking. Use accessible 48 dp Compose cells and primitive `SavedStateHandle` selection while keeping the single Room/StateFlow derivation and Room/schema/JSON version 4, CSV, backup rules, privacy, permissions, dependencies, and architecture unchanged. See `docs/specs/SPEC-insights-onset-time-counts.md`, D-1 through D-10.
 - Reason: this is the next product-defined Insights view and can reuse reviewed episode onsets without a new classifier or persistence change; descriptive sleep counts require separate cohort and boundary decisions.
 - Supersedes: none; narrows the onset-time portion deferred by Phase 5 D-1, Phase 6 D-1, and Phase 8 D-1.
+
+## D-010 — Phase 10 descriptive sleep counts
+
+- Date: 2026-08-04
+- Decision: add one native descriptive sleep section from the existing normalized sleep union. Group completed periods by recorded Wake in the selected half-open range, classify exact elapsed duration `<=3h` as nap and `>3h` as night, show direct counts and exact duration summaries from the first completed period, and exclude/disclose incomplete periods. Omit the prototype's five-hour post-wake comparison and every effect claim. Restore only primitive category selection while keeping Room/schema/JSON version 4 and CSV, backup, privacy, permissions, dependencies, and architecture unchanged. See `docs/specs/SPEC-insights-sleep-counts.md`, D-1 through D-10.
+- Reason: this is the smallest handoff-supported sleep slice that preserves raw-data truth and range behavior without turning recording opportunity or sparse later ratings into an implied sleep effect.
+- Supersedes: none; narrows the descriptive sleep portion deferred by Phase 5 D-1, Phase 6 D-1, Phase 8 D-1, and Phase 9 D-1.

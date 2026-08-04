@@ -17,6 +17,14 @@ const val ONSET_TIME_CAVEAT =
         "Driving, meetings, and sleep can make recording happen later. " +
         "Historical starts use your device's current time zone."
 
+const val SLEEP_COUNTS_CAVEAT =
+    "Nights are periods over 3 elapsed hours; naps are 3 hours or less. " +
+        "These labels use duration, not time of day. " +
+        "Periods are grouped by recorded Wake time, so one may have started before this range. " +
+        "Selected-range day boundaries use your device's current time zone. " +
+        "Incomplete periods are excluded. " +
+        "These counts do not show whether sleep changed what you recorded afterward."
+
 enum class InsightRange(val shortLabel: String, val spokenLabel: String) {
     ONE_DAY("1D", "1 day"),
     THREE_DAYS("3D", "3 days"),
@@ -257,6 +265,70 @@ private fun onsetClockWindowBoundary(startHour: Int, durationHours: Int, hourFor
 
 private fun Int.toTwelveHour(): Int = (this % 12).takeIf { it != 0 } ?: 12
 
+enum class SleepCategory { NIGHT, NAP }
+
+data class SleepCategoryCount(
+    val category: SleepCategory,
+    val count: Int,
+    val durationsMillis: List<Long>,
+    val medianDurationMillis: Long?,
+    val shortestDurationMillis: Long?,
+    val longestDurationMillis: Long?
+)
+
+data class SleepCounts(
+    val completedCount: Int,
+    val incompleteCount: Int,
+    val categories: List<SleepCategoryCount>
+) {
+    val isEligible: Boolean
+        get() = completedCount > 0
+}
+
+fun sleepCountsDenominator(counts: SleepCounts): String {
+    val periodWord = if (counts.completedCount == 1) "period" else "periods"
+    return "${counts.completedCount} completed sleep $periodWord woke in this range."
+}
+
+fun sleepIncompleteText(counts: SleepCounts): String? = when (counts.incompleteCount) {
+    0 -> null
+    1 -> "1 incomplete sleep period is excluded because its Wake time is missing or later than now."
+    else -> "${counts.incompleteCount} incomplete sleep periods are excluded because their Wake times are missing or later than now."
+}
+
+fun sleepCategoryVisibleLabel(category: SleepCategory): String = when (category) {
+    SleepCategory.NIGHT -> "Nights"
+    SleepCategory.NAP -> "Naps"
+}
+
+fun sleepCategoryBoundary(category: SleepCategory): String = when (category) {
+    SleepCategory.NIGHT -> "over 3 elapsed hours"
+    SleepCategory.NAP -> "3 elapsed hours or less"
+}
+
+fun sleepCategoryReadout(counts: SleepCounts, categoryIndex: Int): String? {
+    val category = counts.categories.getOrNull(categoryIndex) ?: return null
+    val periodWord = if (counts.completedCount == 1) "period" else "periods"
+    val classification = when (category.category) {
+        SleepCategory.NIGHT -> if (category.count == 1) {
+            "was a night over 3 elapsed hours"
+        } else {
+            "were nights over 3 elapsed hours"
+        }
+        SleepCategory.NAP -> if (category.count == 1) {
+            "was a nap of 3 elapsed hours or less"
+        } else {
+            "were naps of 3 elapsed hours or less"
+        }
+    }
+    val prefix = "Of ${counts.completedCount} completed sleep $periodWord, " +
+        "${category.count} $classification."
+    if (category.count == 0) return "$prefix There are no durations in this category."
+    return "$prefix Middle duration ${formatDuration(requireNotNull(category.medianDurationMillis))}; " +
+        "shortest ${formatDuration(requireNotNull(category.shortestDurationMillis))}; " +
+        "longest ${formatDuration(requireNotNull(category.longestDurationMillis))}."
+}
+
 data class InsightsSnapshot(
     val rangeStartMillis: Long,
     val nowMillis: Long,
@@ -269,6 +341,7 @@ data class InsightsSnapshot(
     val entryChart: EntryChart,
     val onsetGapHistogram: OnsetGapHistogram,
     val onsetTimeCounts: OnsetTimeCounts,
+    val sleepCounts: SleepCounts,
     val nextInvalidationMillis: Long?
 ) {
     fun rasterStateAt(instantMillis: Long): Pair<RasterState, Int?> {

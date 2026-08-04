@@ -8,6 +8,7 @@ import java.time.ZoneId
 import java.time.ZoneOffset
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -745,6 +746,194 @@ class EpisodeEngineTest {
         assertFalse(sleepPaused.isEligible)
         assertFalse(twentyFour.isEligible)
         assertEquals(eight.eligibleOnsetCount, eight.buckets.sumOf(OnsetHourBucket::count))
+    }
+
+    @Test
+    fun sleepCountsPartitionExactThreeHourBoundaryAndSummarizeExactDurations() {
+        val counts = derive(
+            rows = listOf(
+                sleep(1, 0, hour),
+                sleep(2, 2 * hour, 5 * hour),
+                sleep(3, 6 * hour, 10 * hour),
+                sleep(4, 11 * hour, 17 * hour)
+            ),
+            now = 20 * hour
+        ).sleepCounts
+
+        assertTrue(counts.isEligible)
+        assertEquals(4, counts.completedCount)
+        assertEquals(0, counts.incompleteCount)
+        assertEquals(listOf(SleepCategory.NIGHT, SleepCategory.NAP), counts.categories.map { it.category })
+        val nights = counts.categories[0]
+        val naps = counts.categories[1]
+        assertEquals(listOf(4 * hour, 6 * hour), nights.durationsMillis)
+        assertEquals(5 * hour, nights.medianDurationMillis)
+        assertEquals(listOf(hour, 3 * hour), naps.durationsMillis)
+        assertEquals(2 * hour, naps.medianDurationMillis)
+        assertEquals(counts.completedCount, counts.categories.sumOf(SleepCategoryCount::count))
+        assertEquals("4 completed sleep periods woke in this range.", sleepCountsDenominator(counts))
+        assertEquals(
+            "Of 4 completed sleep periods, 2 were nights over 3 elapsed hours. " +
+                "Middle duration 5h; shortest 4h; longest 6h.",
+            sleepCategoryReadout(counts, 0)
+        )
+        assertEquals(
+            "Of 4 completed sleep periods, 2 were naps of 3 elapsed hours or less. " +
+                "Middle duration 2h; shortest 1h; longest 3h.",
+            sleepCategoryReadout(counts, 1)
+        )
+    }
+
+    @Test
+    fun sleepCountsAttributeByHalfOpenWakeAndKeepFullCrossBoundaryDuration() {
+        val rangeStart = Instant.parse("2026-01-31T00:00:00Z").toEpochMilli()
+        val now = Instant.parse("2026-01-31T23:00:00Z").toEpochMilli()
+        val counts = deriveInsights(
+            rows = listOf(
+                sleep(1, rangeStart - 2 * hour, rangeStart - 1),
+                sleep(2, rangeStart - 4 * hour, rangeStart),
+                sleep(3, now - hour, now)
+            ),
+            hold = HoldDuration.SIXTEEN,
+            now = Instant.ofEpochMilli(now),
+            zoneId = ZoneOffset.UTC,
+            range = InsightRange.ONE_DAY
+        ).sleepCounts
+
+        assertEquals(1, counts.completedCount)
+        assertEquals(listOf(4 * hour), counts.categories[0].durationsMillis)
+        assertTrue(counts.categories[1].durationsMillis.isEmpty())
+        assertEquals(
+            "Of 1 completed sleep period, 0 were naps of 3 elapsed hours or less. " +
+                "There are no durations in this category.",
+            sleepCategoryReadout(counts, 1)
+        )
+    }
+
+    @Test
+    fun sleepCountsDiscloseOpenAndFutureEndingPeriodsButExcludeThem() {
+        val counts = derive(
+            rows = listOf(
+                sleep(1, 0, 4 * hour),
+                sleep(2, 3 * hour, null),
+                sleep(3, 20 * hour, 24 * hour)
+            ),
+            now = 8 * hour
+        ).sleepCounts
+
+        assertFalse(counts.isEligible)
+        assertEquals(0, counts.completedCount)
+        assertEquals(1, counts.incompleteCount)
+        assertEquals(
+            "1 incomplete sleep period is excluded because its Wake time is missing or later than now.",
+            sleepIncompleteText(counts)
+        )
+
+        val futureEnd = derive(
+            rows = listOf(sleep(1, 2 * hour, 10 * hour)),
+            now = 8 * hour
+        ).sleepCounts
+        assertEquals(0, futureEnd.completedCount)
+        assertEquals(1, futureEnd.incompleteCount)
+    }
+
+    @Test
+    fun sleepCountsNormalizeOverlappingAndTouchingClosedRowsOnce() {
+        val counts = derive(
+            rows = listOf(
+                sleep(1, 0, 2 * hour),
+                sleep(2, hour, 3 * hour),
+                sleep(3, 4 * hour, 5 * hour),
+                sleep(4, 5 * hour, 8 * hour)
+            ),
+            now = 10 * hour
+        ).sleepCounts
+
+        assertEquals(2, counts.completedCount)
+        assertEquals(listOf(4 * hour), counts.categories[0].durationsMillis)
+        assertEquals(listOf(3 * hour), counts.categories[1].durationsMillis)
+    }
+
+    @Test
+    fun sleepCountsUseElapsedDurationAcrossDstAndCurrentZoneOnlyForRangeMembership() {
+        val chicago = ZoneId.of("America/Chicago")
+        val springStart = Instant.parse("2026-03-08T07:30:00Z").toEpochMilli()
+        val springEnd = Instant.parse("2026-03-08T10:30:00Z").toEpochMilli()
+        val spring = deriveInsights(
+            listOf(sleep(1, springStart, springEnd)), HoldDuration.SIXTEEN,
+            Instant.parse("2026-03-08T12:00:00Z"), chicago, InsightRange.ONE_DAY
+        ).sleepCounts
+        assertEquals(listOf(3 * hour), spring.categories[1].durationsMillis)
+
+        val fallStart = Instant.parse("2026-11-01T05:30:00Z").toEpochMilli()
+        val fallEnd = Instant.parse("2026-11-01T08:30:00.001Z").toEpochMilli()
+        val fall = deriveInsights(
+            listOf(sleep(1, fallStart, fallEnd)), HoldDuration.SIXTEEN,
+            Instant.parse("2026-11-01T12:00:00Z"), chicago, InsightRange.ONE_DAY
+        ).sleepCounts
+        assertEquals(listOf(3 * hour + 1), fall.categories[0].durationsMillis)
+
+        val wake = Instant.parse("2026-01-31T05:30:00Z").toEpochMilli()
+        val now = Instant.parse("2026-01-31T07:00:00Z")
+        val rows = listOf(sleep(1, wake - 4 * hour, wake))
+        val utc = deriveInsights(rows, HoldDuration.SIXTEEN, now, ZoneOffset.UTC, InsightRange.ONE_DAY).sleepCounts
+        val local = deriveInsights(rows, HoldDuration.SIXTEEN, now, chicago, InsightRange.ONE_DAY).sleepCounts
+        assertEquals(1, utc.completedCount)
+        assertEquals(0, local.completedCount)
+    }
+
+    @Test
+    fun sleepCountsUseEveryRangeAndIgnoreEntriesMarkersHoldAndPrivateText() {
+        val now = Instant.parse("2026-06-15T18:00:00Z")
+        val start = now.toEpochMilli() - 6 * hour
+        val end = now.toEpochMilli() - hour
+        InsightRange.entries.forEach { range ->
+            val counts = deriveInsights(
+                listOf(
+                    sleep(1, start, end),
+                    entry(2, start, 8, chips = listOf("private"), note = "hidden"),
+                    marker(3, start, "private marker")
+                ),
+                HoldDuration.entries.first(),
+                now,
+                ZoneOffset.UTC,
+                range
+            ).sleepCounts
+            assertEquals(range.name, 1, counts.completedCount)
+            assertEquals(range.name, listOf(5 * hour), counts.categories[0].durationsMillis)
+        }
+
+        val baseline = derive(listOf(sleep(1, 0, 4 * hour)), HoldDuration.EIGHT, 8 * hour).sleepCounts
+        val changed = derive(
+            listOf(
+                sleep(1, 0, 4 * hour),
+                entry(2, hour, 10, note = "sensitive"),
+                marker(3, 2 * hour, "sensitive")
+            ),
+            HoldDuration.TWENTY_FOUR,
+            8 * hour
+        ).sleepCounts
+        assertEquals(baseline, changed)
+    }
+
+    @Test
+    fun sleepCopyIsDeterministicSingularPluralAndNonInferential() {
+        val one = derive(listOf(sleep(1, 0, 4 * hour)), now = 8 * hour).sleepCounts
+        assertEquals("1 completed sleep period woke in this range.", sleepCountsDenominator(one))
+        assertEquals(
+            "Of 1 completed sleep period, 1 was a night over 3 elapsed hours. " +
+                "Middle duration 4h; shortest 4h; longest 4h.",
+            sleepCategoryReadout(one, 0)
+        )
+        assertNull(sleepIncompleteText(one))
+        assertNull(sleepCategoryReadout(one, -1))
+        val generated = listOf(
+            sleepCountsDenominator(one),
+            sleepCategoryReadout(one, 0).orEmpty()
+        ).joinToString(" ").lowercase()
+        listOf("cause", "correlation", "predict", "risk", "diagnosis", "significance", "recommend")
+            .forEach { assertFalse(generated.contains(it)) }
+        assertTrue(SLEEP_COUNTS_CAVEAT.contains("do not show whether sleep changed"))
     }
 
     @Test

@@ -32,6 +32,7 @@ private const val EXPLORED_KEY = "insights.exploredInstant"
 private const val CHART_EXPLORED_KEY = "insights.chartExploredInstant"
 private const val ONSET_GAP_BUCKET_KEY = "insights.selectedOnsetGapBucket"
 private const val ONSET_HOUR_KEY = "insights.selectedOnsetHour"
+private const val SLEEP_CATEGORY_KEY = "insights.selectedSleepCategory"
 private const val HOUR_MILLIS = 3_600_000L
 
 data class InsightsUiState(
@@ -42,6 +43,7 @@ data class InsightsUiState(
     val chartExploredInstantMillis: Long? = null,
     val selectedOnsetGapBucketIndex: Int? = null,
     val selectedOnsetHour: Int? = null,
+    val selectedSleepCategoryIndex: Int? = null,
     val hourFormat: HourFormat = HourFormat.TWELVE,
     val holdDuration: HoldDuration = HoldDuration.SIXTEEN,
     val hideNotes: Boolean = false,
@@ -78,7 +80,9 @@ class InsightsViewModel(
             selectedOnsetGapBucketIndex = savedStateHandle.get<Int>(ONSET_GAP_BUCKET_KEY)
                 ?.takeIf { it in 0 until 10 },
             selectedOnsetHour = savedStateHandle.get<Int>(ONSET_HOUR_KEY)
-                ?.takeIf { it in 0..23 }
+                ?.takeIf { it in 0..23 },
+            selectedSleepCategoryIndex = savedStateHandle.get<Int>(SLEEP_CATEGORY_KEY)
+                ?.takeIf { it in SleepCategory.entries.indices }
         )
     )
     val uiState: StateFlow<InsightsUiState> = _uiState.asStateFlow()
@@ -125,6 +129,9 @@ class InsightsViewModel(
             val selectedOnsetHour = _uiState.value.selectedOnsetHour
                 ?.takeIf { snapshot.onsetTimeCounts.isEligible }
                 ?.takeIf { hour -> snapshot.onsetTimeCounts.buckets.any { it.hourOfDay == hour } }
+            val selectedSleepCategory = _uiState.value.selectedSleepCategoryIndex
+                ?.takeIf { snapshot.sleepCounts.isEligible }
+                ?.takeIf { it in snapshot.sleepCounts.categories.indices }
             if (explored == null) savedStateHandle.remove<Long>(EXPLORED_KEY)
             else savedStateHandle[EXPLORED_KEY] = explored
             if (chartExplored == null) savedStateHandle.remove<Long>(CHART_EXPLORED_KEY)
@@ -133,6 +140,8 @@ class InsightsViewModel(
             else savedStateHandle[ONSET_GAP_BUCKET_KEY] = selectedOnsetGapBucket
             if (selectedOnsetHour == null) savedStateHandle.remove<Int>(ONSET_HOUR_KEY)
             else savedStateHandle[ONSET_HOUR_KEY] = selectedOnsetHour
+            if (selectedSleepCategory == null) savedStateHandle.remove<Int>(SLEEP_CATEGORY_KEY)
+            else savedStateHandle[SLEEP_CATEGORY_KEY] = selectedSleepCategory
             _uiState.update {
                 it.copy(
                     range = range,
@@ -142,6 +151,7 @@ class InsightsViewModel(
                     chartExploredInstantMillis = chartExplored,
                     selectedOnsetGapBucketIndex = selectedOnsetGapBucket,
                     selectedOnsetHour = selectedOnsetHour,
+                    selectedSleepCategoryIndex = selectedSleepCategory,
                     hourFormat = read.settings.hourFormat,
                     holdDuration = read.settings.holdDuration,
                     hideNotes = read.settings.hideNotes,
@@ -176,6 +186,7 @@ class InsightsViewModel(
         savedStateHandle.remove<Long>(CHART_EXPLORED_KEY)
         savedStateHandle.remove<Int>(ONSET_GAP_BUCKET_KEY)
         savedStateHandle.remove<Int>(ONSET_HOUR_KEY)
+        savedStateHandle.remove<Int>(SLEEP_CATEGORY_KEY)
         _uiState.update {
             it.copy(
                 range = range,
@@ -183,6 +194,7 @@ class InsightsViewModel(
                 chartExploredInstantMillis = null,
                 selectedOnsetGapBucketIndex = null,
                 selectedOnsetHour = null,
+                selectedSleepCategoryIndex = null,
                 loading = it.snapshot == null
             )
         }
@@ -246,6 +258,13 @@ class InsightsViewModel(
         if (!counts.isEligible || counts.buckets.none { it.hourOfDay == hour }) return
         savedStateHandle[ONSET_HOUR_KEY] = hour
         _uiState.update { it.copy(selectedOnsetHour = hour) }
+    }
+
+    fun selectSleepCategory(index: Int) {
+        val counts = _uiState.value.snapshot?.sleepCounts ?: return
+        if (!counts.isEligible || index !in counts.categories.indices) return
+        savedStateHandle[SLEEP_CATEGORY_KEY] = index
+        _uiState.update { it.copy(selectedSleepCategoryIndex = index) }
     }
 
     private fun moveChartTarget(

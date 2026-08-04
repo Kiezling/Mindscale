@@ -343,6 +343,105 @@ class InsightsScreenTest {
     }
 
     @Test
+    fun sleepCountsRefuseZeroAndDiscloseIncompletePeriod() {
+        val state = InsightsUiState(
+            loading = false,
+            snapshot = snapshot(listOf(entry(1, 0, 0), sleep(2, 2 * HOUR, null)))
+        )
+        setContent(state)
+
+        composeTestRule.onNodeWithTag("insights_screen")
+            .performScrollToNode(hasTestTag("sleep_counts_refusal"))
+        composeTestRule.onNodeWithText("No completed sleep periods woke in this range.").assertExists()
+        composeTestRule.onNodeWithText(
+            "1 incomplete sleep period is excluded because its Wake time is missing or later than now."
+        ).assertExists()
+        composeTestRule.onNodeWithTag("sleep_category_cells").assertDoesNotExist()
+        composeTestRule.onNodeWithText(SLEEP_COUNTS_CAVEAT).assertExists()
+    }
+
+    @Test
+    fun sleepCountsExposeTwoSelectableAccessibleCellsAndLiveReadout() {
+        var selected: Int? = null
+        val countsRows = listOf(
+            entry(1, 0, 0),
+            sleep(2, 0, 2 * HOUR),
+            sleep(3, 3 * HOUR, 7 * HOUR),
+            sleep(4, 8 * HOUR, null)
+        )
+        val state = InsightsUiState(
+            loading = false,
+            selectedSleepCategoryIndex = 0,
+            snapshot = snapshot(countsRows)
+        )
+        setContent(state, onSelectSleepCategory = { selected = it })
+
+        composeTestRule.onNodeWithTag("insights_screen")
+            .performScrollToNode(hasTestTag("sleep_category_cells"))
+        composeTestRule.onNodeWithText("2 completed sleep periods woke in this range.").assertExists()
+        composeTestRule.onNodeWithTag("sleep_category_0")
+            .assertHeightIsAtLeast(48.dp)
+            .assertIsSelected()
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
+            .assert(
+                SemanticsMatcher.expectValue(
+                    SemanticsProperties.ContentDescription,
+                    listOf("Nights, 1 of 2 completed sleep periods, over 3 elapsed hours")
+                )
+            )
+            .performClick()
+        composeTestRule.onNodeWithTag("sleep_category_1").assertHeightIsAtLeast(48.dp).assertExists()
+
+        assertEquals(0, selected)
+        composeTestRule.onNodeWithText(
+            "Of 2 completed sleep periods, 1 was a night over 3 elapsed hours. " +
+                "Middle duration 4h; shortest 4h; longest 4h."
+        ).assertExists()
+        composeTestRule.onNodeWithTag("sleep_counts_readout").assert(
+            SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, androidx.compose.ui.semantics.LiveRegionMode.Polite)
+        )
+        composeTestRule.onNodeWithText(SLEEP_COUNTS_CAVEAT).assertExists()
+    }
+
+    @Test
+    fun sleepCountsKeepZeroCategorySelectableAndHonest() {
+        var selected: Int? = null
+        val state = InsightsUiState(
+            loading = false,
+            selectedSleepCategoryIndex = 1,
+            snapshot = snapshot(listOf(entry(1, 0, 0), sleep(2, 0, 4 * HOUR)))
+        )
+        setContent(state, onSelectSleepCategory = { selected = it })
+
+        composeTestRule.onNodeWithTag("insights_screen")
+            .performScrollToNode(hasTestTag("sleep_category_cells"))
+        composeTestRule.onNodeWithTag("sleep_category_1").assertIsSelected().performClick()
+
+        assertEquals(1, selected)
+        composeTestRule.onNodeWithText(
+            "Of 1 completed sleep period, 0 were naps of 3 elapsed hours or less. " +
+                "There are no durations in this category."
+        ).assertExists()
+    }
+
+    @Test
+    fun verticalSwipeOnSleepCategoryScrollsParentList() {
+        val state = InsightsUiState(
+            loading = false,
+            snapshot = snapshot(listOf(entry(1, 0, 0), sleep(2, 0, 4 * HOUR)))
+        )
+        setContent(state)
+
+        val list = composeTestRule.onNodeWithTag("insights_screen")
+        list.performScrollToNode(hasTestTag("sleep_category_cells"))
+        val before = list.fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange].value()
+        composeTestRule.onNodeWithTag("sleep_category_0").performTouchInput { swipeDown() }
+        val after = list.fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange].value()
+
+        assertTrue(after < before)
+    }
+
+    @Test
     fun staleSnapshotShowsErrorAndWorkingRetry() {
         var retries = 0
         setContent(
@@ -386,6 +485,7 @@ class InsightsScreenTest {
         onPreviousEvent: () -> Boolean = { true },
         onSelectOnsetGapBucket: (Int) -> Unit = {},
         onSelectOnsetHour: (Int) -> Unit = {},
+        onSelectSleepCategory: (Int) -> Unit = {},
         onRetry: () -> Unit = {}
     ) {
         composeTestRule.setContent {
@@ -407,6 +507,7 @@ class InsightsScreenTest {
                     onNextEvent = { true },
                     onSelectOnsetGapBucket = onSelectOnsetGapBucket,
                     onSelectOnsetHour = onSelectOnsetHour,
+                    onSelectSleepCategory = onSelectSleepCategory,
                     onRetry = onRetry,
                     zoneId = ZoneOffset.UTC
                 )
@@ -435,6 +536,9 @@ class InsightsScreenTest {
 
     private fun marker(id: Long, ts: Long, text: String) =
         EpisodeSourceRow("MARKER", id, ts, null, null, null, text = text)
+
+    private fun sleep(id: Long, start: Long, end: Long?) =
+        EpisodeSourceRow("SLEEP", id, start, end, null, null)
 
     private fun episodeRows(onsets: List<Long>): List<EpisodeSourceRow> = buildList {
         var id = 1L

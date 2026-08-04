@@ -8,7 +8,21 @@ Build MindScale as a native Android application using Kotlin, Jetpack Compose, M
 
 The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716ca7343`: `SPEC.md` is the rationale and `MindScale v2.dc.html` is the visual/behavioral reference for Track, Full Log, Insights, Report, Safety card, Profile, and Settings. A local exported handoff is available at `C:\Users\mckie\Downloads\MindScale-handoff\mindscale\project\`; its `MindScale v2.dc.html` is the primary implementation reference. Repository specs under `docs/specs/` govern native implementation after human approval.
 
-## Current phase: Phase 9 Insights onset-time counts merged and complete
+## Current phase: Phase 10 Insights descriptive sleep counts — implemented and verified locally
+
+- Phase 10 branch: `agent/phase10-insights-sleep-counts`, created from synchronized `main` at `652096b9cb61cdb5ff004ed352ce0f5a54d62e95`
+- Starting synchronization: `HEAD`, local `main`, local `origin/main`, and live GitHub `refs/heads/main` all resolved to `652096b9cb61cdb5ff004ed352ce0f5a54d62e95` before branching
+- Governing spec: `docs/specs/SPEC-insights-sleep-counts.md` — `IMPLEMENTED — VERIFIED LOCALLY`; D-1 through D-10 frozen on 2026-08-04 before application-code edits
+- Reconciled boundary: direct counts of completed normalized sleep periods grouped by recorded Wake, duration-only `night` (`>3h`) versus `nap` (`<=3h`), exact duration summaries, incomplete disclosure, and accessible/restorable category selection
+- The prototype's five-hour post-wake comparison is excluded because it needs a separate coverage/cohort/minimum-sample contract and would exceed this non-inferential descriptive slice
+- Approval gate satisfied: the user granted full Phase 10 ownership and authorized decisions, implementation, commits, pushes, PR readiness, merge, and synchronization without another review pause
+- Room/schema/JSON version 4, CSV, backup, permissions, dependencies, toolchain, navigation, DI, privacy, and local-only architecture remain frozen
+- Frozen documentation commit: `e6afe3280acccb1fd0849b26b5fac5b9e4699980`
+- Verified implementation commit: `945300d0bad66be21de33b9494a19d393cf40aba`
+- Local verification: 168/168 JVM tests, lint with 0 errors/22 existing warnings, debug assembly, focused 27/27 connected tests, full 100/100 connected tests, installed-app manual inspection, critical review, and `git diff --check` passed
+- Exact next action: commit verification-state documentation, push the branch, open/ready/merge the PR at the verified head, synchronize `main`, and add the phase-boundary documentation commit
+
+### Phase 9 publication checkpoint
 
 - Phase 9 branch: `agent/phase9-onset-time-counts`, created from synchronized `main` at `76880a978e68e79348941de891a0bc6251986188`
 - Before branch creation, local `main`, local `origin/main`, and live GitHub `refs/heads/main` all resolved to `76880a978e68e79348941de891a0bc6251986188`; the GitHub connector confirmed `Kiezling/Mindscale` is accessible with push/admin permission and default branch `main`
@@ -148,7 +162,7 @@ The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716c
 
 ## Active blocker
 
-No active blocker. Phase 9 is merged and complete.
+No active blocker. Phase 10 is implemented and verified locally; publication is pending.
 
 ## Known decisions
 
@@ -162,10 +176,33 @@ No active blocker. Phase 9 is merged and complete.
 
 ## Next tasks
 
-1. Reconcile and freeze a separate spec for the descriptive sleep-count slice before implementation; resolve night/nap, range/open-sleep attribution, minimum-sample, and post-wake semantics.
-2. Keep Report/Profile, import/restore, Safety, and breathing work in `docs/specs/BACKLOG.md`; continue excluding `.agents/` and `.codex/`.
+1. Commit the Phase 10 verification-state documentation on `agent/phase10-insights-sleep-counts`.
+2. Push the branch, open the draft PR with complete evidence, mark it ready, verify exact-head mergeability, and merge.
+3. Fast-forward local `main`, add/push the phase-boundary documentation commit, and verify local/tracking/live `main` match.
+4. Keep Report/Profile, import/restore, Safety, and breathing work in `docs/specs/BACKLOG.md`; continue excluding `.agents/` and `.codex/`.
 
 ## Last verification
+
+Phase 10 final local verification completed 2026-08-04 for implementation commit `945300d0bad66be21de33b9494a19d393cf40aba` on `agent/phase10-insights-sleep-counts`:
+
+- `test`: 168/168 JVM tests passed; 0 failures, errors, or skips across 12 suites.
+- `lint`: passed with 0 errors and the same 22 existing warnings.
+- `assembleDebug`: passed.
+- `adb devices -l`: intended `MindScale_API_36` API 36 emulator connected as `emulator-5554`.
+- Focused Room/Insights connected run passed 27/27 after final copy and zero-category coverage.
+- `connectedDebugAndroidTest`: 100/100 passed with 0 failures or skips.
+- Installed-app inspection verified no-completed/open and mixed eligible states, exact-three-hour nap/four-hour night, selection/readout, incomplete disclosure, vertical reachability, light/dark, 12/24-hour behavior, 150% font, rotation/configuration restoration, and native content descriptions/targets. Font, theme, rotation, and time format were restored; the temporary seed source/test package were removed.
+- Critical review corrected future-Wake disclosure grammar and found no remaining blocking cohort/range, DST/zone, incomplete-data, arithmetic, accessibility, restoration, concurrency, privacy, persistence, or rollback issue.
+- Practical manual DST/zone reprojection and listened-to TalkBack speech remain coverage gaps; exhaustive pure tests plus Compose semantics/activation/live-region tests and device UI hierarchy cover those contracts.
+- `git diff --check` passed with only configured LF-to-CRLF notices. No schema, backup/CSV, manifest/permission, dependency/toolchain, navigation/DI, WebView, server/account/analytics, or background-work file changed.
+
+Phase 10 starting-state verification completed 2026-08-04 before application-code edits:
+
+- `git status --short --branch` showed synchronized `main` with only expected untracked `.agents/` and `.codex/` directories.
+- `HEAD`, local `main`, local `origin/main`, and live GitHub `refs/heads/main` all resolved to `652096b9cb61cdb5ff004ed352ce0f5a54d62e95`.
+- Branch `agent/phase10-insights-sleep-counts` was created from that exact head.
+- Product handoff `SPEC.md` and `MindScale v2.dc.html`, all existing Insights specs, backlog, decisions, state, and relevant failed paths were reconciled before freezing D-010.
+- No Gradle oracle was rerun for the documentation-only freeze; the merged Phase 9 application tree and its verification evidence below remain unchanged.
 
 Phase 9 publication checkpoint completed 2026-08-04:
 

@@ -46,7 +46,7 @@ private data class MarkerFact(val id: Long, val ts: Long, val text: String)
 private data class SleepSpan(
     val start: Long,
     val end: Long,
-    val open: Boolean
+    val incomplete: Boolean
 )
 
 private data class EpisodeBuilder(
@@ -178,6 +178,7 @@ fun deriveInsights(
         firstEntryMillis = model.entries.firstOrNull()?.ts,
         zoneId = zoneId
     )
+    val sleepCounts = buildSleepCounts(model.sleeps, rangeStart, nowMillis)
     val nextMidnight = today.plusDays(1).atStartOfDay(zoneId).toInstant().toEpochMilli()
     val candidates = listOfNotNull(model.futureBoundary, model.nextHoldExpiry, nextMidnight)
         .filter { it > nowMillis }
@@ -199,7 +200,47 @@ fun deriveInsights(
         entryChart = entryChart,
         onsetGapHistogram = onsetGapHistogram,
         onsetTimeCounts = onsetTimeCounts,
+        sleepCounts = sleepCounts,
         nextInvalidationMillis = candidates.minOrNull()
+    )
+}
+
+private fun buildSleepCounts(
+    sleeps: List<SleepSpan>,
+    rangeStartMillis: Long,
+    nowMillis: Long
+): SleepCounts {
+    val completedDurations = sleeps.asSequence()
+        .filterNot(SleepSpan::incomplete)
+        .filter { it.end >= rangeStartMillis && it.end < nowMillis }
+        .map { sleep -> Math.subtractExact(sleep.end, sleep.start) }
+        .toList()
+    val incompleteCount = sleeps.count { sleep ->
+        sleep.incomplete && overlapMillis(rangeStartMillis, nowMillis, sleep.start, sleep.end) > 0L
+    }
+    val categories = SleepCategory.entries.map { category ->
+        val durations = completedDurations.filter { duration ->
+            when (category) {
+                SleepCategory.NIGHT -> duration > 3 * HOUR_MILLIS
+                SleepCategory.NAP -> duration <= 3 * HOUR_MILLIS
+            }
+        }.sorted()
+        SleepCategoryCount(
+            category = category,
+            count = durations.size,
+            durationsMillis = durations,
+            medianDurationMillis = durations.takeIf { it.isNotEmpty() }?.let(::median),
+            shortestDurationMillis = durations.firstOrNull(),
+            longestDurationMillis = durations.lastOrNull()
+        )
+    }
+    require(categories.sumOf(SleepCategoryCount::count) == completedDurations.size) {
+        "Sleep category count mismatch"
+    }
+    return SleepCounts(
+        completedCount = completedDurations.size,
+        incompleteCount = incompleteCount,
+        categories = categories
     )
 }
 
@@ -407,13 +448,17 @@ private fun normalizeSleeps(rows: List<EpisodeSourceRow>, nowMillis: Long): List
         val rawEnd = row.endTs
         if (rawEnd != null) require(rawEnd > row.ts) { "Sleep ${row.id} ends before it starts" }
         val end = min(rawEnd ?: nowMillis, nowMillis)
-        if (end <= row.ts) null else SleepSpan(row.ts, end, rawEnd == null)
+        if (end <= row.ts) null else SleepSpan(row.ts, end, rawEnd == null || rawEnd > nowMillis)
     }.sortedBy { it.start }
     val merged = mutableListOf<SleepSpan>()
     raw.forEach { span ->
         val last = merged.lastOrNull()
         if (last != null && span.start <= last.end) {
-            merged[merged.lastIndex] = SleepSpan(last.start, max(last.end, span.end), last.open || span.open)
+            merged[merged.lastIndex] = SleepSpan(
+                last.start,
+                max(last.end, span.end),
+                last.incomplete || span.incomplete
+            )
         } else merged += span
     }
     return merged
