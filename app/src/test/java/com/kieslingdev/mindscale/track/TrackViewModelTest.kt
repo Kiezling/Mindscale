@@ -3,6 +3,8 @@ package com.kieslingdev.mindscale.track
 import androidx.lifecycle.SavedStateHandle
 import com.kieslingdev.mindscale.data.Entry
 import com.kieslingdev.mindscale.data.EntryKind
+import com.kieslingdev.mindscale.data.EpisodeSourceDao
+import com.kieslingdev.mindscale.data.HoldDuration
 import com.kieslingdev.mindscale.data.SleepInterval
 import com.kieslingdev.mindscale.data.TrackSettings
 import kotlinx.coroutines.Dispatchers
@@ -49,6 +51,7 @@ class TrackViewModelTest {
         sleepDao: FakeSleepDao = FakeSleepDao(),
         markerDao: FakeMarkerDao = FakeMarkerDao(),
         settingsDao: FakeTrackSettingsDao = FakeTrackSettingsDao(),
+        episodeSourceDao: EpisodeSourceDao? = null,
         savedStateHandle: SavedStateHandle = SavedStateHandle(),
         now: () -> Long = { fixedNow }
     ): Fixture {
@@ -58,7 +61,8 @@ class TrackViewModelTest {
             markerDao,
             settingsDao,
             savedStateHandle = savedStateHandle,
-            nowProvider = now
+            nowProvider = now,
+            episodeSourceDao = episodeSourceDao
         )
         dispatcher.scheduler.runCurrent()
         return Fixture(vm, entryDao, sleepDao, markerDao, settingsDao)
@@ -380,6 +384,30 @@ class TrackViewModelTest {
         assertNotNull(prompt)
         assertEquals(insertedId, prompt!!.entryId)
         assertTrue(prompt.selected.isEmpty())
+    }
+
+    @Test
+    fun `production onset path opens prompt after an assumed hold gap`() = runTest {
+        val hour = 3_600_000L
+        val entries = FakeEntryDao()
+        entries.insert(Entry(ts = 0, value = 5))
+        val settings = FakeTrackSettingsDao(
+            TrackSettings(askChips = true, holdDuration = HoldDuration.EIGHT)
+        )
+        val source = FakeEpisodeSourceDao(entries, settings)
+        val fixture = viewModel(
+            entryDao = entries,
+            settingsDao = settings,
+            episodeSourceDao = source,
+            now = { 9 * hour }
+        )
+
+        fixture.viewModel.onEvent(TrackEvent.KeyTapped(4))
+        dispatcher.scheduler.runCurrent()
+
+        assertEquals(2, entries.insertCalls.size)
+        assertEquals(9 * hour, entries.insertCalls.last().ts)
+        assertNotNull(fixture.viewModel.uiState.value.onsetChipPrompt)
     }
 
     @Test

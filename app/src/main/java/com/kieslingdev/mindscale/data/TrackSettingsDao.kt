@@ -64,6 +64,9 @@ interface TrackSettingsDao {
     @Query("UPDATE track_settings SET anchorPromptDone = :done WHERE id = 0")
     suspend fun setAnchorPromptDone(done: Boolean): Int
 
+    @Query("UPDATE track_settings SET holdDuration = :duration WHERE id = 0")
+    suspend fun setHoldDuration(duration: HoldDuration): Int
+
     @Update
     suspend fun update(settings: TrackSettings)
 }

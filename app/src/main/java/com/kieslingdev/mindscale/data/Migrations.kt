@@ -57,3 +57,12 @@ val MIGRATION_2_3: Migration = object : Migration(2, 3) {
         db.execSQL("ALTER TABLE track_settings ADD COLUMN anchorPromptDone INTEGER NOT NULL DEFAULT 0")
     }
 }
+
+/** Phase 5 additive-only setting for the awake-time episode hold. */
+val MIGRATION_3_4: Migration = object : Migration(3, 4) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "ALTER TABLE track_settings ADD COLUMN holdDuration TEXT NOT NULL DEFAULT 'SIXTEEN'"
+        )
+    }
+}

@@ -4,6 +4,7 @@ import com.kieslingdev.mindscale.data.TrackSettings
 import com.kieslingdev.mindscale.data.TrackSettingsDao
 import com.kieslingdev.mindscale.data.ThemeMode
 import com.kieslingdev.mindscale.data.HourFormat
+import com.kieslingdev.mindscale.data.HoldDuration
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -42,6 +43,8 @@ class FakeTrackSettingsDao(initial: TrackSettings = TrackSettings()) : TrackSett
     override suspend fun setHideNotes(hidden: Boolean): Int = commit { it.copy(hideNotes = hidden) }
 
     override suspend fun setAnchorPromptDone(done: Boolean): Int = commit { it.copy(anchorPromptDone = done) }
+
+    override suspend fun setHoldDuration(duration: HoldDuration): Int = commit { it.copy(holdDuration = duration) }
 
     override suspend fun update(settings: TrackSettings) {
         updateCalls += settings

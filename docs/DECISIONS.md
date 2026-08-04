@@ -29,3 +29,10 @@ Record stable decisions that should survive chat resets and model/provider chang
 - Decision: route by task risk and judgment requirements, not by provider brand. Reserve the strongest/scarcest tier for specs, irreversible design, adjudication, and critical review; downshift implementation and mechanical work.
 - Reason: protects scarce credits, reduces context cost, and keeps high-tier attention on decisions with lasting leverage.
 - Supersedes: defaulting an entire feature session to the strongest model.
+
+## D-005 — Phase 5 Insights foundation
+
+- Date: 2026-08-03
+- Decision: derive episodes from raw Entries/SleepIntervals with a mandatory configurable awake-time hold; add the native range-based episode summary/raster without persisted episodes, interpolation, sample data, or inferential claims. Use additive Room 3→4 hold persistence, JSON backup v4, and a transactional hold-aware onset classifier. See `docs/specs/SPEC-insights-foundation.md`, D-1 through D-10.
+- Reason: establishes the product's event-contingent, awake-time-weighted measurement model while keeping the first Insights slice bounded, local, deterministic, and accessible.
+- Supersedes: Phase 2's explicitly temporary prior-row-only onset classification.

@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.kieslingdev.mindscale.data.DataControlDao
 import com.kieslingdev.mindscale.data.DEFAULT_ONSET_CHIPS
 import com.kieslingdev.mindscale.data.HourFormat
+import com.kieslingdev.mindscale.data.HoldDuration
 import com.kieslingdev.mindscale.data.SleepSettingOutcome
 import com.kieslingdev.mindscale.data.ThemeMode
 import com.kieslingdev.mindscale.data.TrackSettings
@@ -109,6 +110,8 @@ class SettingsViewModel(
 
     fun setTheme(mode: ThemeMode) = mutate("Could not change appearance.") { settingsDao.setAppearance(mode) }
     fun setHourFormat(format: HourFormat) = mutate("Could not change time format.") { settingsDao.setHourFormat(format) }
+    fun setHoldDuration(duration: HoldDuration) =
+        mutate("Could not change the episode hold.") { settingsDao.setHoldDuration(duration) }
     fun setAskChips(enabled: Boolean) = mutate("Could not change onset prompts.") { settingsDao.setAskChips(enabled) }
     fun setHideNotes(hidden: Boolean) = mutate("Could not change note previews.") { settingsDao.setHideNotes(hidden) }
     fun setPaused(paused: Boolean) = mutate("Could not change tracking state.") { settingsDao.setPaused(paused) }

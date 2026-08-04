@@ -43,3 +43,10 @@ Read the headings at session start and the full entry only when it overlaps the 
 - What failed: `cmd.exe //d //s //c "gradlew.bat test"` failed with "'gradlew.bat' is not recognized as an internal or external command, operable program or batch file." even though `cmd.exe`'s working directory was confirmed correct (`cd` and `dir gradlew.bat` both succeeded from the same cmd.exe invocation). Root cause: this machine has the Windows env var `NoDefaultCurrentDirectoryInExePath=1` set, which disables cmd.exe's normal fallback of searching the current directory for a bare command name not found on `PATH`. This blocked a `git commit` via the `gatekeeper.sh`/`oracle.sh` hook chain, even though `test`/`lint`/`assembleDebug` had all just passed moments earlier when invoked directly (with an explicit `.\` prefix) from Git Bash.
 - Decision/workaround: `oracle.sh`'s `run_gradle()` now invokes `.\gradlew.bat` (explicit relative path) instead of the bare `gradlew.bat`, which resolves regardless of `NoDefaultCurrentDirectoryInExePath`.
 - Status: resolved and regression-tested (`bash .claude/hooks/oracle.sh` run standalone, confirmed `PASS test lint assembleDebug` logged). Do not revert the leading `.\` back to a bare filename.
+
+## 2026-08-04 — Terminated Gradle test run left a truncated binary result
+
+- Scope: local JVM oracle recovery after a timed-out/stopped Gradle invocation.
+- What failed: `testDebugUnitTest` immediately reported only `java.io.EOFException` and launched no test executor because the interrupted run left `app/build/test-results/testDebugUnitTest/binary/results-generic.bin` truncated. Repeated source-level debugging could not address it.
+- Decision/workaround: confirm with `--info` that failure occurs before `Gradle Test Executor` starts, then run `./gradlew.bat cleanTestDebugUnitTest testDebugUnitTest`. Do not delete source or Gradle caches for this signal.
+- Status: resolved; the focused suite and all later full oracles passed.
