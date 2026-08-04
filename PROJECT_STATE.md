@@ -8,21 +8,22 @@ Build MindScale as a native Android application using Kotlin, Jetpack Compose, M
 
 The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716ca7343`: `SPEC.md` is the rationale and `MindScale v2.dc.html` is the visual/behavioral reference for Track, Full Log, Insights, Report, Safety card, Profile, and Settings. A local exported handoff is available at `C:\Users\mckie\Downloads\MindScale-handoff\mindscale\project\`; its `MindScale v2.dc.html` is the primary implementation reference. Repository specs under `docs/specs/` govern native implementation after human approval.
 
-## Current phase: Phase 6 Insights entry chart implemented and verified locally
+## Current phase: Phases 5-6 merged; Phase 7 specification pending
 
-- Branch: `agent/phase5-insights-foundation`, created from updated `main` at `c177db20ae5cf7c6ef41dd526b1cb70a5d19baa5`
+- Branch: `main`; local `main` and `origin/main` are synchronized at `fee0caf6dd1da2a3ecb9e04da1bab454ca009836`
 - Phase 4 final branch head: `93fac65711e8e3eeb72cf6f1406d386f0386e9da`
 - Phase 4 PR #1: merged into `main` as `c177db20ae5cf7c6ef41dd526b1cb70a5d19baa5` on 2026-08-03 local time (`2026-08-04T03:37:50Z`)
 - Phase 5 spec: `docs/specs/SPEC-insights-foundation.md` — `IMPLEMENTED — VERIFIED LOCALLY`; D-1 through D-10 frozen
 - Phase 5 implementation commit: `cd3a1cf51adb468f968a78a2a04d85ce317d76ed`, pushed to `origin/agent/phase5-insights-foundation` on 2026-08-04
-- Phase 6 branch: `agent/phase6-entry-chart`, stacked from published Phase 5 head `c8a7bdb17a12aba58dba59927ffc81506d5b42dc` because Phase 5 is not yet merged
+- Phase 5/6 integration PR #3: merged into `main` as `fee0caf6dd1da2a3ecb9e04da1bab454ca009836` on 2026-08-04 (`2026-08-04T14:10:15Z`)
+- Phase 6 branch: `agent/phase6-entry-chart`, merged into `agent/phase5-insights-foundation` by PR #2 as `3d92a2fd5805b102c2a6b0ef01f5d47931361c56`
 - Phase 6 spec: `docs/specs/SPEC-insights-entry-chart.md` — `IMPLEMENTED — VERIFIED LOCALLY`; D-1 through D-8 frozen
 - Phase 6 implementation commit: `53f9d54ea79f56b2d069297f4d6a4b8923aeae23`, pushed to `origin/agent/phase6-entry-chart` on 2026-08-04
 - Phase 1 spec: `docs/specs/SPEC-track-numpad-logging.md` — `IMPLEMENTED`
 - Phase 2 spec: `docs/specs/SPEC-track-phase2-completeness.md` — `IMPLEMENTED`
 - Phase 3 spec: `docs/specs/SPEC-full-log.md` — `IMPLEMENTED` on 2026-08-03
 - Phase 4 spec: `docs/specs/SPEC-settings-data-control.md` — `IMPLEMENTED` on 2026-08-03/04; D-1 through D-9 remain frozen
-- Current worktree: Phase 6 is committed and pushed on `agent/phase6-entry-chart`; only the pre-existing untracked `.agents/` and `.codex/` tooling directories remain outside feature scope
+- Current worktree: synchronized `main` at `fee0caf6dd1da2a3ecb9e04da1bab454ca009836`; only this handoff update plus the pre-existing untracked `.agents/` and `.codex/` tooling directories are outside the merge commit
 
 ## Environment
 
@@ -99,7 +100,7 @@ The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716c
 
 ## Active blocker
 
-No active blocker. Phase 6 is committed, pushed, and ready for stacked review after Phase 5.
+No active blocker. Phases 5 and 6 are merged into `main`. The next implementation requires a new bounded specification and decision gate.
 
 ## Known decisions
 
@@ -113,9 +114,9 @@ No active blocker. Phase 6 is committed, pushed, and ready for stacked review af
 
 ## Next tasks
 
-1. Open pull requests only if separately requested; Phase 6 review must retain its Phase 5 dependency or wait until Phase 5 is merged.
+1. Draft a bounded Phase 7 specification for true process recreation of Track's open backdate/edit/note dialogs and their drafts.
 2. Preserve Room schema 4, backup format 4, and every Phase 5/6 engine invariant.
-3. Require a new bounded spec/decision gate before beginning another Insights view or product area.
+3. Obtain approval for the Phase 7 specification before changing application code, then create a fresh feature branch from updated `main`.
 
 ## Last verification
 
@@ -160,6 +161,14 @@ Results:
 - `git diff --check` passed with only Windows line-ending notices. The emulator-only test records/screenshots are disposable build evidence and are not repository source artifacts.
 - One interrupted Gradle run left a truncated generated test result and caused a raw `EOFException`; `cleanTestDebugUnitTest` recovered it. The durable workaround is in `FAILED_PATHS.md`.
 - Critical review completed and all findings were resolved; see the checked Phase 5 acceptance criteria.
+
+Repository/PR synchronization verified 2026-08-04 after Phases 5-6 publication:
+
+- GitHub PR #2 merged Phase 6 head `7bc414f4aa04a717247e612f8170d610b22bea47` into `agent/phase5-insights-foundation` as `3d92a2fd5805b102c2a6b0ef01f5d47931361c56`.
+- GitHub PR #3 merged the combined Phase 5/6 branch into `main` as `fee0caf6dd1da2a3ecb9e04da1bab454ca009836` on 2026-08-04 (`2026-08-04T14:10:15Z`).
+- `git switch main` and `git pull --ff-only origin main` succeeded; local `main`, `origin/main`, and `origin/HEAD` are synchronized at `fee0caf6dd1da2a3ecb9e04da1bab454ca009836`.
+- Phase 6 publication head `7bc414f4aa04a717247e612f8170d610b22bea47` is an ancestor of updated `main`.
+- No Gradle oracle was rerun for this synchronization and documentation-only handoff update; the Phase 6 verification evidence above remains current for the merged application tree.
 
 Repository/PR synchronization verified 2026-08-03 before Phase 5 drafting:
 
