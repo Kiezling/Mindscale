@@ -8,13 +8,13 @@ Build MindScale as a native Android application using Kotlin, Jetpack Compose, M
 
 The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716ca7343`: `SPEC.md` is the rationale and `MindScale v2.dc.html` is the visual/behavioral reference for Track, Full Log, Insights, Report, Safety card, Profile, and Settings. A local exported handoff is available at `C:\Users\mckie\Downloads\MindScale-handoff\mindscale\project\`; its `MindScale v2.dc.html` is the primary implementation reference. Repository specs under `docs/specs/` govern native implementation after human approval.
 
-## Current phase: Phase 8 Insights onset-gap histogram specification drafted — awaiting approval
+## Current phase: Phase 8 Insights onset-gap histogram approved — implementation ready
 
 - Branch: `agent/phase8-onset-gap-histogram`, created from synchronized `main` at `86bd313e47515bd81eded5e03796195a3b389bff`
 - Local `main`, local `origin/main`, and live GitHub `refs/heads/main` were verified at `86bd313e47515bd81eded5e03796195a3b389bff` before branch creation
-- Phase 8 draft spec: `docs/specs/SPEC-insights-onset-gap-histogram.md` — `DRAFT — AWAITING APPROVAL`; D-1 through D-10 are proposed, not frozen
+- Phase 8 spec: `docs/specs/SPEC-insights-onset-gap-histogram.md` — `FROZEN — APPROVED`; D-1 through D-10 frozen on 2026-08-04 before application-code edits
 - Phase 8 reconciled boundary: one six-onset-minimum, ten-bucket, elapsed onset-to-onset gap histogram derived from the existing Phase 5 episode model; onset-time and sleep views remain deferred
-- Approval blocker: no application-code edit may begin until the user approves the complete Phase 8 spec and D-1 through D-10
+- Approval gate satisfied: the user reiterated full project ownership and authorized all decisions, implementation, commits, pushes, and PRs without further approval
 - Expected untracked paths remain `.agents/` and `.codex/`; they are excluded from product/documentation scope
 
 ### Prior phase publication
@@ -113,7 +113,7 @@ The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716c
 
 ## Active blocker
 
-Phase 8 is approval-gated. The detailed specification and D-1 through D-10 must be approved before application-code edits begin.
+No active blocker. Phase 8 is approved and ready for implementation from the frozen specification.
 
 ## Known decisions
 
@@ -127,8 +127,8 @@ Phase 8 is approval-gated. The detailed specification and D-1 through D-10 must 
 
 ## Next tasks
 
-1. Obtain approval for `docs/specs/SPEC-insights-onset-gap-histogram.md` and proposed D-1 through D-10.
-2. After approval, freeze the spec, record D-008, and implement the pure histogram model/derivation tests first; continue excluding `.agents/` and `.codex/`.
+1. Implement the pure Phase 8 histogram model/derivation and focused JVM tests from the frozen specification.
+2. Continue through ViewModel, accessible Compose UI, connected verification, critical review, publication, and merge without further approval pauses; continue excluding `.agents/` and `.codex/`.
 
 ## Last verification
 

@@ -1,6 +1,6 @@
 # MindScale Phase 8 — Insights onset-gap histogram
 
-Status: DRAFT — AWAITING APPROVAL
+Status: FROZEN — APPROVED
 
 Owner: Codex
 
@@ -8,7 +8,7 @@ Date: 2026-08-04
 
 Last verified commit: `86bd313e47515bd81eded5e03796195a3b389bff`
 
-Approval: Not yet granted. No application-code edit may begin until the user approves this complete specification and D-1 through D-10.
+Approval: On 2026-08-04, the user reiterated full project ownership and explicitly authorized all decisions, implementation, commits, pushes, and PRs without further approval. This satisfies the Phase 8 approval gate; D-1 through D-10 are frozen before application-code edits.
 
 Governing product sources:
 
@@ -312,7 +312,7 @@ Manual verification on the intended API 36 emulator covers global empty, zero-to
 
 ## Machine-checkable acceptance criteria
 
-- [ ] SPEC/APPROVAL: this complete spec and D-1 through D-10 are approved and frozen before the first application-code edit; Git history/diff proves the approval-gated ordering.
+- [x] SPEC/APPROVAL: this complete spec and D-1 through D-10 are approved and frozen before the first application-code edit; Git history/diff proves the approval-gated ordering. — APPROVED 2026-08-04
 - [ ] BOUNDARY: Phase 8 adds only `Days between onsets`; onset-time, sleep comparison, report, import, safety, breathing, and all inferential analysis remain absent.
 - [ ] SOURCE: `InsightsSnapshot.onsetGapHistogram` is derived from the existing Phase 5 `BuiltModel.episodes` in the same pure derivation; no parallel onset classifier or UI-side derivation exists.
 - [ ] RANGE: tests prove both onset endpoints are inside `[rangeStart, now)`, carried-in onsets are excluded, exact-start is included, exact-now/future is excluded, and all six existing ranges drive the result.
@@ -375,4 +375,4 @@ Manual verification on the intended API 36 emulator covers global empty, zero-to
 - **D-9 (state/concurrency, recommended):** persist only a validated bucket index in `SavedStateHandle`; retain the existing single Room/settings Flow, off-main immutable derivation, cancellation, invalidation, and Retry behavior.
 - **D-10 (persistence/architecture, required):** keep Room/schema/JSON at version 4, CSV/backup rules/permissions unchanged, and add no framework, dependency, cache, module, server, account, analytics, or background work.
 
-Approval gate is open. Application code must remain unchanged until the user approves this complete specification and D-1 through D-10. A material change after approval requires a documented spec amendment before implementation continues.
+Approval gate is satisfied. D-1 through D-10 are frozen; a material change requires a documented spec amendment before implementation continues.
