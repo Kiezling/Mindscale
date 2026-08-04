@@ -17,11 +17,12 @@ The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716c
 - Phase 5 implementation commit: `cd3a1cf51adb468f968a78a2a04d85ce317d76ed`, pushed to `origin/agent/phase5-insights-foundation` on 2026-08-04
 - Phase 6 branch: `agent/phase6-entry-chart`, stacked from published Phase 5 head `c8a7bdb17a12aba58dba59927ffc81506d5b42dc` because Phase 5 is not yet merged
 - Phase 6 spec: `docs/specs/SPEC-insights-entry-chart.md` — `IMPLEMENTED — VERIFIED LOCALLY`; D-1 through D-8 frozen
+- Phase 6 implementation commit: `53f9d54ea79f56b2d069297f4d6a4b8923aeae23`, pushed to `origin/agent/phase6-entry-chart` on 2026-08-04
 - Phase 1 spec: `docs/specs/SPEC-track-numpad-logging.md` — `IMPLEMENTED`
 - Phase 2 spec: `docs/specs/SPEC-track-phase2-completeness.md` — `IMPLEMENTED`
 - Phase 3 spec: `docs/specs/SPEC-full-log.md` — `IMPLEMENTED` on 2026-08-03
 - Phase 4 spec: `docs/specs/SPEC-settings-data-control.md` — `IMPLEMENTED` on 2026-08-03/04; D-1 through D-9 remain frozen
-- Current worktree: verified Phase 6 application, test, spec, decision, backlog, and state changes on `agent/phase6-entry-chart`; commit and push are authorized and pending publication
+- Current worktree: Phase 6 is committed and pushed on `agent/phase6-entry-chart`; only the pre-existing untracked `.agents/` and `.codex/` tooling directories remain outside feature scope
 
 ## Environment
 
@@ -98,7 +99,7 @@ The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716c
 
 ## Active blocker
 
-No active blocker. Phase 6 is locally complete, verified, and authorized for commit and push on the stacked branch.
+No active blocker. Phase 6 is committed, pushed, and ready for stacked review after Phase 5.
 
 ## Known decisions
 
@@ -112,13 +113,13 @@ No active blocker. Phase 6 is locally complete, verified, and authorized for com
 
 ## Next tasks
 
-1. Commit and push the verified Phase 6 stacked branch; open a pull request only if separately requested.
+1. Open pull requests only if separately requested; Phase 6 review must retain its Phase 5 dependency or wait until Phase 5 is merged.
 2. Preserve Room schema 4, backup format 4, and every Phase 5/6 engine invariant.
 3. Require a new bounded spec/decision gate before beginning another Insights view or product area.
 
 ## Last verification
 
-Phase 6 final local verification completed 2026-08-04 from `S:\Android\AndroidProjects\MindScale` on uncommitted branch `agent/phase6-entry-chart` based on Phase 5 publication head `c8a7bdb17a12aba58dba59927ffc81506d5b42dc`:
+Phase 6 final local verification completed 2026-08-04 from `S:\Android\AndroidProjects\MindScale` for implementation commit `53f9d54ea79f56b2d069297f4d6a4b8923aeae23`, based on Phase 5 publication head `c8a7bdb17a12aba58dba59927ffc81506d5b42dc`:
 
 ```powershell
 .\gradlew.bat test lint assembleDebug --no-daemon --console=plain
