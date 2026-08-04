@@ -8,7 +8,18 @@ Build MindScale as a native Android application using Kotlin, Jetpack Compose, M
 
 The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716ca7343`: `SPEC.md` is the rationale and `MindScale v2.dc.html` is the visual/behavioral reference for Track, Full Log, Insights, Report, Safety card, Profile, and Settings. A local exported handoff is available at `C:\Users\mckie\Downloads\MindScale-handoff\mindscale\project\`; its `MindScale v2.dc.html` is the primary implementation reference. Repository specs under `docs/specs/` govern native implementation after human approval.
 
-## Current phase: Phase 8 Insights onset-gap histogram merged and complete
+## Current phase: Phase 9 Insights onset-time counts approved and active
+
+- Phase 9 branch: `agent/phase9-onset-time-counts`, created from synchronized `main` at `76880a978e68e79348941de891a0bc6251986188`
+- Before branch creation, local `main`, local `origin/main`, and live GitHub `refs/heads/main` all resolved to `76880a978e68e79348941de891a0bc6251986188`; the GitHub connector confirmed `Kiezling/Mindscale` is accessible with push/admin permission and default branch `main`
+- Phase 9 spec: `docs/specs/SPEC-insights-onset-time-counts.md` — `FROZEN — APPROVED`; D-1 through D-10 were frozen on 2026-08-04 before application-code edits
+- Reconciled boundary: one six-onset-minimum, 24 local-clock-hour count view derived from the existing Phase 5 episode model, with a deterministic four-hour count sentence, exact denominators, recording-displacement/current-zone caveats, and accessible primitive selection
+- Selection rationale: onset-time counts are the next product-ordered Insights view and need no new source/cohort rules; descriptive sleep counts remain deferred because their night/nap, boundary, incomplete-sleep, and post-wake semantics require a separate spec
+- Approval gate satisfied: the user granted full ownership and authorized decisions, implementation, commits, pushes, PR readiness, merge, and synchronization without another review pause
+- Exact next action after the documentation commit: implement the pure onset-time model/derivation/copy helpers and focused JVM coverage before ViewModel or Compose changes
+- Expected untracked paths remain `.agents/` and `.codex/`; they are excluded from product/documentation scope
+
+### Phase 8 publication checkpoint
 
 - Phase 8 branch: `agent/phase8-onset-gap-histogram`, created from synchronized `main` at `86bd313e47515bd81eded5e03796195a3b389bff`
 - Phase 8 PR #5 merged into `main` as `042376265cb801a4d8e80375b3eb7fff54c1d0aa` on 2026-08-04 (`2026-08-04T18:48:52Z`)
@@ -138,10 +149,19 @@ No active blocker. Phase 8 is merged and complete.
 
 ## Next tasks
 
-1. Reconcile the remaining onset-time and descriptive-sleep Insights backlog and select one bounded Phase 9 slice.
-2. Draft and freeze the Phase 9 specification before changing application code; continue excluding `.agents/` and `.codex/`.
+1. Commit the frozen Phase 9 specification, D-009, active-state, and backlog ownership before application-code edits.
+2. Implement and verify the approved onset-time count slice; keep descriptive sleep counts in the backlog and continue excluding `.agents/` and `.codex/`.
 
 ## Last verification
+
+Phase 9 starting-state verification completed 2026-08-04 before application-code edits:
+
+- `git status --short --branch` showed synchronized `main` with only expected untracked `.agents/` and `.codex/`.
+- `HEAD`, local `main`, local `origin/main`, and live `git ls-remote origin refs/heads/main` all resolved to `76880a978e68e79348941de891a0bc6251986188`.
+- GitHub repository metadata confirmed public repository `Kiezling/Mindscale`, default branch `main`, and connector push/admin access.
+- Branch `agent/phase9-onset-time-counts` was created from that exact head.
+- Product rationale, the complete primary HTML handoff, the three governing Insights specs, current engine/ViewModel/Compose/DAO code, and focused JVM/instrumented tests were reconciled before drafting.
+- No Gradle oracle was rerun for this documentation-only approval state; the merged Phase 8 application evidence below remains current.
 
 Repository synchronization verified 2026-08-04 after Phase 8 publication:
 
