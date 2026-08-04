@@ -79,7 +79,7 @@ The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716c
 
 ## Active blocker
 
-No code blocker. Draft PR #1 is open, mergeable, and awaiting human review/merge. Phase 5 should begin from updated `main` after PR #1 is merged, or from this feature branch if review is still pending.
+No code blocker. Draft PR #1 is open and awaiting human review; the branch has the expected `main` merge base with no divergent commits. Phase 5 should begin from updated `main` after PR #1 is merged, or from this feature branch if review is still pending.
 
 ## Known decisions
 
