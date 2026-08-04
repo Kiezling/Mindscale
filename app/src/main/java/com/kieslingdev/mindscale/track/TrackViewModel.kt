@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.kieslingdev.mindscale.data.Entry
 import com.kieslingdev.mindscale.data.EntryDao
 import com.kieslingdev.mindscale.data.EntryKind
+import com.kieslingdev.mindscale.data.EpisodeSourceDao
 import com.kieslingdev.mindscale.data.Marker
 import com.kieslingdev.mindscale.data.MarkerDao
 import com.kieslingdev.mindscale.data.SleepCaptureOutcome
@@ -61,7 +62,8 @@ class TrackViewModel(
     private val markerDao: MarkerDao,
     private val settingsDao: TrackSettingsDao,
     private val savedStateHandle: SavedStateHandle = SavedStateHandle(),
-    private val nowProvider: () -> Long = System::currentTimeMillis
+    private val nowProvider: () -> Long = System::currentTimeMillis,
+    private val episodeSourceDao: EpisodeSourceDao? = null
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(
@@ -212,9 +214,21 @@ class TrackViewModel(
      * ever a UI-captured convenience value, never the correctness mechanism.
      */
     private suspend fun performCapture(value: Int, ts: Long, armed: EntryKind?) {
+        if (armed == null && episodeSourceDao != null) {
+            val result = episodeSourceDao.insertOrdinaryAndClassify(Entry(ts = ts, value = value))
+            when {
+                !result.settingsAvailable -> setToast("Settings are unavailable. Your rating was saved.")
+                !result.classificationAvailable ->
+                    setToast("Your rating was saved, but the onset prompt is unavailable.")
+                result.promptEnabled -> _uiState.update {
+                    it.copy(onsetChipPrompt = OnsetChipPromptState(entryId = result.entryId))
+                }
+            }
+            return
+        }
+
         val priorEntry = if (armed == null) entryDao.mostRecentAtOrBefore(ts) else null
         val isOnset = armed == null && value > 0 && (priorEntry == null || priorEntry.value == 0)
-
         val insertedId = entryDao.insert(Entry(ts = ts, value = value, kind = armed))
 
         when (armed) {

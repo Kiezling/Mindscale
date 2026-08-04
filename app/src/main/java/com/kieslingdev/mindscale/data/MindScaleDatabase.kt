@@ -9,7 +9,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
     entities = [Entry::class, SleepInterval::class, Marker::class, TrackSettings::class],
-    version = 3,
+    version = 4,
     exportSchema = true
 )
 @TypeConverters(ChipsConverter::class, EntryKindConverter::class, SettingsConverters::class)
@@ -19,6 +19,7 @@ abstract class MindScaleDatabase : RoomDatabase() {
     abstract fun markerDao(): MarkerDao
     abstract fun trackSettingsDao(): TrackSettingsDao
     abstract fun dataControlDao(): DataControlDao
+    abstract fun episodeSourceDao(): EpisodeSourceDao
 
     companion object {
         const val NAME = "mindscale.db"
@@ -35,9 +36,9 @@ abstract class MindScaleDatabase : RoomDatabase() {
                 super.onCreate(db)
                 db.execSQL(
                     "INSERT INTO track_settings (id, sleepOn, askChips, paused, checkinAt, sleepIntroShown, " +
-                        "themeMode, hourFormat, anchor2, anchor5, anchor8, onsetChips, hideNotes, anchorPromptDone) " +
+                        "themeMode, hourFormat, anchor2, anchor5, anchor8, onsetChips, hideNotes, anchorPromptDone, holdDuration) " +
                         "VALUES (0, 1, 0, 0, 0, 0, 'SYSTEM', 'TWELVE', '', '', '', " +
-                        "'${DEFAULT_ONSET_CHIPS.joinToString("\u001F").replace("'", "''")}', 0, 0)"
+                        "'${DEFAULT_ONSET_CHIPS.joinToString("\u001F").replace("'", "''")}', 0, 0, 'SIXTEEN')"
                 )
             }
         }
@@ -45,7 +46,7 @@ abstract class MindScaleDatabase : RoomDatabase() {
         /** Manual singleton construction (no DI framework, per Invariant 11 / D-3). */
         fun build(context: Context): MindScaleDatabase =
             Room.databaseBuilder(context.applicationContext, MindScaleDatabase::class.java, NAME)
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                 .addCallback(seedSettingsCallback)
                 .build()
     }

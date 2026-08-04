@@ -28,18 +28,21 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.kieslingdev.mindscale.log.LogRoute
 import com.kieslingdev.mindscale.log.LogViewModel
+import com.kieslingdev.mindscale.insights.InsightsRoute
+import com.kieslingdev.mindscale.insights.InsightsViewModel
 import com.kieslingdev.mindscale.settings.SettingsFocus
 import com.kieslingdev.mindscale.settings.SettingsRoute
 import com.kieslingdev.mindscale.settings.SettingsViewModel
 import com.kieslingdev.mindscale.track.TrackRoute
 import com.kieslingdev.mindscale.track.TrackViewModel
 
-enum class AppDestination { TRACK, LOG, SETTINGS }
+enum class AppDestination { TRACK, LOG, INSIGHTS, SETTINGS }
 
 @Composable
 fun MindScaleApp(
     trackViewModel: TrackViewModel,
     logViewModel: LogViewModel,
+    insightsViewModel: InsightsViewModel,
     settingsViewModel: SettingsViewModel
 ) {
     var destinationName by rememberSaveable { mutableStateOf(AppDestination.TRACK.name) }
@@ -59,6 +62,7 @@ fun MindScaleApp(
         destinationName = when (destination) {
             AppDestination.SETTINGS -> priorDestinationName
             AppDestination.LOG -> AppDestination.TRACK.name
+            AppDestination.INSIGHTS -> AppDestination.TRACK.name
             AppDestination.TRACK -> AppDestination.TRACK.name
         }
     }
@@ -87,6 +91,7 @@ fun MindScaleApp(
                         when (destination) {
                             AppDestination.TRACK -> "Track"
                             AppDestination.LOG -> "Full Log"
+                            AppDestination.INSIGHTS -> "Insights"
                             AppDestination.SETTINGS -> "Settings"
                         },
                         style = MaterialTheme.typography.titleMedium
@@ -120,6 +125,15 @@ fun MindScaleApp(
                         label = { Text("Log") },
                         modifier = Modifier.semantics { contentDescription = "Log tab" }
                     )
+                    NavigationBarItem(
+                        selected = destination == AppDestination.INSIGHTS,
+                        onClick = { destinationName = AppDestination.INSIGHTS.name },
+                        icon = { Text("▦") },
+                        label = { Text("Insights") },
+                        modifier = Modifier
+                            .testTag("insights_tab")
+                            .semantics { contentDescription = "Insights tab" }
+                    )
                 }
             }
         }
@@ -131,6 +145,7 @@ fun MindScaleApp(
                 modifier = Modifier.padding(innerPadding)
             )
             AppDestination.LOG -> LogRoute(logViewModel, Modifier.padding(innerPadding))
+            AppDestination.INSIGHTS -> InsightsRoute(insightsViewModel, Modifier.padding(innerPadding))
             AppDestination.SETTINGS -> SettingsRoute(
                 settingsViewModel,
                 focus = SettingsFocus.valueOf(settingsFocusName),

@@ -48,6 +48,7 @@ class DataControlDaoTest {
         database.markerDao().insert(Marker(ts = 50, text = "event"))
         database.trackSettingsDao().setPaused(true)
         database.trackSettingsDao().setAppearance(ThemeMode.DARK)
+        database.trackSettingsDao().setHoldDuration(HoldDuration.TWENTY_FOUR)
 
         assertEquals(EraseCounts(1, 1, 1), database.dataControlDao().eraseEverythingAndResetSettings())
         val snapshot = database.dataControlDao().snapshot()
@@ -55,6 +56,7 @@ class DataControlDaoTest {
         assertEquals(0, snapshot.sleeps.size)
         assertEquals(0, snapshot.markers.size)
         assertEquals(ThemeMode.SYSTEM, snapshot.settings.themeMode)
+        assertEquals(HoldDuration.SIXTEEN, snapshot.settings.holdDuration)
         assertFalse(snapshot.settings.paused)
     }
 }

@@ -18,5 +18,6 @@ data class TrackSettings(
     val anchor8: String = "",
     val onsetChips: List<String> = DEFAULT_ONSET_CHIPS,
     val hideNotes: Boolean = false,
-    val anchorPromptDone: Boolean = false
+    val anchorPromptDone: Boolean = false,
+    val holdDuration: HoldDuration = HoldDuration.SIXTEEN
 )

@@ -6,10 +6,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
@@ -31,6 +34,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kieslingdev.mindscale.data.HourFormat
+import com.kieslingdev.mindscale.data.HoldDuration
 import com.kieslingdev.mindscale.data.ThemeMode
 import java.io.OutputStreamWriter
 import kotlinx.coroutines.Dispatchers
@@ -108,8 +112,8 @@ fun SettingsScreen(
     LaunchedEffect(focus) {
         listState.animateScrollToItem(when (focus) {
             SettingsFocus.TOP -> 0
-            SettingsFocus.ANCHORS -> 3
-            SettingsFocus.DATA -> 11
+            SettingsFocus.ANCHORS -> 4
+            SettingsFocus.DATA -> 12
         })
     }
 
@@ -136,6 +140,21 @@ fun SettingsScreen(
                     selected = uiState.settings.hourFormat,
                     label = { if (it == HourFormat.TWELVE) "12-hour" else "24-hour" },
                     onSelected = viewModel::setHourFormat
+                )
+            }
+        }
+        item(key = "hold") {
+            SettingsSection("An entry ends after") {
+                ChoiceRow(
+                    values = HoldDuration.entries,
+                    selected = uiState.settings.holdDuration,
+                    label = { "${it.hours}h" },
+                    onSelected = viewModel::setHoldDuration
+                )
+                Text(
+                    "Waking hours. Sleep pauses this clock. This changes how Insights treats " +
+                        "gaps across your history; your records do not change.",
+                    style = MaterialTheme.typography.bodySmall
                 )
             }
         }
@@ -272,13 +291,18 @@ private fun SettingsSection(title: String, content: @Composable ColumnScope.() -
 
 @Composable
 private fun <T> ChoiceRow(values: List<T>, selected: T, label: (T) -> String, onSelected: (T) -> Unit) {
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    Row(
+        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
         values.forEach { value ->
             FilterChip(
                 selected = value == selected,
                 onClick = { onSelected(value) },
                 label = { Text(label(value)) },
-                modifier = Modifier.semantics { contentDescription = "${label(value)}, ${if (value == selected) "selected" else "not selected"}" }
+                modifier = Modifier
+                    .heightIn(min = 48.dp)
+                    .semantics { contentDescription = "${label(value)}, ${if (value == selected) "selected" else "not selected"}" }
             )
         }
     }

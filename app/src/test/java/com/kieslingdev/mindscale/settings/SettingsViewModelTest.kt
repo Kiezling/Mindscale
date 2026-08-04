@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import com.kieslingdev.mindscale.data.DataControlDao
 import com.kieslingdev.mindscale.data.Entry
 import com.kieslingdev.mindscale.data.Marker
+import com.kieslingdev.mindscale.data.HoldDuration
 import com.kieslingdev.mindscale.data.SleepInterval
 import com.kieslingdev.mindscale.data.TrackSettings
 import com.kieslingdev.mindscale.track.FakeTrackSettingsDao
@@ -100,6 +101,19 @@ class SettingsViewModelTest {
         vm.retryDocumentWrite()
         assertEquals(original, vm.uiState.value.pendingDocument)
         assertNull(vm.uiState.value.retryDocument)
+    }
+
+    @Test
+    fun holdDurationUsesTargetedWriteAndUpdatesObservedState() = runTest {
+        val settings = FakeTrackSettingsDao()
+        val vm = SettingsViewModel(settings, FakeDataControlDao())
+        dispatcher.scheduler.runCurrent()
+
+        vm.setHoldDuration(HoldDuration.TWENTY_FOUR)
+        dispatcher.scheduler.runCurrent()
+
+        assertEquals(HoldDuration.TWENTY_FOUR, vm.uiState.value.settings.holdDuration)
+        assertEquals(HoldDuration.TWENTY_FOUR, settings.updateCalls.single().holdDuration)
     }
 }
 

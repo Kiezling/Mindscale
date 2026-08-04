@@ -14,7 +14,7 @@ fun recordsFilename(at: Instant): String = "mindscale-records-${FilenameFormatte
 fun encodeBackup(snapshot: DataSnapshot, exportedAt: Instant): String = buildString {
     append("{\n")
     append("  \"format\": \"mindscale-backup\",\n")
-    append("  \"version\": 3,\n")
+    append("  \"version\": 4,\n")
     append("  \"exportedAt\": ").appendJson(exportedAt.toString()).append(",\n")
     append("  \"entries\": [")
     snapshot.entries.forEachIndexed { index, entry ->
@@ -55,7 +55,8 @@ fun encodeBackup(snapshot: DataSnapshot, exportedAt: Instant): String = buildStr
     append("\n    \"sleepOn\": ${s.sleepOn},")
     append("\n    \"askChips\": ${s.askChips},")
     append("\n    \"hideNotes\": ${s.hideNotes},")
-    append("\n    \"paused\": ${s.paused}")
+    append("\n    \"paused\": ${s.paused},")
+    append("\n    \"holdHours\": ${s.holdDuration.hours}")
     append("\n  }\n}")
 }
 

@@ -12,6 +12,7 @@ import androidx.lifecycle.viewmodel.CreationExtras
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import com.kieslingdev.mindscale.log.LogViewModel
+import com.kieslingdev.mindscale.insights.InsightsViewModel
 import com.kieslingdev.mindscale.settings.SettingsViewModel
 import com.kieslingdev.mindscale.track.TrackViewModel
 import com.kieslingdev.mindscale.ui.theme.MindScaleTheme
@@ -29,7 +30,8 @@ class MainActivity : ComponentActivity() {
                     sleepDao = database.sleepDao(),
                     markerDao = database.markerDao(),
                     settingsDao = database.trackSettingsDao(),
-                    savedStateHandle = extras.createSavedStateHandle()
+                    savedStateHandle = extras.createSavedStateHandle(),
+                    episodeSourceDao = database.episodeSourceDao()
                 ) as T
             }
         }
@@ -63,6 +65,19 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private val insightsViewModel: InsightsViewModel by viewModels {
+        object : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
+                return InsightsViewModel(
+                    sourceDao = database.episodeSourceDao(),
+                    settingsDao = database.trackSettingsDao(),
+                    savedStateHandle = extras.createSavedStateHandle()
+                ) as T
+            }
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -72,6 +87,7 @@ class MainActivity : ComponentActivity() {
                 MindScaleApp(
                     trackViewModel = trackViewModel,
                     logViewModel = logViewModel,
+                    insightsViewModel = insightsViewModel,
                     settingsViewModel = settingsViewModel
                 )
             }

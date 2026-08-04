@@ -1,6 +1,6 @@
 # MindScale project state
 
-Last updated: 2026-08-03
+Last updated: 2026-08-04
 
 ## Goal
 
@@ -8,17 +8,21 @@ Build MindScale as a native Android application using Kotlin, Jetpack Compose, M
 
 The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716ca7343`: `SPEC.md` is the rationale and `MindScale v2.dc.html` is the visual/behavioral reference for Track, Full Log, Insights, Report, Safety card, Profile, and Settings. A local exported handoff is available at `C:\Users\mckie\Downloads\MindScale-handoff\mindscale\project\`; its `MindScale v2.dc.html` is the primary implementation reference. Repository specs under `docs/specs/` govern native implementation after human approval.
 
-## Current phase: Phase 4 published for review; Phase 5 starts in a new session
+## Current phase: Phase 6 Insights entry chart implemented and verified locally
 
-- Branch: `agent/phase4-settings-data-control`
-- Phase 4 implementation checkpoint: `ea30fdeaa0dfe3987fd5cb71201756ccbe72092d` (`Implement Phase 4 settings and data control`)
-- Upstream: `origin/agent/phase4-settings-data-control`; base `origin/main` remains `87eb817713a459fd231ce77169dfa522b249f641`
-- Draft pull request: `https://github.com/Kiezling/Mindscale/pull/1` targeting `main`
+- Branch: `agent/phase5-insights-foundation`, created from updated `main` at `c177db20ae5cf7c6ef41dd526b1cb70a5d19baa5`
+- Phase 4 final branch head: `93fac65711e8e3eeb72cf6f1406d386f0386e9da`
+- Phase 4 PR #1: merged into `main` as `c177db20ae5cf7c6ef41dd526b1cb70a5d19baa5` on 2026-08-03 local time (`2026-08-04T03:37:50Z`)
+- Phase 5 spec: `docs/specs/SPEC-insights-foundation.md` — `IMPLEMENTED — VERIFIED LOCALLY`; D-1 through D-10 frozen
+- Phase 5 implementation commit: `cd3a1cf51adb468f968a78a2a04d85ce317d76ed`, pushed to `origin/agent/phase5-insights-foundation` on 2026-08-04
+- Phase 6 branch: `agent/phase6-entry-chart`, stacked from published Phase 5 head `c8a7bdb17a12aba58dba59927ffc81506d5b42dc` because Phase 5 is not yet merged
+- Phase 6 spec: `docs/specs/SPEC-insights-entry-chart.md` — `IMPLEMENTED — VERIFIED LOCALLY`; D-1 through D-8 frozen
+- Phase 6 implementation commit: `53f9d54ea79f56b2d069297f4d6a4b8923aeae23`, pushed to `origin/agent/phase6-entry-chart` on 2026-08-04
 - Phase 1 spec: `docs/specs/SPEC-track-numpad-logging.md` — `IMPLEMENTED`
 - Phase 2 spec: `docs/specs/SPEC-track-phase2-completeness.md` — `IMPLEMENTED`
 - Phase 3 spec: `docs/specs/SPEC-full-log.md` — `IMPLEMENTED` on 2026-08-03
 - Phase 4 spec: `docs/specs/SPEC-settings-data-control.md` — `IMPLEMENTED` on 2026-08-03/04; D-1 through D-9 remain frozen
-- Current worktree: Phase 4 implementation is committed and pushed; this closure update is the final documentation-only follow-up
+- Current worktree: Phase 6 is committed and pushed on `agent/phase6-entry-chart`; only the pre-existing untracked `.agents/` and `.codex/` tooling directories remain outside feature scope
 
 ## Environment
 
@@ -77,9 +81,25 @@ The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716c
 - Added deterministic version-3 JSON backup and RFC-4180 CSV export through `CreateDocument`, with no storage permission, plus export-first atomic erase/reset.
 - Critical review fixed an untappable status-bar-overlapped Settings action, retained encoded exports for write retry, and made word de-duplication locale-independent.
 
+### Phase 5 — Insights foundation
+
+- Added a third native Insights destination with six local-calendar ranges, restoration, Back-to-Track behavior, and Settings return-to-Insights behavior without a navigation framework.
+- Added a pure deterministic episode engine over Entry/Sleep facts: same-timestamp collapse, explicit/assumed/ongoing endings, awake-time holds, sleep union, clipped range duration/AUC, clear-day eligibility, local/DST-safe raster projection, and scheduled time invalidation.
+- Replaced production ordinary-capture onset detection with a hold/sleep-aware Room transaction that snapshots settings, classifies at the capture timestamp, inserts the rating atomically, and suppresses prompting safely if classification/settings are unavailable.
+- Added additive Room 3→4 hold persistence with 8/12/16/24 waking-hour choices, schema 4, targeted writes, fresh/default erase reset, and deterministic JSON backup version 4 `holdHours`; CSV remains unchanged.
+- Added native Material 3 summary/fact/episode UI and a Canvas day/hour raster with text legend, future hatching, touch/horizontal-drag exploration, visible live readout, TalkBack custom actions, stable date keys, and explicit 48 dp range/choice targets.
+- Critical review and manual API 36 inspection fixed carried-duration leakage, future sleep-end invalidation, raster vertical-scroll interception, low-contrast future state, duplicate ongoing copy, and undersized range targets.
+
+### Phase 6 — Insights entry chart
+
+- Added a native step-only `What you recorded` chart driven by the Phase 5 effective-state engine, with 0/5/10 axes, shared ranges, sleep gaps/bands, event lines, and no interpolation or chart dependency.
+- Expanded the single reactive Room UNION projection with Entry note and Marker text while keeping Room/schema/backup at version 4 and preserving transactional onset classification.
+- Added independent chart selection restoration, touch and horizontal-drag exploration, event snapping, visible/live source-rating readout, note-preview privacy, and six TalkBack navigation actions.
+- Added pure engine, ViewModel, Room, Compose, gesture-ownership, semantics, and privacy coverage; final manual inspection covered touch readout, event discovery, light/dark rendering, and 150% font scaling.
+
 ## Active blocker
 
-No code blocker. Draft PR #1 is open and awaiting human review; the branch has the expected `main` merge base with no divergent commits. Phase 5 should begin from updated `main` after PR #1 is merged, or from this feature branch if review is still pending.
+No active blocker. Phase 6 is committed, pushed, and ready for stacked review after Phase 5.
 
 ## Known decisions
 
@@ -93,12 +113,61 @@ No code blocker. Draft PR #1 is open and awaiting human review; the branch has t
 
 ## Next tasks
 
-1. Review and merge draft PR #1 into `main` when satisfied.
-2. Start Phase 5 in a new session; fetch first and verify whether PR #1 has merged before changing code.
-3. Re-read `AGENTS.md`, `PROJECT_STATE.md`, `DECISIONS.md`, `FAILURES.md`, `docs/specs/BACKLOG.md`, and all implemented specs before drafting Phase 5.
-4. Inspect the local Claude Design handoff and propose one bounded Phase 5 spec; do not implement until its decisions are approved.
+1. Open pull requests only if separately requested; Phase 6 review must retain its Phase 5 dependency or wait until Phase 5 is merged.
+2. Preserve Room schema 4, backup format 4, and every Phase 5/6 engine invariant.
+3. Require a new bounded spec/decision gate before beginning another Insights view or product area.
 
 ## Last verification
+
+Phase 6 final local verification completed 2026-08-04 from `S:\Android\AndroidProjects\MindScale` for implementation commit `53f9d54ea79f56b2d069297f4d6a4b8923aeae23`, based on Phase 5 publication head `c8a7bdb17a12aba58dba59927ffc81506d5b42dc`:
+
+```powershell
+.\gradlew.bat test lint assembleDebug --no-daemon --console=plain
+adb devices -l
+.\gradlew.bat connectedDebugAndroidTest --no-daemon --console=plain
+git diff --check
+```
+
+Results:
+
+- JVM tests: 122/122 passed; 0 failures, 0 errors, 0 skipped.
+- Lint: passed with 0 errors and the same 22 existing template/dependency/toolchain warnings; no Phase 6 warning remains.
+- Debug assembly: passed; no dependency, toolchain, manifest, permission, or schema JSON change was made.
+- Intended device: `emulator-5554`, `MindScale_API_36` (API 36).
+- Instrumented/UI tests: 80/80 passed; 0 failures, 0 errors, 0 skipped. Coverage includes the unified Entry/Sleep/Marker source, transactional onset with markers present, chart touch/horizontal drag, vertical scroll ownership, note privacy, event text, all six semantic actions' ViewModel targets, and all Phase 1–5 regressions.
+- Manual installed-app review used local UI-created records and verified the 30-day compressed step geometry, persistent source/event readout, event-line snapping, scroll into episode facts, light mode, dark mode, and 150% font scaling. Emulator `font_scale` and night mode were restored to `1.0` and `no`.
+- Final review found no blocking product, persistence, concurrency, accessibility, grammar, or architecture issue. A stale off-screen heading assertion and an over-broad drag-test start were corrected; the focused 11-test Insights class and final 80-test suite then passed.
+- `git diff --check` passed with only Windows line-ending notices.
+
+Phase 5 final local verification completed 2026-08-04 from `S:\Android\AndroidProjects\MindScale` at uncommitted branch head/base `c177db20ae5cf7c6ef41dd526b1cb70a5d19baa5`:
+
+```powershell
+.\gradlew.bat test
+.\gradlew.bat lint
+.\gradlew.bat assembleDebug
+adb devices -l
+.\gradlew.bat connectedDebugAndroidTest
+git diff --check
+```
+
+Results:
+
+- JVM tests: 116/116 passed; 0 failures.
+- Lint and debug assembly: passed; no toolchain/dependency change was made.
+- Intended device: `emulator-5554`, `MindScale_API_36` (API 36).
+- Instrumented/UI tests: 77/77 passed; 0 failures, 0 errors, 0 skipped. Coverage includes Room 1→4/2→4/3→4, settings/default erase, unified source/transactional onset, all Phase 1–4 regressions, navigation/recreation, Insights states/ranges/semantics, 48 dp range targets, vertical raster scroll, and 12/24-hour readout.
+- Manual installed-app walkthrough verified Track/Log/Insights navigation, empty and populated Insights, touch readout, vertical scrolling past the raster, fact/episode cards, hold setting, Settings return, light/dark output, 150% font scaling, and TalkBack-enabled focus/navigation. Connected tests invoke every custom raster accessibility action; no WebView, JavaScript/chart dependency, new permission, account, server, analytics, or background worker was added.
+- `git diff --check` passed with only Windows line-ending notices. The emulator-only test records/screenshots are disposable build evidence and are not repository source artifacts.
+- One interrupted Gradle run left a truncated generated test result and caused a raw `EOFException`; `cleanTestDebugUnitTest` recovered it. The durable workaround is in `FAILED_PATHS.md`.
+- Critical review completed and all findings were resolved; see the checked Phase 5 acceptance criteria.
+
+Repository/PR synchronization verified 2026-08-03 before Phase 5 drafting:
+
+- GitHub PR #1 is closed and merged; head `93fac65711e8e3eeb72cf6f1406d386f0386e9da`, merge commit `c177db20ae5cf7c6ef41dd526b1cb70a5d19baa5`.
+- `git fetch --prune origin` and `git pull --ff-only origin main` succeeded.
+- Local `main` and `origin/main` were identical (`0 0`) at `c177db20ae5cf7c6ef41dd526b1cb70a5d19baa5`, and Phase 4 head was confirmed as an ancestor.
+- Phase 5 branch `agent/phase5-insights-foundation` was created from that merge commit before documentation edits.
+- No Gradle oracle was rerun for the documentation-only spec draft; the latest application evidence remains the Phase 4 suite below.
 
 Phase 4 final pre-publication verification completed 2026-08-03/04 from `S:\Android\AndroidProjects\MindScale`:
 
@@ -127,7 +196,7 @@ Results:
 
 - Phase 1 backdate/edit/note dialog-open state still needs a dedicated true process-recreation correction; see `docs/specs/BACKLOG.md`.
 - JSON/CSV import remains deferred; Phase 4 exports are one-way until a separately approved validation/merge/rollback spec exists.
-- The approved time-weighted/hold/auto-end episode model remains unimplemented and must reconcile Phase 2's simplified onset rule.
+- The time-weighted/hold episode model and Phase 2 onset reconciliation are implemented and verified by `docs/specs/SPEC-insights-foundation.md`.
 - Gold/ink theming is implemented; approved typography assets remain a future design decision.
 - Full Log import/export and clinician-report data actions remain deferred; no inert controls are shown.
 

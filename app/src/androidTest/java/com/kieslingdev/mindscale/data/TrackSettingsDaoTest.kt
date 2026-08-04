@@ -48,6 +48,7 @@ class TrackSettingsDaoTest {
         assertEquals(DEFAULT_ONSET_CHIPS, settings.onsetChips)
         assertFalse(settings.hideNotes)
         assertFalse(settings.anchorPromptDone)
+        assertEquals(HoldDuration.SIXTEEN, settings.holdDuration)
     }
 
     @Test
@@ -76,8 +77,23 @@ class TrackSettingsDaoTest {
         assertEquals("high", updated.anchor8)
         assertEquals(ThemeMode.DARK, updated.themeMode)
         assertTrue(updated.hideNotes)
+        assertEquals(HoldDuration.SIXTEEN, updated.holdDuration)
         assertTrue(updated.sleepOn)
         assertFalse(updated.askChips)
+    }
+
+    @Test
+    fun setHoldDuration_updatesOnlyHold_andMissingRowReturnsZero() = runBlocking {
+        dao.setAppearance(ThemeMode.DARK)
+        assertEquals(1, dao.setHoldDuration(HoldDuration.TWENTY_FOUR))
+
+        val updated = dao.current()
+        assertEquals(HoldDuration.TWENTY_FOUR, updated.holdDuration)
+        assertEquals(ThemeMode.DARK, updated.themeMode)
+        assertTrue(updated.sleepOn)
+
+        database.openHelper.writableDatabase.execSQL("DELETE FROM track_settings WHERE id = 0")
+        assertEquals(0, dao.setHoldDuration(HoldDuration.EIGHT))
     }
 
     @Test
