@@ -5,6 +5,7 @@ import com.kieslingdev.mindscale.data.HoldDuration
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import java.time.temporal.ChronoUnit
 import java.util.Locale
 import kotlin.math.max
 import kotlin.math.min
@@ -170,6 +171,13 @@ fun deriveInsights(
         markers = model.markers
     )
     val onsetGapHistogram = buildOnsetGapHistogram(model.episodes, rangeStart, nowMillis)
+    val onsetTimeCounts = buildOnsetTimeCounts(
+        episodes = model.episodes,
+        rangeStartMillis = rangeStart,
+        nowMillis = nowMillis,
+        firstEntryMillis = model.entries.firstOrNull()?.ts,
+        zoneId = zoneId
+    )
     val nextMidnight = today.plusDays(1).atStartOfDay(zoneId).toInstant().toEpochMilli()
     val candidates = listOfNotNull(model.futureBoundary, model.nextHoldExpiry, nextMidnight)
         .filter { it > nowMillis }
@@ -190,8 +198,68 @@ fun deriveInsights(
         rasterDays = raster,
         entryChart = entryChart,
         onsetGapHistogram = onsetGapHistogram,
+        onsetTimeCounts = onsetTimeCounts,
         nextInvalidationMillis = candidates.minOrNull()
     )
+}
+
+private fun buildOnsetTimeCounts(
+    episodes: List<DerivedEpisode>,
+    rangeStartMillis: Long,
+    nowMillis: Long,
+    firstEntryMillis: Long?,
+    zoneId: ZoneId
+): OnsetTimeCounts {
+    val onsets = episodes.asSequence()
+        .map(DerivedEpisode::onsetMillis)
+        .filter { it >= rangeStartMillis && it < nowMillis }
+        .sorted()
+        .toList()
+    val hourCounts = IntArray(24)
+    onsets.forEach { onsetMillis ->
+        val hour = Instant.ofEpochMilli(onsetMillis).atZone(zoneId).hour
+        require(hour in hourCounts.indices) { "Invalid local onset hour $hour" }
+        hourCounts[hour]++
+    }
+    require(hourCounts.sum() == onsets.size) { "Onset-time bucket count mismatch" }
+
+    var fourHourStart = 0
+    var fourHourCount = -1
+    hourCounts.indices.forEach { startHour ->
+        val count = (0 until 4).sumOf { offset -> hourCounts[(startHour + offset) % 24] }
+        if (count > fourHourCount) {
+            fourHourStart = startHour
+            fourHourCount = count
+        }
+    }
+    require(fourHourStart in 0..23 && fourHourCount >= 0) { "Invalid onset-time four-hour window" }
+
+    return OnsetTimeCounts(
+        eligibleOnsetCount = onsets.size,
+        coveredLocalDayCount = coveredLocalDayCount(
+            rangeStartMillis = rangeStartMillis,
+            nowMillis = nowMillis,
+            firstEntryMillis = firstEntryMillis,
+            zoneId = zoneId
+        ),
+        buckets = hourCounts.mapIndexed { hour, count -> OnsetHourBucket(hour, count) },
+        fourHourWindowStartHour = fourHourStart,
+        fourHourWindowCount = fourHourCount
+    )
+}
+
+private fun coveredLocalDayCount(
+    rangeStartMillis: Long,
+    nowMillis: Long,
+    firstEntryMillis: Long?,
+    zoneId: ZoneId
+): Int {
+    val firstEntry = firstEntryMillis ?: return 0
+    val start = max(rangeStartMillis, firstEntry)
+    if (nowMillis <= start) return 0
+    val firstDate = Instant.ofEpochMilli(start).atZone(zoneId).toLocalDate()
+    val lastDate = Instant.ofEpochMilli(Math.subtractExact(nowMillis, 1L)).atZone(zoneId).toLocalDate()
+    return Math.toIntExact(ChronoUnit.DAYS.between(firstDate, lastDate) + 1L)
 }
 
 private fun buildOnsetGapHistogram(

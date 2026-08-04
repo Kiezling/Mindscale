@@ -2,6 +2,7 @@ package com.kieslingdev.mindscale.insights
 
 import com.kieslingdev.mindscale.data.EpisodeSourceRow
 import com.kieslingdev.mindscale.data.HoldDuration
+import com.kieslingdev.mindscale.data.HourFormat
 import java.time.Instant
 import java.time.ZoneId
 import java.time.ZoneOffset
@@ -529,6 +530,221 @@ class EpisodeEngineTest {
 
         assertEquals(1, histogram.buckets[9].count)
         assertEquals(5, histogram.buckets.sumOf(OnsetGapBucket::count))
+    }
+
+    @Test
+    fun onsetTimeCountsRefuseZeroThroughFiveStartsWithExactCopy() {
+        val expectedCopy = listOf(
+            "Needs 6 more recorded starts in this range before this chart is shown. There are 0 starts to count by hour.",
+            "Needs 5 more recorded starts in this range before this chart is shown. There is 1 start to count by hour.",
+            "Needs 4 more recorded starts in this range before this chart is shown. There are 2 starts to count by hour.",
+            "Needs 3 more recorded starts in this range before this chart is shown. There are 3 starts to count by hour.",
+            "Needs 2 more recorded starts in this range before this chart is shown. There are 4 starts to count by hour.",
+            "Needs 1 more recorded start in this range before this chart is shown. There are 5 starts to count by hour."
+        )
+
+        expectedCopy.indices.forEach { onsetCount ->
+            val counts = derive(episodeRows(List(onsetCount) { it * day }), now = 6 * day).onsetTimeCounts
+            assertFalse(counts.isEligible)
+            assertEquals(onsetCount, counts.eligibleOnsetCount)
+            assertEquals(24, counts.buckets.size)
+            assertEquals(onsetCount, counts.buckets.sumOf(OnsetHourBucket::count))
+            assertEquals(expectedCopy[onsetCount], onsetTimeRefusalText(counts))
+        }
+    }
+
+    @Test
+    fun onsetTimeCountsUseExactLocalHourBoundariesAndMidnight() {
+        val onsets = listOf(
+            "2026-01-01T00:00:00Z",
+            "2026-01-02T01:59:59Z",
+            "2026-01-03T02:00:00Z",
+            "2026-01-04T12:30:00Z",
+            "2026-01-05T23:00:00Z",
+            "2026-01-06T23:59:59Z"
+        ).map { Instant.parse(it).toEpochMilli() }
+        val counts = deriveInsights(
+            rows = episodeRows(onsets, zeroAfterMillis = 60_000L),
+            hold = HoldDuration.SIXTEEN,
+            now = Instant.parse("2026-01-07T00:00:00Z"),
+            zoneId = ZoneOffset.UTC,
+            range = InsightRange.SEVEN_DAYS
+        ).onsetTimeCounts
+
+        assertTrue(counts.isEligible)
+        assertEquals(1, counts.buckets[0].count)
+        assertEquals(1, counts.buckets[1].count)
+        assertEquals(1, counts.buckets[2].count)
+        assertEquals(1, counts.buckets[12].count)
+        assertEquals(2, counts.buckets[23].count)
+        assertEquals(6, counts.buckets.sumOf(OnsetHourBucket::count))
+    }
+
+    @Test
+    fun onsetTimeCountsUseEveryExistingRangeSelection() {
+        val now = Instant.parse("2026-06-15T18:00:00Z")
+        val onsets = List(6) { index -> now.toEpochMilli() - (12L - index * 2L) * hour }
+
+        InsightRange.entries.forEach { range ->
+            val counts = deriveInsights(
+                rows = episodeRows(onsets, zeroAfterMillis = hour / 2),
+                hold = HoldDuration.SIXTEEN,
+                now = now,
+                zoneId = ZoneOffset.UTC,
+                range = range
+            ).onsetTimeCounts
+
+            assertEquals(range.name, 6, counts.eligibleOnsetCount)
+            assertEquals(range.name, 6, counts.buckets.sumOf(OnsetHourBucket::count))
+        }
+    }
+
+    @Test
+    fun onsetTimeCountsRequireOnsetInsideHalfOpenRange() {
+        val rangeStart = Instant.parse("2026-01-31T00:00:00Z").toEpochMilli()
+        val now = Instant.parse("2026-01-31T23:00:00Z").toEpochMilli()
+        val onsets = listOf(
+            rangeStart - hour,
+            rangeStart,
+            rangeStart + 3 * hour,
+            rangeStart + 6 * hour,
+            rangeStart + 9 * hour,
+            rangeStart + 12 * hour,
+            rangeStart + 15 * hour,
+            now
+        )
+        val counts = deriveInsights(
+            rows = episodeRows(onsets, zeroAfterMillis = 30 * 60_000L),
+            hold = HoldDuration.SIXTEEN,
+            now = Instant.ofEpochMilli(now),
+            zoneId = ZoneOffset.UTC,
+            range = InsightRange.ONE_DAY
+        ).onsetTimeCounts
+
+        assertEquals(6, counts.eligibleOnsetCount)
+        assertEquals(6, counts.buckets.sumOf(OnsetHourBucket::count))
+        assertEquals(1, counts.buckets[0].count)
+        assertEquals(0, counts.buckets[23].count)
+    }
+
+    @Test
+    fun onsetTimeCountsReprojectThroughCurrentZoneAndCombineFallBackHour() {
+        val fixedUtcOnsets = List(6) { index ->
+            Instant.parse("2026-01-0${index + 1}T14:30:00Z").toEpochMilli()
+        }
+        val utc = deriveInsights(
+            episodeRows(fixedUtcOnsets), HoldDuration.SIXTEEN,
+            Instant.parse("2026-01-07T00:00:00Z"), ZoneOffset.UTC, InsightRange.SEVEN_DAYS
+        ).onsetTimeCounts
+        val chicago = deriveInsights(
+            episodeRows(fixedUtcOnsets), HoldDuration.SIXTEEN,
+            Instant.parse("2026-01-07T00:00:00Z"), ZoneId.of("America/Chicago"), InsightRange.SEVEN_DAYS
+        ).onsetTimeCounts
+        assertEquals(6, utc.buckets[14].count)
+        assertEquals(6, chicago.buckets[8].count)
+
+        val overlapOnsets = listOf(
+            "2026-10-28T01:30:00-05:00",
+            "2026-10-29T01:30:00-05:00",
+            "2026-10-30T01:30:00-05:00",
+            "2026-10-31T01:30:00-05:00",
+            "2026-11-01T01:30:00-05:00",
+            "2026-11-01T01:30:00-06:00"
+        ).map { Instant.parse(it).toEpochMilli() }
+        val overlap = deriveInsights(
+            episodeRows(overlapOnsets, zeroAfterMillis = 60_000L), HoldDuration.SIXTEEN,
+            Instant.parse("2026-11-02T06:00:00Z"), ZoneId.of("America/Chicago"), InsightRange.SEVEN_DAYS
+        ).onsetTimeCounts
+        assertEquals(6, overlap.buckets[1].count)
+        assertEquals(0, overlap.buckets[2].count)
+    }
+
+    @Test
+    fun onsetTimeFourHourWindowWrapsMidnightAndBreaksTiesAtEarliestHour() {
+        val base = Instant.parse("2026-01-01T00:00:00Z").toEpochMilli()
+        val wrapHours = listOf(22, 23, 0, 1, 22, 23)
+        val wrapOnsets = wrapHours.mapIndexed { index, hourOfDay -> base + index * day + hourOfDay * hour }
+        val wrap = deriveInsights(
+            episodeRows(wrapOnsets, zeroAfterMillis = 60_000L), HoldDuration.SIXTEEN,
+            Instant.ofEpochMilli(base + 7 * day), ZoneOffset.UTC, InsightRange.THIRTY_DAYS
+        ).onsetTimeCounts
+        assertEquals(22, wrap.fourHourWindowStartHour)
+        assertEquals(6, wrap.fourHourWindowCount)
+        assertEquals(
+            "6 of 6 recorded starts in this range were recorded from 10:00 PM up to but not including 2:00 AM.",
+            onsetTimeFourHourSentence(wrap, HourFormat.TWELVE)
+        )
+
+        val tieHours = listOf(0, 4, 8, 12, 16, 20)
+        val tieOnsets = tieHours.mapIndexed { index, hourOfDay -> base + index * day + hourOfDay * hour }
+        val tie = deriveInsights(
+            episodeRows(tieOnsets, zeroAfterMillis = 60_000L), HoldDuration.SIXTEEN,
+            Instant.ofEpochMilli(base + 7 * day), ZoneOffset.UTC, InsightRange.THIRTY_DAYS
+        ).onsetTimeCounts
+        assertEquals(0, tie.fourHourWindowStartHour)
+        assertEquals(1, tie.fourHourWindowCount)
+    }
+
+    @Test
+    fun onsetTimeCoveredDaysUseLocalDatesAcrossDstAndPartialEndpoints() {
+        val zone = ZoneId.of("America/Chicago")
+        val first = Instant.parse("2026-03-08T05:30:00Z").toEpochMilli() // Mar 7, 11:30 PM CST
+        val now = Instant.parse("2026-03-09T05:30:00Z") // Mar 9, 12:30 AM CDT
+        val counts = deriveInsights(
+            rows = listOf(entry(1, first, 0)),
+            hold = HoldDuration.SIXTEEN,
+            now = now,
+            zoneId = zone,
+            range = InsightRange.SEVEN_DAYS
+        ).onsetTimeCounts
+
+        assertEquals(3, counts.coveredLocalDayCount)
+    }
+
+    @Test
+    fun onsetTimeCopyUsesExactTwelveAndTwentyFourHourBoundariesWithoutInference() {
+        val counts = derive(episodeRows(List(6) { it * day + 14 * hour }), now = 7 * day).onsetTimeCounts
+
+        assertEquals("2p", onsetHourVisibleLabel(14, HourFormat.TWELVE))
+        assertEquals("14", onsetHourVisibleLabel(14, HourFormat.TWENTY_FOUR))
+        assertEquals(
+            "6 of 6 recorded starts were recorded from 2:00 PM up to but not including 3:00 PM.",
+            onsetTimeBucketReadout(counts, 14, HourFormat.TWELVE)
+        )
+        assertEquals(
+            "6 of 6 recorded starts were recorded from 14:00 up to but not including 15:00.",
+            onsetTimeBucketReadout(counts, 14, HourFormat.TWENTY_FOUR)
+        )
+        val generated = listOf(
+            onsetTimeDenominator(counts),
+            onsetTimeBucketReadout(counts, 14, HourFormat.TWELVE).orEmpty(),
+            onsetTimeFourHourSentence(counts, HourFormat.TWELVE)
+        ).joinToString(" ").lowercase()
+        listOf("typical", "usually", "tends to", "most common", "pattern", "risk", "predicts", "diagnosis")
+            .forEach { assertFalse(generated.contains(it)) }
+    }
+
+    @Test
+    fun onsetTimeCountsReuseHoldAndSleepEpisodeSplitsAndIgnoreMarkers() {
+        val rows = buildList {
+            repeat(6) { index ->
+                add(entry(index.toLong() + 1, index * 10L * hour, 5))
+                add(marker(index.toLong() + 20, index * 10L * hour, "context $index"))
+            }
+        }
+        val eight = derive(rows, hold = HoldDuration.EIGHT, now = 70 * hour).onsetTimeCounts
+        val sleepPaused = derive(
+            rows + sleep(40, hour, 20 * hour),
+            hold = HoldDuration.EIGHT,
+            now = 70 * hour
+        ).onsetTimeCounts
+        val twentyFour = derive(rows, hold = HoldDuration.TWENTY_FOUR, now = 70 * hour).onsetTimeCounts
+
+        assertTrue(eight.isEligible)
+        assertEquals(4, sleepPaused.eligibleOnsetCount)
+        assertFalse(sleepPaused.isEligible)
+        assertFalse(twentyFour.isEligible)
+        assertEquals(eight.eligibleOnsetCount, eight.buckets.sumOf(OnsetHourBucket::count))
     }
 
     @Test

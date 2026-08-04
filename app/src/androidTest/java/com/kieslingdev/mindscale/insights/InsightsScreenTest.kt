@@ -273,6 +273,76 @@ class InsightsScreenTest {
     }
 
     @Test
+    fun onsetTimeCountsRefuseSparseRangeWithoutRenderingHours() {
+        val state = InsightsUiState(
+            loading = false,
+            snapshot = snapshot(episodeRows(listOf(0L, 2 * HOUR, 4 * HOUR, 6 * HOUR, 8 * HOUR)))
+        )
+        setContent(state)
+
+        composeTestRule.onNodeWithTag("insights_screen")
+            .performScrollToNode(hasTestTag("onset_time_refusal"))
+        composeTestRule.onNodeWithText(
+            "Needs 1 more recorded start in this range before this chart is shown. " +
+                "There are 5 starts to count by hour."
+        ).assertExists()
+        composeTestRule.onNodeWithTag("onset_time_bars").assertDoesNotExist()
+        composeTestRule.onNodeWithText("Select an hour to read its exact count.").assertDoesNotExist()
+    }
+
+    @Test
+    fun onsetTimeCountsExposeTwentyFourSelectableHoursAndLiveReadout() {
+        var selected: Int? = null
+        val state = InsightsUiState(
+            loading = false,
+            selectedOnsetHour = 0,
+            snapshot = snapshot(episodeRows(listOf(0L, 2 * HOUR, 4 * HOUR, 6 * HOUR, 8 * HOUR, 10 * HOUR)))
+        )
+        setContent(state, onSelectOnsetHour = { selected = it })
+
+        composeTestRule.onNodeWithTag("insights_screen")
+            .performScrollToNode(hasTestTag("onset_time_bars"))
+        composeTestRule.onNodeWithText("6 recorded starts across 1 local calendar day in this range.").assertExists()
+        (0 until 24).forEach { hour ->
+            composeTestRule.onNodeWithTag("onset_time_hour_$hour").assertExists().assertHeightIsAtLeast(48.dp)
+        }
+        composeTestRule.onNodeWithTag("onset_time_hour_0")
+            .assertIsSelected()
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
+            .assert(
+                SemanticsMatcher.expectValue(
+                    SemanticsProperties.ContentDescription,
+                    listOf("12:00 AM hour, 1 of 6 recorded starts, from 12:00 AM up to but not including 1:00 AM")
+                )
+            )
+            .performClick()
+
+        assertEquals(0, selected)
+        composeTestRule.onNodeWithText(
+            "1 of 6 recorded starts were recorded from 12:00 AM up to but not including 1:00 AM."
+        ).assertExists()
+        composeTestRule.onNodeWithText(ONSET_TIME_CAVEAT).assertExists()
+        composeTestRule.onNodeWithTag("onset_time_hour_23").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun verticalSwipeOnOnsetTimeHourScrollsParentList() {
+        val state = InsightsUiState(
+            loading = false,
+            snapshot = snapshot(episodeRows(listOf(0L, 2 * HOUR, 4 * HOUR, 6 * HOUR, 8 * HOUR, 10 * HOUR)))
+        )
+        setContent(state)
+
+        val list = composeTestRule.onNodeWithTag("insights_screen")
+        list.performScrollToNode(hasTestTag("onset_time_bars"))
+        val before = list.fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange].value()
+        composeTestRule.onNodeWithTag("onset_time_hour_0").performTouchInput { swipeDown() }
+        val after = list.fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange].value()
+
+        assertTrue(after < before)
+    }
+
+    @Test
     fun staleSnapshotShowsErrorAndWorkingRetry() {
         var retries = 0
         setContent(
@@ -315,6 +385,7 @@ class InsightsScreenTest {
         onExploreChart: (Long) -> Unit = {},
         onPreviousEvent: () -> Boolean = { true },
         onSelectOnsetGapBucket: (Int) -> Unit = {},
+        onSelectOnsetHour: (Int) -> Unit = {},
         onRetry: () -> Unit = {}
     ) {
         composeTestRule.setContent {
@@ -335,6 +406,7 @@ class InsightsScreenTest {
                     onPreviousEvent = onPreviousEvent,
                     onNextEvent = { true },
                     onSelectOnsetGapBucket = onSelectOnsetGapBucket,
+                    onSelectOnsetHour = onSelectOnsetHour,
                     onRetry = onRetry,
                     zoneId = ZoneOffset.UTC
                 )
