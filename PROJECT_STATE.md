@@ -8,7 +8,7 @@ Build MindScale as a native Android application using Kotlin, Jetpack Compose, M
 
 The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716ca7343`: `SPEC.md` is the rationale and `MindScale v2.dc.html` is the visual/behavioral reference for Track, Full Log, Insights, Report, Safety card, Profile, and Settings. A local exported handoff is available at `C:\Users\mckie\Downloads\MindScale-handoff\mindscale\project\`; its `MindScale v2.dc.html` is the primary implementation reference. Repository specs under `docs/specs/` govern native implementation after human approval.
 
-## Current phase: Phase 12 local import and restore — implemented and verified locally
+## Current phase: Phase 12 local import and restore merged and complete
 
 - Phase 12 branch: `agent/phase12-import-restore`, created from synchronized `main` at `ce5913341461725c3ad59b697a4e994e501fa046`
 - Starting synchronization: `HEAD`, local `main`, local `origin/main`, and live GitHub `refs/heads/main` all resolved to `ce5913341461725c3ad59b697a4e994e501fa046` before branching
@@ -23,7 +23,10 @@ The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716c
 - Two defects were caught by installed-app inspection rather than by tests: microsecond `exportedAt` precision made MindScale reject its own export, and the preview dialog's fixed height cap hid the permanent-deletion sentence at 200% font. Both are fixed and pinned by `RealDeviceBackupTest` and the uncapped scrollable dialog
 - Critical review blocked on a cancel-after-confirm race that could report a completed mutation as cancelled; an import is now non-cancellable once its transaction starts
 - Honest gaps: the two canonical-row rollback checks are defensive and unexercisable from a valid database; at 200% font combined with landscape the preview's deletion counts require scrolling; a chip containing `|` remains ambiguous in the pre-existing records CSV format; no fuzzing campaign was run; spoken TalkBack output was not audited
-- Exact next action: publish the branch, open and merge the PR, then synchronize `main` and record the phase boundary
+- Verification-state commit: `2a6afddd06b09d7e367fa46ade1c5aa58ccd9bc1`
+- Phase 12 PR #9 was opened as draft, marked ready, and verified `CLEAN`/`MERGEABLE` at exact head `2a6afddd06b09d7e367fa46ade1c5aa58ccd9bc1`; no remote status checks are configured
+- PR #9 merged into `main` as `cbd29d0b3db2259f477a29fdf102c91ecf607d79` on 2026-08-05 (`2026-08-05T05:00:38Z`) using expected-head protection; local `HEAD`, local `main`, `origin/main`, and live GitHub `refs/heads/main` all matched that merge before this phase-boundary documentation commit
+- Exact next action after the phase boundary: leave Safety, paced breathing, and the UI-overhaul work unstarted until each is separately scoped, specified, and approved
 - Explicitly not started: Safety, paced breathing, and the later UI-overhaul phase
 
 ### Phase 11 merged checkpoint
@@ -200,7 +203,7 @@ The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716c
 
 ## Active blocker
 
-No active blocker. Phase 11 is merged and complete; Phase 12 is specified and in implementation.
+No active blocker. Phase 12 is merged and complete.
 
 ## Known decisions
 
@@ -214,11 +217,19 @@ No active blocker. Phase 11 is merged and complete; Phase 12 is specified and in
 
 ## Next tasks
 
-1. Implement `docs/specs/SPEC-import-restore.md` tasks 2 through 9, then run the full oracle and installed-app matrix and one critical review.
-2. Keep Safety, paced breathing, and the UI-overhaul work unstarted in `docs/specs/BACKLOG.md` until separately assigned and specified.
-3. Continue excluding `.agents/` and `.codex/` from product/documentation commits.
+1. Keep the Safety card, paced breathing, and the UI-overhaul work unstarted in `docs/specs/BACKLOG.md` until each is separately assigned and specified. Backlog order is Safety, then paced breathing.
+2. Continue excluding `.agents/` and `.codex/` from product/documentation commits.
 
 ## Last verification
+
+Phase 12 publication checkpoint completed 2026-08-05:
+
+- Pushed `agent/phase12-import-restore` through verification-state commit `2a6afddd06b09d7e367fa46ade1c5aa58ccd9bc1`.
+- GitHub PR #9 was opened as draft, marked ready, and confirmed `CLEAN`/`MERGEABLE` at that exact head.
+- PR #9 merged into `main` as `cbd29d0b3db2259f477a29fdf102c91ecf607d79` with expected-head protection.
+- Local `main` fast-forwarded from `ce5913341461725c3ad59b697a4e994e501fa046` to `cbd29d0b3db2259f477a29fdf102c91ecf607d79`; `HEAD`, local `main`, `origin/main`, and live `git ls-remote origin refs/heads/main` all matched before this phase-boundary documentation commit, and the verified head is an ancestor of the merge.
+- No Android oracle was rerun for the GitHub merge or this documentation-only checkpoint because the application/test tree is the exact verified PR head plus GitHub's merge commit.
+- Expected untracked `.agents/` and `.codex/` remain excluded; no other local change was present before this documentation update.
 
 Phase 12 final local verification completed 2026-08-04 for implementation commit `9a670d9` on `agent/phase12-import-restore`:
 
@@ -437,7 +448,7 @@ Results:
 ## Known coverage gaps and backlog
 
 - Phase 1 backdate/edit/note dialog-open restoration is implemented and verified by Phase 7; see `docs/specs/SPEC-track-dialog-restoration.md`.
-- JSON/CSV import is specified by `docs/specs/SPEC-import-restore.md` and under implementation in Phase 12; exports remain one-way until that phase is verified and merged.
+- JSON/CSV import and restore is implemented and merged by Phase 12; see `docs/specs/SPEC-import-restore.md` for its frozen semantics and honest coverage gaps. Saved backups are now restorable inputs rather than one-way export evidence.
 - The time-weighted/hold episode model and Phase 2 onset reconciliation are implemented and verified by `docs/specs/SPEC-insights-foundation.md`.
 - Gold/ink theming is implemented; approved typography assets remain a future design decision.
 - Full Log import/export and clinician-report data actions remain deferred; no inert controls are shown.
