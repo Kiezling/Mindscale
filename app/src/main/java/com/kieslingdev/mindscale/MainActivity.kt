@@ -11,6 +11,8 @@ import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.CreationExtras
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
+import com.kieslingdev.mindscale.breathing.BreathingViewModel
+import com.kieslingdev.mindscale.breathing.SystemBreathingClock
 import com.kieslingdev.mindscale.log.LogViewModel
 import com.kieslingdev.mindscale.insights.InsightsViewModel
 import com.kieslingdev.mindscale.settings.SettingsViewModel
@@ -112,6 +114,21 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private val breathingViewModel: BreathingViewModel by viewModels {
+        object : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
+                // Only the session writer and a clock. No entry, sleep, marker, episode,
+                // profile, or settings source is wired in, so the pacer cannot become
+                // something the app decides to offer (Phase 14, D-10).
+                return BreathingViewModel(
+                    sessionDao = database.breathingSessionDao(),
+                    clock = SystemBreathingClock()
+                ) as T
+            }
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -125,6 +142,7 @@ class MainActivity : ComponentActivity() {
                     settingsViewModel = settingsViewModel,
                     reportProfileViewModel = reportProfileViewModel,
                     safetyViewModel = safetyViewModel,
+                    breathingViewModel = breathingViewModel,
                     eraseRevision = settingsState.eraseRevision
                 )
             }

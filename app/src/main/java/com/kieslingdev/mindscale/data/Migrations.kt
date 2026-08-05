@@ -111,3 +111,23 @@ val MIGRATION_5_6: Migration = object : Migration(5, 6) {
         )
     }
 }
+
+/**
+ * Phase 14 additive-only paced breathing: one new table and one new settings column. No
+ * existing table, column, row, or index is altered, so a 6→7 upgrade cannot lose anything.
+ *
+ * `breathingOn` defaults to 1 for every existing row, which is the same value a fresh
+ * install gets, so an upgrading user and a new user see the identical starting state
+ * (`docs/specs/SPEC-paced-breathing.md`, D-8, D-9).
+ */
+val MIGRATION_6_7: Migration = object : Migration(6, 7) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS breathing_sessions (" +
+                "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                "startedAt INTEGER NOT NULL, " +
+                "endedAt INTEGER NOT NULL)"
+        )
+        db.execSQL("ALTER TABLE track_settings ADD COLUMN breathingOn INTEGER NOT NULL DEFAULT 1")
+    }
+}

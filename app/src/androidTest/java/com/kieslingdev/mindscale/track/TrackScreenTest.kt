@@ -6,8 +6,11 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -16,8 +19,11 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.test.longClick
+import com.kieslingdev.mindscale.breathing.BreathingCopy
 import com.kieslingdev.mindscale.data.Entry
+import com.kieslingdev.mindscale.data.TrackSettings
 import com.kieslingdev.mindscale.ui.theme.MindScaleTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -345,5 +351,84 @@ class TrackScreenTest {
         )
         composeTestRule.onNodeWithText("Cancel").assertIsDisplayed()
         composeTestRule.onNodeWithText("Save").assertIsDisplayed().assertIsNotEnabled()
+    }
+
+    // ---- Phase 14: the paced-breathing entry point ----
+
+    /**
+     * The link's visibility depends on two settings the user set, and on nothing recorded.
+     * A pacer that appeared in response to a rating would be an inference MindScale does
+     * not make (`docs/specs/SPEC-paced-breathing.md`, D-7, D-10).
+     */
+    @Test
+    fun breathingLink_isShownWhenTheSettingIsOnAndTrackingIsNotPaused() {
+        setContent(uiState = TrackUiState(settings = TrackSettings(breathingOn = true), isPaused = false))
+
+        composeTestRule.onNodeWithTag("track_screen")
+            .performScrollToNode(hasTestTag("breathing_link"))
+        composeTestRule.onNodeWithTag("breathing_link")
+            .assertIsDisplayed()
+            .assertHeightIsAtLeast(48.dp)
+            .assert(
+                SemanticsMatcher.expectValue(
+                    SemanticsProperties.ContentDescription,
+                    listOf(BreathingCopy.TRACK_LINK_DESCRIPTION)
+                )
+            )
+        composeTestRule.onNodeWithText(BreathingCopy.TRACK_LINK).assertIsDisplayed()
+    }
+
+    @Test
+    fun breathingLink_isAbsentWhenTheSettingIsOff() {
+        setContent(uiState = TrackUiState(settings = TrackSettings(breathingOn = false), isPaused = false))
+
+        composeTestRule.onNodeWithTag("breathing_link").assertDoesNotExist()
+        // The Safety link is unconditional and stays reachable regardless.
+        composeTestRule.onNodeWithTag("track_screen").performScrollToNode(hasTestTag("safety_link"))
+        composeTestRule.onNodeWithTag("safety_link").assertIsDisplayed()
+    }
+
+    /** A session writes a dated record, and pause means no capture. */
+    @Test
+    fun breathingLink_isAbsentWhileTrackingIsPaused() {
+        setContent(uiState = TrackUiState(settings = TrackSettings(breathingOn = true), isPaused = true))
+
+        composeTestRule.onNodeWithTag("breathing_link").assertDoesNotExist()
+        composeTestRule.onNodeWithTag("track_screen").performScrollToNode(hasTestTag("safety_link"))
+        composeTestRule.onNodeWithTag("safety_link").assertIsDisplayed()
+    }
+
+    @Test
+    fun breathingLink_tapCallsTheNavigationCallbackAndRecordsNothing() {
+        var opened = 0
+        composeTestRule.setContent {
+            MindScaleTheme {
+                TrackScreen(
+                    uiState = TrackUiState(settings = TrackSettings(breathingOn = true)),
+                    onEvent = {},
+                    onOpenBreathing = { opened += 1 }
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithTag("track_screen")
+            .performScrollToNode(hasTestTag("breathing_link"))
+        composeTestRule.onNodeWithTag("breathing_link").performClick()
+        assertEquals(1, opened)
+    }
+
+    /** Safety stays last so crisis content never sits between logging and anything else. */
+    @Test
+    fun breathingLink_sitsAboveTheSafetyLink() {
+        setContent(uiState = TrackUiState(settings = TrackSettings(breathingOn = true)))
+
+        composeTestRule.onNodeWithTag("track_screen")
+            .performScrollToNode(hasTestTag("safety_link"))
+        val breathing = composeTestRule.onNodeWithTag("breathing_link").fetchSemanticsNode()
+        val safety = composeTestRule.onNodeWithTag("safety_link").fetchSemanticsNode()
+        assertTrue(
+            "breathing ${breathing.boundsInRoot.top} must sit above safety ${safety.boundsInRoot.top}",
+            breathing.boundsInRoot.top < safety.boundsInRoot.top
+        )
     }
 }

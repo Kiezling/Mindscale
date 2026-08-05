@@ -38,13 +38,16 @@ import com.kieslingdev.mindscale.settings.SettingsViewModel
 import com.kieslingdev.mindscale.report.ProfileRoute
 import com.kieslingdev.mindscale.report.ReportProfileViewModel
 import com.kieslingdev.mindscale.report.ReportRoute
+import com.kieslingdev.mindscale.breathing.BreathingCopy
+import com.kieslingdev.mindscale.breathing.BreathingRoute
+import com.kieslingdev.mindscale.breathing.BreathingViewModel
 import com.kieslingdev.mindscale.safety.SafetyCopy
 import com.kieslingdev.mindscale.safety.SafetyRoute
 import com.kieslingdev.mindscale.safety.SafetyViewModel
 import com.kieslingdev.mindscale.track.TrackRoute
 import com.kieslingdev.mindscale.track.TrackViewModel
 
-enum class AppDestination { TRACK, LOG, INSIGHTS, PROFILE, REPORT, SETTINGS, SAFETY }
+enum class AppDestination { TRACK, LOG, INSIGHTS, PROFILE, REPORT, SETTINGS, SAFETY, BREATHING }
 
 @Composable
 fun MindScaleApp(
@@ -54,6 +57,7 @@ fun MindScaleApp(
     settingsViewModel: SettingsViewModel,
     reportProfileViewModel: ReportProfileViewModel,
     safetyViewModel: SafetyViewModel,
+    breathingViewModel: BreathingViewModel,
     eraseRevision: Long = 0
 ) {
     var destinationStackState by rememberSaveable { mutableStateOf(AppDestination.TRACK.name) }
@@ -64,6 +68,10 @@ fun MindScaleApp(
 
     LaunchedEffect(eraseRevision) {
         if (eraseRevision > 0 && eraseRevision != handledEraseRevision) {
+            // An erase or restore navigates back to Track from wherever the user was. A
+            // session running at that moment is ended and recorded like any other, rather
+            // than being left running against a screen that is no longer there.
+            breathingViewModel.leaveScreen()
             destinationStackState = AppDestination.TRACK.name
             settingsFocusName = SettingsFocus.TOP.name
             handledEraseRevision = eraseRevision
@@ -85,6 +93,10 @@ fun MindScaleApp(
     }
 
     fun navigateBack() {
+        // Leaving the pacer ends it. This is wired to navigation rather than to
+        // `onDispose` or `ON_STOP`, both of which also fire on a rotation and would end a
+        // session because the user turned the phone (`SPEC-paced-breathing.md`, D-6).
+        if (destination == AppDestination.BREATHING) breathingViewModel.leaveScreen()
         if (destinationStack.size > 1) {
             destinationStackState = destinationStack.dropLast(1).joinToString(",")
         } else {
@@ -112,7 +124,8 @@ fun MindScaleApp(
                             AppDestination.PROFILE,
                             AppDestination.REPORT,
                             AppDestination.SETTINGS,
-                            AppDestination.SAFETY
+                            AppDestination.SAFETY,
+                            AppDestination.BREATHING
                         )
                     ) {
                         TextButton(onClick = ::navigateBack, modifier = Modifier.testTag("overlay_back")) {
@@ -130,6 +143,7 @@ fun MindScaleApp(
                             AppDestination.REPORT -> "Clinician summary"
                             AppDestination.SETTINGS -> "Settings"
                             AppDestination.SAFETY -> SafetyCopy.TOP_BAR_TITLE
+                            AppDestination.BREATHING -> BreathingCopy.TOP_BAR_TITLE
                         },
                         style = MaterialTheme.typography.titleMedium
                     )
@@ -180,6 +194,7 @@ fun MindScaleApp(
                 trackViewModel,
                 onOpenSettings = ::openSettings,
                 onOpenSafety = { openOverlay(AppDestination.SAFETY) },
+                onOpenBreathing = { openOverlay(AppDestination.BREATHING) },
                 modifier = Modifier.padding(innerPadding)
             )
             AppDestination.LOG -> LogRoute(logViewModel, Modifier.padding(innerPadding))
@@ -207,6 +222,10 @@ fun MindScaleApp(
             )
             AppDestination.SAFETY -> SafetyRoute(
                 safetyViewModel,
+                modifier = Modifier.padding(innerPadding)
+            )
+            AppDestination.BREATHING -> BreathingRoute(
+                breathingViewModel,
                 modifier = Modifier.padding(innerPadding)
             )
         }

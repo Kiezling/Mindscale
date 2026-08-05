@@ -48,14 +48,16 @@ data class PendingDocument(
     val entryCount: Int,
     val sleepCount: Int,
     val markerCount: Int,
-    val safetyPlanItemCount: Int
+    val safetyPlanItemCount: Int,
+    val breathingSessionCount: Int
 )
 
 data class EraseConfirmation(
     val entryCount: Int,
     val sleepCount: Int,
     val markerCount: Int,
-    val safetyPlanItemCount: Int
+    val safetyPlanItemCount: Int,
+    val breathingSessionCount: Int
 )
 
 /** A validated, previewed import awaiting explicit confirmation (Phase 12, D-7). */
@@ -160,6 +162,9 @@ class SettingsViewModel(
     fun setAskChips(enabled: Boolean) = mutate("Could not change onset prompts.") { settingsDao.setAskChips(enabled) }
     fun setHideNotes(hidden: Boolean) = mutate("Could not change note previews.") { settingsDao.setHideNotes(hidden) }
     fun setPaused(paused: Boolean) = mutate("Could not change tracking state.") { settingsDao.setPaused(paused) }
+
+    fun setBreathingOn(enabled: Boolean) =
+        mutate("Could not change paced breathing.") { settingsDao.setBreathingOn(enabled) }
 
     fun setSleepOn(enabled: Boolean) {
         viewModelScope.launch {
@@ -274,7 +279,8 @@ class SettingsViewModel(
                             entryCount = snapshot.entries.size,
                             sleepCount = snapshot.sleeps.size,
                             markerCount = snapshot.markers.size,
-                            safetyPlanItemCount = snapshot.safetyPlan.size
+                            safetyPlanItemCount = snapshot.safetyPlan.size,
+                            breathingSessionCount = snapshot.breathingSessions.size
                         ),
                         retryDocument = null
                     )
@@ -319,7 +325,8 @@ class SettingsViewModel(
                         document.entryCount,
                         document.sleepCount,
                         document.markerCount,
-                        document.safetyPlanItemCount
+                        document.safetyPlanItemCount,
+                        document.breathingSessionCount
                     ),
                     message = "Backup saved"
                 )
@@ -453,7 +460,8 @@ class SettingsViewModel(
             sleeps = existing.sleeps.size,
             markers = existing.markers.size,
             externalScores = dataControlDao.allExternalScores().size,
-            safetyPlanItems = dataControlDao.safetyPlanItemCount()
+            safetyPlanItems = dataControlDao.safetyPlanItemCount(),
+            breathingSessions = dataControlDao.breathingSessionCount()
         )
         return ParseResult.Ok(
             PendingImport(ImportKind.BACKUP_RESTORE, payload, previewOf(payload, counts))
@@ -536,7 +544,8 @@ class SettingsViewModel(
                     counts.sleeps,
                     counts.markers,
                     counts.externalScores,
-                    counts.safetyPlanItems
+                    counts.safetyPlanItems,
+                    counts.breathingSessions
                 )
             )
         }
@@ -553,7 +562,9 @@ class SettingsViewModel(
                 importing = false,
                 pendingImport = null,
                 importError = null,
-                message = ImportMessages.added(counts.entries, counts.sleeps, counts.markers)
+                message = ImportMessages.added(
+                    counts.entries, counts.sleeps, counts.markers, counts.breathingSessions
+                )
             )
         }
     }

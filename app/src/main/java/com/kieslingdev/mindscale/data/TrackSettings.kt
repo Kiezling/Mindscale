@@ -19,5 +19,12 @@ data class TrackSettings(
     val onsetChips: List<String> = DEFAULT_ONSET_CHIPS,
     val hideNotes: Boolean = false,
     val anchorPromptDone: Boolean = false,
-    val holdDuration: HoldDuration = HoldDuration.SIXTEEN
+    val holdDuration: HoldDuration = HoldDuration.SIXTEEN,
+    /**
+     * Whether the Track link into the paced-breathing circle is shown at all
+     * (`docs/specs/SPEC-paced-breathing.md`, D-8). Default on, because a link at the bottom
+     * of a screen the user already scrolls demands nothing on a good day; someone who does
+     * not want it turns it off once and it never reappears.
+     */
+    val breathingOn: Boolean = true
 )

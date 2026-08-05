@@ -1,6 +1,7 @@
 package com.kieslingdev.mindscale.settings
 
 import com.kieslingdev.mindscale.data.BackupPayload
+import com.kieslingdev.mindscale.data.BreathingSession
 import com.kieslingdev.mindscale.data.Entry
 import com.kieslingdev.mindscale.data.EntryKind
 import com.kieslingdev.mindscale.data.Marker
@@ -71,6 +72,7 @@ private data class RatingKey(
 private fun Entry.key() = RatingKey(ts, value, chips, note, kind)
 private fun SleepInterval.key() = startTs to endTs
 private fun Marker.key() = ts to text
+private fun BreathingSession.key() = startedAt to endedAt
 
 /**
  * Refuses in-file duplicates, records that already exist, overlapping sleep periods, and
@@ -86,13 +88,15 @@ fun checkRecordConflicts(
 ): ParseResult<RecordsPayload> = try {
     val fileKeys = payload.entries.map { it.key() } +
         payload.sleeps.map { it.key() } +
-        payload.markers.map { it.key() }
+        payload.markers.map { it.key() } +
+        payload.breathingSessions.map { it.key() }
     val duplicates = fileKeys.size - fileKeys.toSet().size
     if (duplicates > 0) reject(ImportMessages.duplicates(duplicates))
 
     val storedKeys = (existing.entries.map { it.key() } +
         existing.sleeps.map { it.key() } +
-        existing.markers.map { it.key() }).toSet()
+        existing.markers.map { it.key() } +
+        existing.breathingSessions.map { it.key() }).toSet()
     val conflicts = fileKeys.count(storedKeys::contains)
     if (conflicts > 0) reject(ImportMessages.conflicts(conflicts))
 
@@ -118,10 +122,11 @@ private fun restorePreview(backup: BackupPayload, existing: RecordCounts): Impor
         "created ${backup.exportedAt}."
     // Only a version-6 file actually carries a plan. Saying "plus your ... safety plan"
     // about an older backup would claim the file holds something it cannot.
-    val alsoContains = if (backup.version >= 6) {
-        "plus your settings, Profile name, and safety plan."
-    } else {
-        "plus your settings and Profile name."
+    val alsoContains = when {
+        backup.version >= 7 ->
+            "plus your settings, Profile name, safety plan, and breathing sessions."
+        backup.version == 6 -> "plus your settings, Profile name, and safety plan."
+        else -> "plus your settings and Profile name."
     }
     lines += "It contains ${count(backup.entries.size, ImportMessages::ratings)}, " +
         "${sleepCount(backup.sleeps.size)}, ${markerCount(backup.markers.size)}, and " +
@@ -130,7 +135,7 @@ private fun restorePreview(backup: BackupPayload, existing: RecordCounts): Impor
         "permanently delete ${count(existing.entries, ImportMessages::ratings)}, " +
         "${sleepCount(existing.sleeps)}, ${markerCount(existing.markers)}, and " +
         "${scoreCount(existing.externalScores)}, and will replace your settings, " +
-        "Profile name, and safety plan."
+        "Profile name, safety plan, and breathing sessions."
     lines += "Check-in time, the sleep introduction flag, and the anchor prompt flag are " +
         "not stored in any backup file. They return to their defaults."
     if (backup.version < 4) {
@@ -148,6 +153,14 @@ private fun restorePreview(backup: BackupPayload, existing: RecordCounts): Impor
     } else {
         lines += "This backup contains ${planCount(backup.safetyPlan.size)}. Your current " +
             "safety plan of ${lineCount(existing.safetyPlanItems)} is permanently deleted."
+    }
+    if (backup.version < 7) {
+        lines += "This backup predates paced breathing. Your " +
+            "${sessionCount(existing.breathingSessions)} will be permanently deleted, and " +
+            "the paced-breathing setting returns to on."
+    } else {
+        lines += "This backup contains ${sessionCount(backup.breathingSessions.size)}. Your " +
+            "current ${sessionCount(existing.breathingSessions)} will be permanently deleted."
     }
     if (backup.externalScores.isNotEmpty()) {
         lines += "Totals entered by you from results obtained elsewhere. MindScale did " +
@@ -168,7 +181,8 @@ private fun mergePreview(records: RecordsPayload): ImportPreview = ImportPreview
     lines = listOf(
         "This file is a MindScale records CSV.",
         "It will add ${count(records.entries.size, ImportMessages::ratings)}, " +
-            "${sleepCount(records.sleeps.size)}, and ${markerCount(records.markers.size)}.",
+            "${sleepCount(records.sleeps.size)}, ${markerCount(records.markers.size)}, and " +
+            "${sessionCount(records.breathingSessions.size)}.",
         "Nothing is deleted. Your settings, Profile name, externally obtained totals, and " +
             "safety plan are not changed. A records CSV does not contain them.",
         "Nothing has changed yet."
@@ -182,6 +196,12 @@ private fun markerCount(value: Int) = "$value marked ${ImportMessages.events(val
 private fun scoreCount(value: Int) =
     "$value externally obtained ${ImportMessages.totals(value)}"
 private fun planCount(value: Int) = "$value safety plan ${ImportMessages.lines(value)}"
+
+/**
+ * Always paired with "will be", never "is" or "are", so the sentence reads correctly for
+ * one session and for none without a second grammar rule.
+ */
+private fun sessionCount(value: Int) = "$value breathing ${ImportMessages.sessions(value)}"
 
 /** Used where "safety plan" is already the subject, so the noun is not repeated. */
 private fun lineCount(value: Int) = "$value ${ImportMessages.lines(value)}"

@@ -1,5 +1,7 @@
 package com.kieslingdev.mindscale.settings
 
+import com.kieslingdev.mindscale.breathing.MAX_BREATHING_SESSION_MILLIS
+import com.kieslingdev.mindscale.data.BreathingSession
 import com.kieslingdev.mindscale.data.DataSnapshot
 import com.kieslingdev.mindscale.data.Entry
 import com.kieslingdev.mindscale.data.EntryKind
@@ -69,7 +71,7 @@ class BackupImportTest {
     @Test
     fun acceptsTheCurrentExportAndPreservesEveryField() {
         val payload = accepted(currentBackup())
-        assertEquals(6, payload.version)
+        assertEquals(7, payload.version)
         assertEquals(exportedAt, payload.exportedAt)
         assertEquals(listOf(2L, 1L), payload.entries.map { it.id })
         assertEquals("line 1\nline 2", payload.entries.first().note)
@@ -138,7 +140,7 @@ class BackupImportTest {
     fun refusesAFutureVersionWithItsOwnMessage() {
         assertEquals(
             ImportMessages.NEWER_VERSION,
-            rejection(currentBackup().replace("\"version\": 6", "\"version\": 7"))
+            rejection(currentBackup().replace("\"version\": 7", "\"version\": 8"))
         )
     }
 
@@ -178,7 +180,7 @@ class BackupImportTest {
         )
         assertEquals(
             ImportMessages.BACKUP_SHAPE,
-            rejection(currentBackup().replace("\"version\": 6,", "\"version\": 6, \"extra\": 1,"))
+            rejection(currentBackup().replace("\"version\": 7,", "\"version\": 7, \"extra\": 1,"))
         )
         // A version-5 file may not omit a version-5 collection and be silently defaulted.
         assertEquals(
@@ -348,6 +350,110 @@ class BackupImportTest {
             "\"entries\": [$many]"
         )
         assertEquals(ImportMessages.TOO_MANY_RECORDS, rejection(text))
+    }
+
+    private fun backupWithSession(): String = encodeBackup(
+        snapshot.copy(
+            breathingSessions = listOf(BreathingSession(id = 1, startedAt = 1_000, endedAt = 5_000))
+        ),
+        exportedAt
+    )
+
+    /** A version-3 through -6 file, built up progressively like the exporter's own history. */
+    private fun legacyBackup(version: Int): String {
+        val holdLine = if (version >= 4) ", \"holdHours\": 16" else ""
+        val profileAndScores = if (version >= 5) {
+            ",\n  \"profile\": {\"displayName\": \"\"},\n  \"externalScores\": []"
+        } else {
+            ""
+        }
+        val safetyPlanLine = if (version >= 6) ",\n  \"safetyPlan\": []" else ""
+        return """
+            {
+              "format": "mindscale-backup",
+              "version": $version,
+              "exportedAt": "2026-08-03T12:34:56Z",
+              "entries": [{"id": 1, "timestamp": "2026-08-01T09:00:00Z", "intensity": 5, "chips": [], "note": null, "kind": null}],
+              "sleeps": [],
+              "markers": [],
+              "settings": {"themeMode": "SYSTEM", "hourFormat": "TWELVE", "anchor2": "", "anchor5": "", "anchor8": "", "onsetChips": ["work"], "sleepOn": true, "askChips": false, "hideNotes": false, "paused": false$holdLine}$profileAndScores$safetyPlanLine
+            }
+        """.trimIndent()
+    }
+
+    @Test
+    fun acceptsAVersionSevenBackupAndRestoresSessionsVerbatim() {
+        val first = BreathingSession(id = 10, startedAt = 1_000, endedAt = 5_000)
+        val second = BreathingSession(id = 11, startedAt = 20_000, endedAt = 20_000)
+        val withSessions = snapshot.copy(breathingSessions = listOf(first, second))
+        val payload = accepted(encodeBackup(withSessions, exportedAt))
+        assertEquals(7, payload.version)
+        // Encoded newest-`startedAt`-first, then id descending (Phase 14, D-9).
+        assertEquals(listOf(second, first), payload.breathingSessions)
+        assertTrue(payload.settings.breathingOn)
+    }
+
+    @Test
+    fun restoresVersionsThreeThroughSixWithAnEmptySessionListAndDefaultBreathingOn() {
+        listOf(3, 4, 5, 6).forEach { version ->
+            val payload = accepted(legacyBackup(version))
+            assertTrue("version $version", payload.breathingSessions.isEmpty())
+            assertEquals("version $version", true, payload.settings.breathingOn)
+        }
+    }
+
+    @Test
+    fun refusesABreathingSessionThatEndsBeforeItStarts() {
+        val bad = snapshot.copy(
+            breathingSessions = listOf(BreathingSession(id = 1, startedAt = 5_000, endedAt = 1_000))
+        )
+        assertEquals(ImportMessages.UNSTORABLE_VALUE, rejection(encodeBackup(bad, exportedAt)))
+    }
+
+    @Test
+    fun refusesABreathingSessionLongerThanTheMaximum() {
+        val bad = snapshot.copy(
+            breathingSessions = listOf(
+                BreathingSession(id = 1, startedAt = 0, endedAt = MAX_BREATHING_SESSION_MILLIS + 1)
+            )
+        )
+        assertEquals(ImportMessages.UNSTORABLE_VALUE, rejection(encodeBackup(bad, exportedAt)))
+    }
+
+    @Test
+    fun refusesDuplicateBreathingSessionIds() {
+        val bad = snapshot.copy(
+            breathingSessions = listOf(
+                BreathingSession(id = 1, startedAt = 1_000, endedAt = 2_000),
+                BreathingSession(id = 1, startedAt = 3_000, endedAt = 4_000)
+            )
+        )
+        assertEquals(ImportMessages.duplicates(1), rejection(encodeBackup(bad, exportedAt)))
+    }
+
+    @Test
+    fun refusesABreathingSessionMissingAKey() {
+        val text = backupWithSession()
+            .replace(", \"end\": \"1970-01-01T00:00:05Z\"}", "}")
+        assertEquals(ImportMessages.BACKUP_SHAPE, rejection(text))
+    }
+
+    @Test
+    fun refusesABreathingSessionWithAnExtraKey() {
+        val text = backupWithSession().replace(
+            "\"end\": \"1970-01-01T00:00:05Z\"}",
+            "\"end\": \"1970-01-01T00:00:05Z\", \"extra\": 1}"
+        )
+        assertEquals(ImportMessages.BACKUP_SHAPE, rejection(text))
+    }
+
+    @Test
+    fun refusesABreathingSessionWithASubMillisecondInstant() {
+        val text = backupWithSession().replace(
+            "\"start\": \"1970-01-01T00:00:01Z\"",
+            "\"start\": \"1970-01-01T00:00:01.000000001Z\""
+        )
+        assertEquals(ImportMessages.UNSTORABLE_VALUE, rejection(text))
     }
 }
 

@@ -1,5 +1,6 @@
 package com.kieslingdev.mindscale.report
 
+import com.kieslingdev.mindscale.data.BreathingSession
 import com.kieslingdev.mindscale.data.DataSnapshot
 import com.kieslingdev.mindscale.data.Entry
 import com.kieslingdev.mindscale.data.ExternalInstrument
@@ -60,6 +61,44 @@ class ClinicianReportTest {
                 ZoneOffset.UTC
             ).text,
             text
+        )
+    }
+
+    /**
+     * A breathing session is an exported fact, not a clinical one. Putting sessions in the
+     * summary next to intensity would invite the causal reading that two placebo-controlled
+     * trials failed to support (`docs/specs/SPEC-paced-breathing.md`, D-11, Invariant 11).
+     */
+    @Test
+    fun breathingSessionsNeverEnterTheClinicianSummary() {
+        val sessions = listOf(
+            BreathingSession(1, startedAt = 1_700_000_000_000L, endedAt = 1_700_000_300_000L),
+            BreathingSession(2, startedAt = 1_700_000_400_000L, endedAt = 1_700_001_000_000L)
+        )
+        val withSessions = buildClinicianReport(
+            DataSnapshot(
+                entries = emptyList(),
+                sleeps = emptyList(),
+                markers = emptyList(),
+                settings = TrackSettings(),
+                breathingSessions = sessions
+            ),
+            InsightRange.THIRTY_DAYS,
+            generatedAt,
+            ZoneOffset.UTC
+        ).text
+
+        assertFalse(withSessions.lowercase().contains("breath"))
+        assertFalse(withSessions.lowercase().contains("paced"))
+        assertEquals(
+            "Recorded sessions must not change the summary at all",
+            buildClinicianReport(
+                DataSnapshot(emptyList(), emptyList(), emptyList(), TrackSettings()),
+                InsightRange.THIRTY_DAYS,
+                generatedAt,
+                ZoneOffset.UTC
+            ).text,
+            withSessions
         )
     }
 

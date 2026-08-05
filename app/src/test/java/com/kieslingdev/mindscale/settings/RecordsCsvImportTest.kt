@@ -1,5 +1,7 @@
 package com.kieslingdev.mindscale.settings
 
+import com.kieslingdev.mindscale.breathing.MAX_BREATHING_SESSION_MILLIS
+import com.kieslingdev.mindscale.data.BreathingSession
 import com.kieslingdev.mindscale.data.DataSnapshot
 import com.kieslingdev.mindscale.data.Entry
 import com.kieslingdev.mindscale.data.EntryKind
@@ -149,6 +151,63 @@ class RecordsCsvImportTest {
     fun refusesMoreRowsThanTheFrozenLimit() {
         val rows = Array(MAX_RECORDS_PER_COLLECTION + 1) { "marker,$ts,,,,,,m$it" }
         assertEquals(ImportMessages.TOO_MANY_RECORDS, rejection(csv(*rows)))
+    }
+
+    @Test
+    fun readsAProductionBreathingRowBackIntoTheSameSession() {
+        val snapshot = DataSnapshot(
+            entries = emptyList(),
+            sleeps = emptyList(),
+            markers = emptyList(),
+            settings = TrackSettings(),
+            breathingSessions = listOf(
+                BreathingSession(9, ts.toEpochMilli() - 60_000, ts.toEpochMilli())
+            )
+        )
+        val payload = accepted(encodeRecordsCsv(snapshot))
+        val session = payload.breathingSessions.single()
+        assertEquals(ts.toEpochMilli() - 60_000, session.startedAt)
+        assertEquals(ts.toEpochMilli(), session.endedAt)
+        // The CSV carries no ids, so Room assigns them on insert.
+        assertEquals(0L, session.id)
+    }
+
+    @Test
+    fun acceptsABreathingRowIncludingAZeroLengthOne() {
+        val row = "breathing,$ts,$ts,,,,,"
+        assertEquals(1, accepted(csv(row)).breathingSessions.size)
+        val session = accepted(csv(row)).breathingSessions.single()
+        assertEquals(ts.toEpochMilli(), session.startedAt)
+        assertEquals(ts.toEpochMilli(), session.endedAt)
+    }
+
+    @Test
+    fun refusesABreathingRowWithAValueInAFieldThatDoesNotApply() {
+        val end = ts.plusSeconds(60)
+        assertEquals(ImportMessages.invalidCsv(2), rejection(csv("breathing,$ts,$end,3,,,,")))
+        assertEquals(ImportMessages.invalidCsv(2), rejection(csv("breathing,$ts,$end,,SLEEP,,,")))
+        assertEquals(ImportMessages.invalidCsv(2), rejection(csv("breathing,$ts,$end,,,work,,")))
+        assertEquals(ImportMessages.invalidCsv(2), rejection(csv("breathing,$ts,$end,,,,note,")))
+        assertEquals(ImportMessages.invalidCsv(2), rejection(csv("breathing,$ts,$end,,,,,text")))
+    }
+
+    @Test
+    fun refusesABreathingRowMissingTheEndTimestamp() {
+        assertEquals(ImportMessages.invalidCsv(2), rejection(csv("breathing,$ts,,,,,,")))
+    }
+
+    @Test
+    fun refusesABreathingRowThatEndsBeforeItStarts() {
+        val earlier = Instant.parse("2026-08-01T09:00:00Z")
+        assertEquals(ImportMessages.UNSTORABLE_VALUE, rejection(csv("breathing,$ts,$earlier,,,,,")))
+    }
+
+    @Test
+    fun refusesABreathingRowLongerThanTheMaximumSessionLength() {
+        val tooLong = ts.plusMillis(MAX_BREATHING_SESSION_MILLIS + 1)
+        assertEquals(ImportMessages.UNSTORABLE_VALUE, rejection(csv("breathing,$ts,$tooLong,,,,,")))
+        val atLimit = ts.plusMillis(MAX_BREATHING_SESSION_MILLIS)
+        assertTrue(parse(csv("breathing,$ts,$atLimit,,,,,")) is ParseResult.Ok)
     }
 
     @Test

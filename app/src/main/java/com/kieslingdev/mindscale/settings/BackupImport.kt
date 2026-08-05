@@ -1,6 +1,7 @@
 package com.kieslingdev.mindscale.settings
 
 import com.kieslingdev.mindscale.data.BackupPayload
+import com.kieslingdev.mindscale.data.BreathingSession
 import com.kieslingdev.mindscale.data.Entry
 import com.kieslingdev.mindscale.data.EntryKind
 import com.kieslingdev.mindscale.data.ExternalInstrument
@@ -40,8 +41,10 @@ private val BASE_ROOT_KEYS =
     setOf("format", "version", "exportedAt", "entries", "sleeps", "markers", "settings")
 private val V5_ROOT_KEYS = BASE_ROOT_KEYS + setOf("profile", "externalScores")
 private val V6_ROOT_KEYS = V5_ROOT_KEYS + "safetyPlan"
+private val V7_ROOT_KEYS = V6_ROOT_KEYS + "breathingSessions"
 
 private val PLAN_KEYS = setOf("id", "step", "position", "text", "phone")
+private val BREATHING_KEYS = setOf("id", "start", "end")
 
 private val ENTRY_KEYS = setOf("id", "timestamp", "intensity", "chips", "note", "kind")
 private val SLEEP_KEYS = setOf("id", "start", "end")
@@ -55,6 +58,7 @@ private val BASE_SETTINGS_KEYS = setOf(
     "onsetChips", "sleepOn", "askChips", "hideNotes", "paused"
 )
 private val HOLD_SETTINGS_KEYS = BASE_SETTINGS_KEYS + "holdHours"
+private val BREATHING_SETTINGS_KEYS = HOLD_SETTINGS_KEYS + "breathingOn"
 
 fun parseBackup(
     text: String,
@@ -81,8 +85,10 @@ private fun readBackup(text: String, now: Instant, zone: ZoneId): BackupPayload 
 
     val hasProfileAndScores = version >= 5
     val hasSafetyPlan = version >= 6
+    val hasBreathing = version >= 7
     root.requireExactKeys(
         when {
+            hasBreathing -> V7_ROOT_KEYS
             hasSafetyPlan -> V6_ROOT_KEYS
             hasProfileAndScores -> V5_ROOT_KEYS
             else -> BASE_ROOT_KEYS
@@ -100,13 +106,18 @@ private fun readBackup(text: String, now: Instant, zone: ZoneId): BackupPayload 
     val markerValues = root.arr("markers")
     val scoreValues = if (hasProfileAndScores) root.arr("externalScores") else emptyList()
     val planValues = if (hasSafetyPlan) root.arr("safetyPlan") else emptyList()
-    requireCounts(entryValues.size, sleepValues.size, markerValues.size, scoreValues.size)
+    val breathingValues = if (hasBreathing) root.arr("breathingSessions") else emptyList()
+    requireCounts(
+        entryValues.size, sleepValues.size, markerValues.size, scoreValues.size,
+        breathingValues.size
+    )
 
     val entries = entryValues.map { readEntry(it, now) }
     val sleeps = sleepValues.map { readSleep(it, now) }
     val markers = markerValues.map { readMarker(it, now) }
     val scores = scoreValues.map { readScore(it, now, zone) }
     val plan = planValues.map(::readPlanItem)
+    val breathing = breathingValues.map { readBreathingSession(it, now) }
 
     requireUniqueIds(entries.map(Entry::id))
     requireUniqueIds(sleeps.map(SleepInterval::id))
@@ -116,6 +127,7 @@ private fun readBackup(text: String, now: Instant, zone: ZoneId): BackupPayload 
     requireSleepStructure(sleeps)
     requireUniqueIds(plan.map(SafetyPlanItem::id))
     requirePlanStructure(plan)
+    requireUniqueIds(breathing.map(BreathingSession::id))
 
     return BackupPayload(
         version = version,
@@ -130,8 +142,31 @@ private fun readBackup(text: String, now: Instant, zone: ZoneId): BackupPayload 
         // Absent before version 6. The preview says so verbatim before anything is
         // written, because a restore that silently emptied a safety plan would be the
         // worst possible kind of quiet data loss (Phase 13, D-9).
-        safetyPlan = plan
+        safetyPlan = plan,
+        // Absent before version 7. The preview says so verbatim, and says that the
+        // sessions currently on the device are deleted with nothing replacing them, before
+        // anything is written (Phase 14, D-9).
+        breathingSessions = breathing
     )
+}
+
+/**
+ * A breathing session from a file is held to the bounds the app itself cannot exceed: a
+ * non-negative interval no longer than the longest length it offers
+ * (`docs/specs/SPEC-paced-breathing.md`, D-9, Invariant 6). Nothing is clamped or repaired
+ * here — a file describing a session MindScale could not have produced is rejected whole.
+ */
+private fun readBreathingSession(value: JsonValue, now: Instant): BreathingSession {
+    val obj = value.asObj()
+    obj.requireExactKeys(BREATHING_KEYS)
+    val startedAt = requireInstantMillis(
+        obj.str("start", ImportMessages.BACKUP_SHAPE), now, ImportMessages.BACKUP_SHAPE
+    )
+    val endedAt = requireInstantMillis(
+        obj.str("end", ImportMessages.BACKUP_SHAPE), now, ImportMessages.BACKUP_SHAPE
+    )
+    requireBreathingBounds(startedAt, endedAt)
+    return BreathingSession(id = requireRowId(obj.long("id")), startedAt = startedAt, endedAt = endedAt)
 }
 
 /**
@@ -268,13 +303,21 @@ private fun readScore(value: JsonValue, now: Instant, zone: ZoneId): ExternalSco
  * of them is disclosed in the preview before anything is written (D-2, D-7).
  */
 private fun readSettings(obj: JsonValue.Obj, version: Int): TrackSettings {
-    obj.requireExactKeys(if (version >= 4) HOLD_SETTINGS_KEYS else BASE_SETTINGS_KEYS)
+    obj.requireExactKeys(
+        when {
+            version >= 7 -> BREATHING_SETTINGS_KEYS
+            version >= 4 -> HOLD_SETTINGS_KEYS
+            else -> BASE_SETTINGS_KEYS
+        }
+    )
     val holdDuration = if (version >= 4) {
         HoldDuration.entries.firstOrNull { it.hours == obj.int("holdHours") }
             ?: reject(ImportMessages.BACKUP_SHAPE)
     } else {
         TrackSettings().holdDuration
     }
+    // In no backup before version 7; takes its model default, disclosed in the preview.
+    val breathingOn = if (version >= 7) obj.bool("breathingOn") else TrackSettings().breathingOn
     return TrackSettings(
         id = 0,
         sleepOn = obj.bool("sleepOn"),
@@ -294,7 +337,8 @@ private fun readSettings(obj: JsonValue.Obj, version: Int): TrackSettings {
         onsetChips = requireOnsetWords(obj.stringArray("onsetChips")),
         hideNotes = obj.bool("hideNotes"),
         anchorPromptDone = TrackSettings().anchorPromptDone,
-        holdDuration = holdDuration
+        holdDuration = holdDuration,
+        breathingOn = breathingOn
     )
 }
 
@@ -307,13 +351,14 @@ private fun requireOnsetWords(values: List<String>): List<String> {
     return words
 }
 
-private fun requireCounts(entries: Int, sleeps: Int, markers: Int, scores: Int) {
+private fun requireCounts(entries: Int, sleeps: Int, markers: Int, scores: Int, breathing: Int) {
     if (entries > MAX_RECORDS_PER_COLLECTION || sleeps > MAX_RECORDS_PER_COLLECTION ||
-        markers > MAX_RECORDS_PER_COLLECTION || scores > MAX_RECORDS_PER_COLLECTION
+        markers > MAX_RECORDS_PER_COLLECTION || scores > MAX_RECORDS_PER_COLLECTION ||
+        breathing > MAX_RECORDS_PER_COLLECTION
     ) {
         reject(ImportMessages.TOO_MANY_RECORDS)
     }
-    if (entries + sleeps + markers + scores > MAX_TOTAL_RECORDS) {
+    if (entries + sleeps + markers + scores + breathing > MAX_TOTAL_RECORDS) {
         reject(ImportMessages.TOO_MANY_RECORDS)
     }
 }

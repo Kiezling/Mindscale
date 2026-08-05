@@ -1,6 +1,7 @@
 package com.kieslingdev.mindscale.settings
 
 import com.kieslingdev.mindscale.data.BackupPayload
+import com.kieslingdev.mindscale.data.BreathingSession
 import com.kieslingdev.mindscale.data.Entry
 import com.kieslingdev.mindscale.data.EntryKind
 import com.kieslingdev.mindscale.data.ExternalInstrument
@@ -102,6 +103,30 @@ class ImportPreflightTest {
     }
 
     @Test
+    fun refusesABreathingSessionThatAlreadyExists() {
+        val stored = BreathingSession(id = 7, startedAt = 10_000, endedAt = 20_000)
+        val payload = RecordsPayload(
+            emptyList(), emptyList(), emptyList(),
+            listOf(BreathingSession(startedAt = 10_000, endedAt = 20_000))
+        )
+        assertEquals(
+            ImportMessages.conflicts(1),
+            (checkRecordConflicts(payload, RecordSnapshot(emptyList(), emptyList(), emptyList(), listOf(stored)))
+                as ParseResult.Rejected).message
+        )
+    }
+
+    @Test
+    fun refusesARepeatedBreathingSessionWithinTheFile() {
+        val session = BreathingSession(startedAt = 10_000, endedAt = 20_000)
+        val payload = RecordsPayload(emptyList(), emptyList(), emptyList(), listOf(session, session.copy()))
+        assertEquals(
+            ImportMessages.duplicates(1),
+            (checkRecordConflicts(payload, emptySnapshot()) as ParseResult.Rejected).message
+        )
+    }
+
+    @Test
     fun refusesASecondOpenSleepPeriod() {
         val storedOpen = RecordSnapshot(emptyList(), listOf(SleepInterval(1, 1_000, null)), emptyList())
         val alsoOpen = RecordsPayload(emptyList(), listOf(SleepInterval(startTs = 5_000, endTs = null)), emptyList())
@@ -123,20 +148,97 @@ class ImportPreflightTest {
     @Test
     fun restorePreviewStatesExactCountsAndEveryDisclosedDefault() {
         val preview = previewOf(
-            ImportPayload.Restore(backup(version = 6, scores = 1, planItems = 2)),
-            RecordCounts(entries = 3, sleeps = 2, markers = 1, externalScores = 4, safetyPlanItems = 5)
+            ImportPayload.Restore(backup(version = 7, scores = 1, planItems = 2, sessions = 3)),
+            RecordCounts(
+                entries = 3, sleeps = 2, markers = 1, externalScores = 4,
+                safetyPlanItems = 5, breathingSessions = 6
+            )
         )
         assertEquals("Restore from backup", preview.title)
         assertEquals("Replace everything", preview.confirmLabel)
         val text = preview.lines.joinToString("\n")
-        assertTrue(text.contains("version 6, created 2026-08-03T12:34:56Z"))
-        assertTrue(text.contains("It contains 1 rating, 1 sleep period, 1 marked event, and 1 externally obtained total, plus your settings, Profile name, and safety plan."))
-        assertTrue(text.contains("permanently delete 3 ratings, 2 sleep periods, 1 marked event, and 4 externally obtained totals, and will replace your settings, Profile name, and safety plan."))
+        assertTrue(text.contains("version 7, created 2026-08-03T12:34:56Z"))
+        assertTrue(text.contains("It contains 1 rating, 1 sleep period, 1 marked event, and 1 externally obtained total, plus your settings, Profile name, safety plan, and breathing sessions."))
+        assertTrue(text.contains("permanently delete 3 ratings, 2 sleep periods, 1 marked event, and 4 externally obtained totals, and will replace your settings, Profile name, safety plan, and breathing sessions."))
         assertTrue(text.contains("Check-in time, the sleep introduction flag, and the anchor prompt flag are not stored in any backup file."))
         assertTrue(text.contains("This backup contains 2 safety plan lines. Your current safety plan of 5 lines is permanently deleted."))
+        assertTrue(text.contains("This backup contains 3 breathing sessions. Your current 6 breathing sessions will be permanently deleted."))
         assertTrue(text.contains("MindScale did not administer or calculate them."))
         assertTrue(text.endsWith("Nothing has changed yet."))
         assertFalse(text.contains("predates"))
+    }
+
+    /**
+     * Version-7 and pre-version-7 breathing lines with correct singular/plural at counts
+     * 0, 1, and 2 (`docs/specs/SPEC-paced-breathing.md`, D-9, D-12).
+     */
+    @Test
+    fun theRestorePreviewStatesBreathingSessionCountsWithCorrectSingularAndPlural() {
+        val preV7Zero = previewOf(
+            ImportPayload.Restore(backup(version = 6)),
+            RecordCounts(breathingSessions = 0)
+        ).lines.joinToString("\n")
+        assertTrue(
+            preV7Zero.contains(
+                "This backup predates paced breathing. Your 0 breathing sessions will be " +
+                    "permanently deleted, and the paced-breathing setting returns to on."
+            )
+        )
+
+        val preV7One = previewOf(
+            ImportPayload.Restore(backup(version = 6)),
+            RecordCounts(breathingSessions = 1)
+        ).lines.joinToString("\n")
+        assertTrue(
+            preV7One.contains(
+                "This backup predates paced breathing. Your 1 breathing session will be " +
+                    "permanently deleted, and the paced-breathing setting returns to on."
+            )
+        )
+
+        val preV7Two = previewOf(
+            ImportPayload.Restore(backup(version = 6)),
+            RecordCounts(breathingSessions = 2)
+        ).lines.joinToString("\n")
+        assertTrue(
+            preV7Two.contains(
+                "This backup predates paced breathing. Your 2 breathing sessions will be " +
+                    "permanently deleted, and the paced-breathing setting returns to on."
+            )
+        )
+
+        val v7Zero = previewOf(
+            ImportPayload.Restore(backup(version = 7, sessions = 0)),
+            RecordCounts(breathingSessions = 0)
+        ).lines.joinToString("\n")
+        assertTrue(
+            v7Zero.contains(
+                "This backup contains 0 breathing sessions. Your current 0 breathing " +
+                    "sessions will be permanently deleted."
+            )
+        )
+
+        val v7One = previewOf(
+            ImportPayload.Restore(backup(version = 7, sessions = 1)),
+            RecordCounts(breathingSessions = 1)
+        ).lines.joinToString("\n")
+        assertTrue(
+            v7One.contains(
+                "This backup contains 1 breathing session. Your current 1 breathing " +
+                    "session will be permanently deleted."
+            )
+        )
+
+        val v7Two = previewOf(
+            ImportPayload.Restore(backup(version = 7, sessions = 2)),
+            RecordCounts(breathingSessions = 2)
+        ).lines.joinToString("\n")
+        assertTrue(
+            v7Two.contains(
+                "This backup contains 2 breathing sessions. Your current 2 breathing " +
+                    "sessions will be permanently deleted."
+            )
+        )
     }
 
     /**
@@ -178,7 +280,8 @@ class ImportPreflightTest {
                 RecordsPayload(
                     listOf(Entry(ts = 1, value = 1), Entry(ts = 2, value = 2)),
                     emptyList(),
-                    listOf(Marker(ts = 3, text = "m"))
+                    listOf(Marker(ts = 3, text = "m")),
+                    listOf(BreathingSession(startedAt = 10, endedAt = 20))
                 )
             ),
             RecordCounts(entries = 99)
@@ -186,7 +289,7 @@ class ImportPreflightTest {
         assertEquals("Import records", preview.title)
         assertEquals("Add these records", preview.confirmLabel)
         val text = preview.lines.joinToString("\n")
-        assertTrue(text.contains("It will add 2 ratings, 0 sleep periods, and 1 marked event."))
+        assertTrue(text.contains("It will add 2 ratings, 0 sleep periods, 1 marked event, and 1 breathing session."))
         assertTrue(text.contains("Nothing is deleted."))
         assertTrue(text.contains("A records CSV does not contain them."))
         assertFalse(text.contains("delete "))
@@ -204,8 +307,8 @@ class ImportPreflightTest {
             addAll(previewOf(ImportPayload.Restore(backup(version = 5, scores = 1)), RecordCounts(1, 1, 1, 1)).lines)
             addAll(previewOf(ImportPayload.Merge(RecordsPayload(emptyList(), emptyList(), emptyList())), RecordCounts()).lines)
             addAll(previewOf(ImportPayload.Restore(backup(version = 6, scores = 1)), RecordCounts(1, 1, 1, 1, 1)).lines)
-            add(ImportMessages.restored(1, 1, 1, 1, 1))
-            add(ImportMessages.added(2, 2, 2))
+            add(ImportMessages.restored(1, 1, 1, 1, 1, 1))
+            add(ImportMessages.added(2, 2, 2, 2))
             addAll(
                 listOf(
                     ImportMessages.TOO_LARGE, ImportMessages.NOT_UTF8, ImportMessages.NOT_A_BACKUP,
@@ -232,7 +335,7 @@ class ImportPreflightTest {
 
     private fun emptySnapshot() = RecordSnapshot(emptyList(), emptyList(), emptyList())
 
-    private fun backup(version: Int, scores: Int = 0, planItems: Int = 0) = BackupPayload(
+    private fun backup(version: Int, scores: Int = 0, planItems: Int = 0, sessions: Int = 0) = BackupPayload(
         safetyPlan = (0 until planItems).map {
             SafetyPlanItem(
                 id = 40L + it,
@@ -256,6 +359,9 @@ class ImportPreflightTest {
                 assessedEpochDay = LocalDate.of(2026, 8, 1).toEpochDay(),
                 enteredAt = 5_000
             )
+        },
+        breathingSessions = (0 until sessions).map {
+            BreathingSession(id = 60L + it, startedAt = 10_000L + it, endedAt = 20_000L + it)
         }
     )
 }

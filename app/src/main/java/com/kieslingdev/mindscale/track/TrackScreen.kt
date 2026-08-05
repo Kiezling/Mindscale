@@ -58,6 +58,7 @@ import com.kieslingdev.mindscale.data.Entry
 import com.kieslingdev.mindscale.data.EntryKind
 import com.kieslingdev.mindscale.data.HourFormat
 import androidx.compose.foundation.layout.heightIn
+import com.kieslingdev.mindscale.breathing.BreathingCopy
 import com.kieslingdev.mindscale.safety.SafetyCopy
 import com.kieslingdev.mindscale.settings.SettingsFocus
 import com.kieslingdev.mindscale.settings.vocabularyForEntry
@@ -90,7 +91,8 @@ fun TrackRoute(
     viewModel: TrackViewModel,
     modifier: Modifier = Modifier,
     onOpenSettings: (SettingsFocus) -> Unit = {},
-    onOpenSafety: () -> Unit = {}
+    onOpenSafety: () -> Unit = {},
+    onOpenBreathing: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     TrackScreen(
@@ -98,6 +100,7 @@ fun TrackRoute(
         onEvent = viewModel::onEvent,
         onOpenSettings = onOpenSettings,
         onOpenSafety = onOpenSafety,
+        onOpenBreathing = onOpenBreathing,
         modifier = modifier
     )
 }
@@ -111,7 +114,8 @@ fun TrackScreen(
     onEvent: (TrackEvent) -> Unit,
     modifier: Modifier = Modifier,
     onOpenSettings: (SettingsFocus) -> Unit = {},
-    onOpenSafety: () -> Unit = {}
+    onOpenSafety: () -> Unit = {},
+    onOpenBreathing: () -> Unit = {}
 ) {
     Box(modifier = modifier.fillMaxSize()) {
         LazyColumn(
@@ -195,6 +199,17 @@ fun TrackScreen(
                 }
             }
 
+            // Shown only when the setting is on and tracking is not paused. A breathing
+            // session writes a dated record, and pause means the capture surface is
+            // hidden, so offering a control that creates records during a pause would
+            // contradict what pause means (`docs/specs/SPEC-paced-breathing.md`, D-7).
+            // Both conditions are settings the user set, never anything recorded.
+            if (uiState.settings.breathingOn && !uiState.isPaused) {
+                item(key = "breathing_link") {
+                    BreathingLink(onOpenBreathing = onOpenBreathing)
+                }
+            }
+
             // Unconditional, including while paused, and last so it never competes with
             // logging. Its presence depends on nothing recorded — that is the whole point
             // (`docs/specs/SPEC-safety-card.md`, D-6).
@@ -243,6 +258,28 @@ private fun ToastBanner(toast: String?) {
  * The always-available way into the Safety card. It is never a dialog, never triggered,
  * and never gated on a rating, pattern, or count — MindScale does not assess risk.
  */
+/**
+ * The only way into the paced-breathing circle. It is never a dialog, never a prompt, and
+ * never appears in response to a rating, an episode, a count, or anything else recorded —
+ * MindScale does not decide that someone should breathe
+ * (`docs/specs/SPEC-paced-breathing.md`, D-7, D-10).
+ */
+@Composable
+private fun BreathingLink(onOpenBreathing: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.Center
+    ) {
+        TextButton(
+            onClick = onOpenBreathing,
+            modifier = Modifier
+                .heightIn(min = 48.dp)
+                .testTag("breathing_link")
+                .semantics { contentDescription = BreathingCopy.TRACK_LINK_DESCRIPTION }
+        ) { Text(BreathingCopy.TRACK_LINK) }
+    }
+}
+
 @Composable
 private fun SafetyLink(onOpenSafety: () -> Unit) {
     Row(

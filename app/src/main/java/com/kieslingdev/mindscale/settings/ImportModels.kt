@@ -16,7 +16,7 @@ enum class ImportKind { BACKUP_RESTORE, RECORDS_MERGE }
 
 /** Backup format versions MindScale has ever written and can therefore read (D-2). */
 const val MIN_BACKUP_VERSION = 3
-const val MAX_BACKUP_VERSION = 6
+const val MAX_BACKUP_VERSION = 7
 
 /** Frozen limits (D-5). Enforced before unbounded allocation. */
 const val MAX_IMPORT_BYTES = 8L * 1024L * 1024L
@@ -60,7 +60,8 @@ data class RecordCounts(
     val sleeps: Int = 0,
     val markers: Int = 0,
     val externalScores: Int = 0,
-    val safetyPlanItems: Int = 0
+    val safetyPlanItems: Int = 0,
+    val breathingSessions: Int = 0
 )
 
 sealed interface ParseResult<out T> {
@@ -113,14 +114,23 @@ object ImportMessages {
         "$count of these records ${if (count == 1) "is" else "are"} already in MindScale. " +
             "Nothing was imported."
 
-    fun restored(entries: Int, sleeps: Int, markers: Int, scores: Int, planItems: Int): String =
+    fun restored(
+        entries: Int,
+        sleeps: Int,
+        markers: Int,
+        scores: Int,
+        planItems: Int,
+        breathingSessions: Int
+    ): String =
         "Restored $entries ${ratings(entries)}, $sleeps sleep ${periods(sleeps)}, " +
             "$markers marked ${events(markers)}, $scores externally obtained " +
-            "${totals(scores)}, and $planItems safety plan ${lines(planItems)}."
+            "${totals(scores)}, $planItems safety plan ${lines(planItems)}, and " +
+            "$breathingSessions breathing ${sessions(breathingSessions)}."
 
-    fun added(entries: Int, sleeps: Int, markers: Int): String =
-        "Added $entries ${ratings(entries)}, $sleeps sleep ${periods(sleeps)}, and " +
-            "$markers marked ${events(markers)}."
+    fun added(entries: Int, sleeps: Int, markers: Int, breathingSessions: Int): String =
+        "Added $entries ${ratings(entries)}, $sleeps sleep ${periods(sleeps)}, " +
+            "$markers marked ${events(markers)}, and $breathingSessions breathing " +
+            "${sessions(breathingSessions)}."
 
     internal fun records(count: Int) = if (count == 1) "record" else "records"
     internal fun ratings(count: Int) = if (count == 1) "rating" else "ratings"
@@ -128,4 +138,5 @@ object ImportMessages {
     internal fun events(count: Int) = if (count == 1) "event" else "events"
     internal fun totals(count: Int) = if (count == 1) "total" else "totals"
     internal fun lines(count: Int) = if (count == 1) "line" else "lines"
+    internal fun sessions(count: Int) = if (count == 1) "session" else "sessions"
 }

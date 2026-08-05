@@ -1,6 +1,7 @@
 package com.kieslingdev.mindscale.settings
 
 import androidx.lifecycle.SavedStateHandle
+import com.kieslingdev.mindscale.data.BreathingSession
 import com.kieslingdev.mindscale.data.DataControlDao
 import com.kieslingdev.mindscale.data.Entry
 import com.kieslingdev.mindscale.data.ExternalScore
@@ -20,7 +21,9 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
 import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
@@ -31,6 +34,49 @@ class SettingsViewModelTest {
 
     @Before fun setUp() = Dispatchers.setMain(dispatcher)
     @After fun tearDown() = Dispatchers.resetMain()
+
+    /**
+     * The paced-breathing toggle is on by default and is a plain targeted settings write.
+     * Turning it off removes the Track link and nothing else — no stored session is
+     * touched (`docs/specs/SPEC-paced-breathing.md`, D-8).
+     */
+    @Test
+    fun pacedBreathingIsOnByDefaultAndTheToggleIsATargetedWrite() = runTest {
+        val settings = FakeTrackSettingsDao()
+        val data = FakeDataControlDao()
+        data.breathingSessions += BreathingSession(id = 1, startedAt = 1_000, endedAt = 61_000)
+        val vm = SettingsViewModel(settings, data, SavedStateHandle())
+        dispatcher.scheduler.runCurrent()
+        assertTrue(vm.uiState.value.settings.breathingOn)
+
+        vm.setBreathingOn(false)
+        dispatcher.scheduler.runCurrent()
+        assertFalse(vm.uiState.value.settings.breathingOn)
+        assertEquals(1, data.breathingSessions.size)
+
+        vm.setBreathingOn(true)
+        dispatcher.scheduler.runCurrent()
+        assertTrue(vm.uiState.value.settings.breathingOn)
+    }
+
+    /** The erase dialog states the exact number of sessions before the user confirms. */
+    @Test
+    fun theEraseConfirmationDisclosesTheStoredBreathingSessionCount() = runTest {
+        val data = FakeDataControlDao()
+        data.breathingSessions += BreathingSession(id = 1, startedAt = 1_000, endedAt = 61_000)
+        data.breathingSessions += BreathingSession(id = 2, startedAt = 70_000, endedAt = 70_000)
+        val vm = SettingsViewModel(
+            FakeTrackSettingsDao(),
+            data,
+            SavedStateHandle(),
+            nowProvider = { Instant.parse("2026-08-05T12:00:00Z") }
+        )
+        dispatcher.scheduler.runCurrent()
+
+        vm.requestBackup()
+        dispatcher.scheduler.runCurrent()
+        assertEquals(2, vm.uiState.value.pendingDocument?.breathingSessionCount)
+    }
 
     @Test
     fun eraseCannotBeConfirmedUntilBackupWriteSucceeds() = runTest {
@@ -139,6 +185,7 @@ internal class FakeDataControlDao : DataControlDao {
     var profile = UserProfile()
     val externalScores = mutableListOf<ExternalScore>()
     val safetyPlan = mutableListOf<SafetyPlanItem>()
+    val breathingSessions = mutableListOf<BreathingSession>()
     var eraseCalls = 0
     var failInsert = false
     private var nextId = 100L
@@ -161,6 +208,9 @@ internal class FakeDataControlDao : DataControlDao {
     override suspend fun insertSafetyPlanItems(items: List<SafetyPlanItem>): List<Long> =
         insert(items, this.safetyPlan) { it.copy(id = generated(it.id)) }
 
+    override suspend fun insertBreathingSessions(sessions: List<BreathingSession>): List<Long> =
+        insert(sessions, this.breathingSessions) { it.copy(id = generated(it.id)) }
+
     private fun <T> insert(incoming: List<T>, into: MutableList<T>, assign: (T) -> T): List<Long> {
         if (failInsert && incoming.isNotEmpty()) error("insert failed")
         return incoming.map { row ->
@@ -172,6 +222,7 @@ internal class FakeDataControlDao : DataControlDao {
                 is Marker -> stored.id
                 is ExternalScore -> stored.id
                 is SafetyPlanItem -> stored.id
+                is BreathingSession -> stored.id
                 else -> 0L
             }
         }
@@ -190,6 +241,9 @@ internal class FakeDataControlDao : DataControlDao {
     override suspend fun allSafetyPlanItems(): List<SafetyPlanItem> =
         safetyPlan.sortedWith(compareBy({ it.position }, { it.id }))
     override suspend fun safetyPlanItemCount(): Int = safetyPlan.size
+    override suspend fun allBreathingSessions(): List<BreathingSession> =
+        breathingSessions.sortedWith(compareByDescending<BreathingSession> { it.startedAt }.thenByDescending { it.id })
+    override suspend fun breathingSessionCount(): Int = breathingSessions.size
     override suspend fun deleteEntries(): Int = entries.size.also { entries.clear() }
     override suspend fun deleteSleeps(): Int = sleeps.size.also { sleeps.clear() }
     override suspend fun deleteMarkers(): Int = markers.size.also { markers.clear() }
@@ -197,6 +251,8 @@ internal class FakeDataControlDao : DataControlDao {
         externalScores.size.also { externalScores.clear() }
     override suspend fun deleteSafetyPlanItems(): Int =
         safetyPlan.size.also { safetyPlan.clear() }
+    override suspend fun deleteBreathingSessions(): Int =
+        breathingSessions.size.also { breathingSessions.clear() }
     override suspend fun resetSettings(defaults: TrackSettings): Int {
         eraseCalls += 1
         settings = defaults

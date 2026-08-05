@@ -13,7 +13,8 @@ data class DataSnapshot(
     val settings: TrackSettings,
     val profile: UserProfile = UserProfile(),
     val externalScores: List<ExternalScore> = emptyList(),
-    val safetyPlan: List<SafetyPlanItem> = emptyList()
+    val safetyPlan: List<SafetyPlanItem> = emptyList(),
+    val breathingSessions: List<BreathingSession> = emptyList()
 )
 
 data class EraseCounts(
@@ -21,7 +22,8 @@ data class EraseCounts(
     val sleeps: Int,
     val markers: Int,
     val externalScores: Int = 0,
-    val safetyPlanItems: Int = 0
+    val safetyPlanItems: Int = 0,
+    val breathingSessions: Int = 0
 )
 
 @Dao
@@ -52,6 +54,9 @@ interface DataControlDao {
     @Query("SELECT * FROM safety_plan_items ORDER BY position ASC, id ASC")
     suspend fun allSafetyPlanItems(): List<SafetyPlanItem>
 
+    @Query("SELECT * FROM breathing_sessions ORDER BY startedAt DESC, id DESC")
+    suspend fun allBreathingSessions(): List<BreathingSession>
+
     @Query("DELETE FROM entries")
     suspend fun deleteEntries(): Int
 
@@ -67,8 +72,14 @@ interface DataControlDao {
     @Query("DELETE FROM safety_plan_items")
     suspend fun deleteSafetyPlanItems(): Int
 
+    @Query("DELETE FROM breathing_sessions")
+    suspend fun deleteBreathingSessions(): Int
+
     @Query("SELECT COUNT(*) FROM safety_plan_items")
     suspend fun safetyPlanItemCount(): Int
+
+    @Query("SELECT COUNT(*) FROM breathing_sessions")
+    suspend fun breathingSessionCount(): Int
 
     @Update
     suspend fun resetSettings(defaults: TrackSettings): Int
@@ -85,7 +96,8 @@ interface DataControlDao {
             settings(),
             profile(),
             allExternalScores(),
-            allSafetyPlanItems()
+            allSafetyPlanItems(),
+            allBreathingSessions()
         )
 
     @Insert
@@ -103,6 +115,9 @@ interface DataControlDao {
     @Insert
     suspend fun insertSafetyPlanItems(items: List<SafetyPlanItem>): List<Long>
 
+    @Insert
+    suspend fun insertBreathingSessions(sessions: List<BreathingSession>): List<Long>
+
     @Query("SELECT COUNT(*) FROM sleeps WHERE endTs IS NULL")
     suspend fun openSleepCount(): Int
 
@@ -115,7 +130,7 @@ interface DataControlDao {
     /** Only the record tables an additive import is checked against (Phase 12, D-4). */
     @Transaction
     suspend fun recordSnapshot(): RecordSnapshot =
-        RecordSnapshot(allEntries(), allSleeps(), allMarkers())
+        RecordSnapshot(allEntries(), allSleeps(), allMarkers(), allBreathingSessions())
 
     /**
      * Replaces every record, the canonical settings row, the canonical Profile row, and
@@ -136,6 +151,7 @@ interface DataControlDao {
         deleteMarkers()
         deleteExternalScores()
         deleteSafetyPlanItems()
+        deleteBreathingSessions()
         check(resetSettings(payload.settings.copy(id = 0)) == 1) {
             "Canonical settings row is missing"
         }
@@ -143,13 +159,20 @@ interface DataControlDao {
             "Canonical profile row is missing"
         }
         val counts = insertRecords(
-            payload.entries, payload.sleeps, payload.markers, payload.externalScores
+            payload.entries, payload.sleeps, payload.markers, payload.externalScores,
+            payload.breathingSessions
         )
         val planIds = insertSafetyPlanItems(payload.safetyPlan)
         check(planIds.all { it > 0L }) { "An imported safety plan line was not inserted" }
-        verifyInvariants(counts, payload.entries.size, payload.sleeps.size, payload.markers.size)
+        verifyInvariants(
+            counts, payload.entries.size, payload.sleeps.size, payload.markers.size,
+            payload.breathingSessions.size
+        )
         check(counts.externalScores == payload.externalScores.size) { "External total count changed" }
         check(safetyPlanItemCount() == payload.safetyPlan.size) { "Safety plan line count changed" }
+        check(breathingSessionCount() == payload.breathingSessions.size) {
+            "Breathing session count changed"
+        }
         return counts.copy(safetyPlanItems = planIds.size)
     }
 
@@ -164,8 +187,14 @@ interface DataControlDao {
         recheck: (RecordSnapshot) -> Boolean
     ): ImportCounts {
         if (!recheck(recordSnapshot())) throw ImportConflictException()
-        val counts = insertRecords(payload.entries, payload.sleeps, payload.markers, emptyList())
-        verifyInvariants(counts, payload.entries.size, payload.sleeps.size, payload.markers.size)
+        val counts = insertRecords(
+            payload.entries, payload.sleeps, payload.markers, emptyList(),
+            payload.breathingSessions
+        )
+        verifyInvariants(
+            counts, payload.entries.size, payload.sleeps.size, payload.markers.size,
+            payload.breathingSessions.size
+        )
         return counts
     }
 
@@ -173,20 +202,34 @@ interface DataControlDao {
         entries: List<Entry>,
         sleeps: List<SleepInterval>,
         markers: List<Marker>,
-        scores: List<ExternalScore>
+        scores: List<ExternalScore>,
+        breathingSessions: List<BreathingSession>
     ): ImportCounts {
         val entryIds = insertEntries(entries)
         val sleepIds = insertSleeps(sleeps)
         val markerIds = insertMarkers(markers)
         val scoreIds = insertExternalScores(scores)
-        val inserted = entryIds + sleepIds + markerIds + scoreIds
+        val breathingIds = insertBreathingSessions(breathingSessions)
+        val inserted = entryIds + sleepIds + markerIds + scoreIds + breathingIds
         check(inserted.all { it > 0L }) { "An imported row was not inserted" }
-        return ImportCounts(entryIds.size, sleepIds.size, markerIds.size, scoreIds.size)
+        return ImportCounts(
+            entryIds.size, sleepIds.size, markerIds.size, scoreIds.size,
+            breathingSessions = breathingIds.size
+        )
     }
 
-    private suspend fun verifyInvariants(counts: ImportCounts, entries: Int, sleeps: Int, markers: Int) {
+    private suspend fun verifyInvariants(
+        counts: ImportCounts,
+        entries: Int,
+        sleeps: Int,
+        markers: Int,
+        breathingSessions: Int
+    ) {
         check(counts.entries == entries && counts.sleeps == sleeps && counts.markers == markers) {
             "Imported row count does not match the approved count"
+        }
+        check(counts.breathingSessions == breathingSessions) {
+            "Imported breathing session count does not match the approved count"
         }
         check(settingsRowCount() == 1) { "Canonical settings row is missing" }
         check(profileRowCount() == 1) { "Canonical profile row is missing" }
@@ -200,7 +243,8 @@ interface DataControlDao {
             deleteSleeps(),
             deleteMarkers(),
             deleteExternalScores(),
-            deleteSafetyPlanItems()
+            deleteSafetyPlanItems(),
+            deleteBreathingSessions()
         )
         check(resetSettings(TrackSettings()) == 1) { "Canonical settings row is missing" }
         check(resetProfile(UserProfile()) == 1) { "Canonical profile row is missing" }
