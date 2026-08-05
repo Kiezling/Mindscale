@@ -1,6 +1,6 @@
 # MindScale Phase 12 — local import and restore
 
-Status: **FROZEN — APPROVED**
+Status: **IMPLEMENTED — VERIFIED LOCALLY**
 
 Owner: Claude Code under the user's full Phase 12 delegation
 
@@ -420,21 +420,43 @@ Then inspect the installed app on the API 36 emulator: valid JSON restore; valid
 
 ## Machine-checkable acceptance criteria
 
-- [ ] SPEC: this spec and D-1 through D-12 are frozen in a documentation-only commit before any application-code edit.
-- [ ] SCOPE: exactly two import actions exist; JSON is replace-only, CSV is add-only, and no code path blends them.
-- [ ] VERSION: 3, 4, and 5 are accepted with the exact disclosed defaults; `> 5` and `< 3` are rejected with their distinct frozen messages; nothing is imported on rejection.
-- [ ] LIMITS: every value in the limits table is enforced before unbounded allocation, at the exact boundary, and rejects totally.
-- [ ] ENCODING: strict UTF-8, single leading BOM, the frozen control-character policy, RFC-4180 quoting, `CRLF`/`LF` terminators, and reject-unknown-keys all behave exactly as frozen.
-- [ ] IDENTITY: duplicate-in-file, conflict-with-stored, and sleep-overlap/open-interval rules reject totally, with exact counts and no silent skip, repair, or dedupe.
-- [ ] PREVIEW: the exact frozen preview, confirm-label, result, and error strings are produced, contain no banned language, and no mutation occurs before confirmation.
-- [ ] PROVENANCE: imported totals require and re-assert `EXTERNALLY_OBTAINED_USER_ENTERED`; no scoring, comparison, threshold, or severity language exists on any import path.
-- [ ] ATOMICITY: all six post-mutation checks roll back on violation, and every failure path leaves the database byte-identical.
-- [ ] RESTORATION: no raw content reaches `SavedStateHandle`; only the two frozen primitives are saved; recreation discards the payload and prompts a re-pick.
-- [ ] COMPATIBILITY: a restored version-5 backup re-exports byte-identically except `exportedAt`; schema, migrations, encoders, permissions, dependencies, and toolchain are unchanged.
-- [ ] PRIVACY: no logging of filenames, content, health data, or validation payloads exists on any import path.
-- [ ] ACCESSIBILITY: 48 dp targets, accessible names, scrollable preview, live-region status, light/dark, 200% font, landscape, and IME behavior are verified.
-- [ ] ORACLES: `test`, `lint`, `assembleDebug`, `adb devices -l`, `connectedDebugAndroidTest`, and `git diff --check` pass from the verified implementation head.
-- [ ] REVIEW: one critical-path review covers hostile-file resistance, parser/version correctness, conflict semantics, atomicity/rollback, canonical-row integrity, provenance, privacy, URI lifecycle, restoration/concurrency, accessibility, export compatibility, and rollback; every blocking finding is resolved.
+- [x] SPEC: this spec and D-1 through D-12 are frozen in a documentation-only commit before any application-code edit.
+- [x] SCOPE: exactly two import actions exist; JSON is replace-only, CSV is add-only, and no code path blends them.
+- [x] VERSION: 3, 4, and 5 are accepted with the exact disclosed defaults; `> 5` and `< 3` are rejected with their distinct frozen messages; nothing is imported on rejection.
+- [x] LIMITS: every value in the limits table is enforced before unbounded allocation, at the exact boundary, and rejects totally.
+- [x] ENCODING: strict UTF-8, single leading BOM, the frozen control-character policy, RFC-4180 quoting, `CRLF`/`LF` terminators, and reject-unknown-keys all behave exactly as frozen.
+- [x] IDENTITY: duplicate-in-file, conflict-with-stored, and sleep-overlap/open-interval rules reject totally, with exact counts and no silent skip, repair, or dedupe.
+- [x] PREVIEW: the exact frozen preview, confirm-label, result, and error strings are produced, contain no banned language, and no mutation occurs before confirmation.
+- [x] PROVENANCE: imported totals require and re-assert `EXTERNALLY_OBTAINED_USER_ENTERED`; no scoring, comparison, threshold, or severity language exists on any import path.
+- [x] ATOMICITY: all six post-mutation checks roll back on violation, and every failure path leaves the database byte-identical.
+- [x] RESTORATION: no raw content reaches `SavedStateHandle`; only the two frozen primitives are saved; recreation discards the payload and prompts a re-pick.
+- [x] COMPATIBILITY: a restored version-5 backup re-exports byte-identically except `exportedAt`; schema, migrations, encoders, permissions, dependencies, and toolchain are unchanged.
+- [x] PRIVACY: no logging of filenames, content, health data, or validation payloads exists on any import path.
+- [x] ACCESSIBILITY: 48 dp targets, accessible names, scrollable preview, live-region status, light/dark, 200% font, landscape, and IME behavior are verified.
+- [x] ORACLES: `test`, `lint`, `assembleDebug`, `adb devices -l`, `connectedDebugAndroidTest`, and `git diff --check` pass from the verified implementation head.
+- [x] REVIEW: one critical-path review covers hostile-file resistance, parser/version correctness, conflict semantics, atomicity/rollback, canonical-row integrity, provenance, privacy, URI lifecycle, restoration/concurrency, accessibility, export compatibility, and rollback; every blocking finding is resolved.
+
+## Verification evidence
+
+- Frozen documentation commit: `c6bb4d4`. Verified implementation commit: `9a670d9`.
+- `.\gradlew.bat test`: 255/255 JVM tests passed across 21 suites; 0 failures, errors, or skips (180 before this phase).
+- `.\gradlew.bat lint`: passed with 0 errors and the unchanged 22-warning baseline. The two new `Recycle` warnings were removed by a narrow, documented `@Suppress` at the two launcher callbacks, where the stream is opened lazily and always closed by `open().use(::readBoundedUtf8)` on the ViewModel's IO context.
+- `.\gradlew.bat assembleDebug`: passed.
+- `adb devices -l`: `emulator-5554`, `MindScale_API_36`, API 36 confirmed by `ro.build.version.sdk` and `emu avd name`.
+- `.\gradlew.bat connectedDebugAndroidTest`: 127/127 passed; 0 failures or skips (111 before this phase).
+- `git diff --check`: passed.
+- Installed-app inspection on the API 36 emulator covered, in one continuous session: creating records, a Profile name and an external PHQ-8 total; exporting a version-5 backup; export-then-erase with the exact destructive confirmation; restoring that backup into an empty install with the exact frozen preview; confirming and seeing `Dark`, `24-hour`, and `8h` restored as selected plus the name, ratings, and total; importing a records CSV; re-importing it to get `3 of these records are already in MindScale. Nothing was imported.`; a duplicate-row CSV giving `This file contains 1 duplicate record.`; a 9 MiB file, a truncated JSON file, an empty file, a version-2 file, and a version-6 file each rejected with their exact frozen message and no mutation; cancelling before confirmation leaving records unchanged; exporting after import and confirming restored ids `1`–`4` verbatim alongside a CSV-added rating at a fresh id `5`; light and dark rendering; 200% font; landscape; true process death by `am kill` producing `Choose the file again to see the preview.`; and erase after import returning to `0 ratings · 0 sleep periods · 0 marked events`. Emulator font scale, auto-rotation, orientation, and night mode were restored and the pushed test files were deleted.
+- Two defects were found by that inspection and fixed: `exportedAt` is written by `Instant.now()` at microsecond precision and was being rejected by the millisecond rule that only belongs on epoch-millis columns; and the preview dialog's fixed 320 dp body cap pushed the permanent-deletion sentence below the fold at 200% font while leaving the confirm action visible. `RealDeviceBackupTest` pins a byte-for-byte real device export as a regression fixture.
+- Critical review returned one blocking finding: cancelling or dismissing the preview after confirming cleared the pending state while the transaction was still running, so a completed mutation could be reported as cancelled. An import is now non-cancellable once its transaction has started, `Cancel` is visibly disabled while it runs, and `cancellingAfterConfirmingCannotMisreportACompletedMutation` covers the race. The review also asked for the two amendments now recorded under D-012 and for an honest coverage note in `ImportDaoTest`.
+
+### Known coverage gaps
+
+- The two canonical-row post-mutation checks are defensive only. The schema seeds exactly one `id = 0` row in `track_settings` and `user_profile` and no import path deletes either, so those branches cannot be forced from a valid database and are not exercised by a test. This is noted in `ImportDaoTest`.
+- At 200% font scale combined with landscape the preview dialog shows roughly one line of body text at a time. All content remains reachable by scrolling and both actions stay visible, but the deletion counts require scrolling in that combination. At 200% portrait or default-scale landscape the destructive sentence is visible without scrolling.
+- The records CSV joins chips with `|`, so a stored chip containing `|` is ambiguous on CSV import and would be split. This is a pre-existing Phase 4 export limitation, not introduced here; the JSON backup carries chips as a proper array and is unaffected. No chip containing `|` can be produced by the app's own onset-word validation.
+- Hostile-file resistance was verified at the frozen boundaries by unit tests and by one real 9 MiB file on the device. No fuzzing campaign was run.
+- TalkBack semantics were verified through Compose semantics and the device view hierarchy; spoken audio was not manually audited.
+- No IME appears anywhere in the import flow, so IME/focus behaviour is unchanged from the existing Settings fields.
 
 ## Task decomposition
 

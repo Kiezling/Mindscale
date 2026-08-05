@@ -8,7 +8,7 @@ Build MindScale as a native Android application using Kotlin, Jetpack Compose, M
 
 The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716ca7343`: `SPEC.md` is the rationale and `MindScale v2.dc.html` is the visual/behavioral reference for Track, Full Log, Insights, Report, Safety card, Profile, and Settings. A local exported handoff is available at `C:\Users\mckie\Downloads\MindScale-handoff\mindscale\project\`; its `MindScale v2.dc.html` is the primary implementation reference. Repository specs under `docs/specs/` govern native implementation after human approval.
 
-## Current phase: Phase 12 local import and restore — spec frozen
+## Current phase: Phase 12 local import and restore — implemented and verified locally
 
 - Phase 12 branch: `agent/phase12-import-restore`, created from synchronized `main` at `ce5913341461725c3ad59b697a4e994e501fa046`
 - Starting synchronization: `HEAD`, local `main`, local `origin/main`, and live GitHub `refs/heads/main` all resolved to `ce5913341461725c3ad59b697a4e994e501fa046` before branching
@@ -18,7 +18,12 @@ The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716c
 - Approval gate satisfied: the user granted full Phase 12 ownership and authorized decisions, implementation, verification, commits, pushes, PR readiness, merge, and final synchronization without another routine pause
 - Frozen constraints: no schema change, migration, downgrade path, destructive fallback, dependency, permission, network, account, analytics, or toolchain change; imported PHQ-8/GAD-7 totals retain fixed external provenance and are never scored or interpreted; raw untrusted file content never enters `SavedStateHandle`
 - Expected untracked paths remain `.agents/` and `.codex/`; they are excluded from product/documentation scope
-- Exact next action: implement the frozen spec in task order 2 through 9, then run the full oracle and installed-app matrix
+- Governing spec status: `IMPLEMENTED — VERIFIED LOCALLY`; frozen documentation commit `c6bb4d4`, verified implementation commit `9a670d9`
+- Verification: 255/255 JVM tests, lint with 0 errors and the unchanged 22-warning baseline, debug assembly, confirmed API 36 emulator, 127/127 connected tests, `git diff --check`, the full installed-app import/restore matrix, and one critical review with its single blocking finding resolved
+- Two defects were caught by installed-app inspection rather than by tests: microsecond `exportedAt` precision made MindScale reject its own export, and the preview dialog's fixed height cap hid the permanent-deletion sentence at 200% font. Both are fixed and pinned by `RealDeviceBackupTest` and the uncapped scrollable dialog
+- Critical review blocked on a cancel-after-confirm race that could report a completed mutation as cancelled; an import is now non-cancellable once its transaction starts
+- Honest gaps: the two canonical-row rollback checks are defensive and unexercisable from a valid database; at 200% font combined with landscape the preview's deletion counts require scrolling; a chip containing `|` remains ambiguous in the pre-existing records CSV format; no fuzzing campaign was run; spoken TalkBack output was not audited
+- Exact next action: publish the branch, open and merge the PR, then synchronize `main` and record the phase boundary
 - Explicitly not started: Safety, paced breathing, and the later UI-overhaul phase
 
 ### Phase 11 merged checkpoint
@@ -214,6 +219,18 @@ No active blocker. Phase 11 is merged and complete; Phase 12 is specified and in
 3. Continue excluding `.agents/` and `.codex/` from product/documentation commits.
 
 ## Last verification
+
+Phase 12 final local verification completed 2026-08-04 for implementation commit `9a670d9` on `agent/phase12-import-restore`:
+
+- `test`: 255/255 JVM tests passed across 21 suites; 0 failures, errors, or skips.
+- `lint`: passed with 0 errors and the same 22 existing warnings. The two new `Recycle` warnings were removed by a narrow documented suppression at the launcher callbacks, where the stream is opened lazily and always closed on the ViewModel's IO context.
+- `assembleDebug`: passed.
+- `adb devices -l`: intended `MindScale_API_36` API 36 emulator connected as `emulator-5554`.
+- `connectedDebugAndroidTest`: 127/127 passed; 0 failures or skips.
+- `git diff --check`: passed.
+- Installed-app inspection covered export, export-then-erase, restore into an empty install with the exact frozen preview and confirmed settings/Profile/external-total restoration, CSV add, duplicate and conflict rejection with exact counts, oversized/malformed/empty/version-2/version-6 rejection, cancel before confirmation, export-after-import with verbatim restored ids, light and dark, 200% font, landscape, true process death, and erase after import. Emulator font scale, rotation, orientation, and night mode were restored and the pushed fixtures were deleted.
+- Critical review found one blocking issue — cancel after confirm could misreport a completed mutation — which is fixed and covered; the review's two documentation amendments are recorded under D-012.
+- No Room schema, migration, exported schema JSON, manifest/permission, dependency, or toolchain file changed.
 
 Phase 12 starting-state verification completed 2026-08-04 before application-code edits:
 
