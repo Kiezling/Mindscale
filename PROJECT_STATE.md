@@ -8,7 +8,7 @@ Build MindScale as a native Android application using Kotlin, Jetpack Compose, M
 
 The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716ca7343`: `SPEC.md` is the rationale and `MindScale v2.dc.html` is the visual/behavioral reference for Track, Full Log, Insights, Report, Safety card, Profile, and Settings. A local exported handoff is available at `C:\Users\mckie\Downloads\MindScale-handoff\mindscale\project\`; its `MindScale v2.dc.html` is the primary implementation reference. Repository specs under `docs/specs/` govern native implementation after human approval.
 
-## Current phase: Phase 14 optional paced-breathing object — implemented and verified locally
+## Current phase: Phase 14 optional paced-breathing object merged and complete
 
 - Phase 14 branch: `agent/phase14-paced-breathing`, created from synchronized `main` at `82ca7041120df0903738645f1a6d46cec44a2fb6`
 - Starting synchronization: `HEAD`, local `main`, local `origin/main`, and live GitHub `refs/heads/main` all resolved to `82ca7041120df0903738645f1a6d46cec44a2fb6` before branching
@@ -26,7 +26,12 @@ The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716c
 - One production defect was caught by installed-app inspection rather than by tests: the Settings data-section copy still said a records CSV contains "ratings, sleep, and marked events only", which became false once breathing sessions were written into it. Both that sentence and the matching import sentence are corrected and pinned by `SettingsImportScreenTest`
 - The critical review returned APPROVE with three non-blocking findings, all closed rather than deferred: the banned-word scan now also covers the breathing disclosure strings outside `BreathingCopy`; the backup array's descending order is now explicit in D-9; and `discardSession()` replaces `leaveScreen()` on the erase path so a session running during an erase is dropped rather than written back into a just-cleared table
 - Honest gaps: spoken TalkBack output was not audited, only semantic order, content descriptions, and the live region; a session in progress is lost on process death, disclosed on screen by `BreathingCopy.RECORDING`; backgrounding does not stop a running session, and whether the user was watching is deliberately not inferred; breathing sessions appear in no in-app view and have no per-session delete, so erase and replace-only restore are the removal paths; overlapping sessions are deliberately not rejected on import; the device cadence check confirmed alternating phases on an ~11-second cycle but `uiautomator` dump latency is too coarse to resolve the 4500/6500 ms boundaries, which are pinned by unit tests and by the exact stored intervals instead
-- Exact next action: publish the branch, open and merge the PR, then leave the UI-overhaul work unstarted until it is separately scoped, specified, and approved
+- Verification-state commit: `f83da2dcdd0b371219accf56d4d3f0abe653380e`
+- Phase 14 PR #11 was opened as draft, marked ready, and verified `CLEAN`/`MERGEABLE` at exact head `f83da2dcdd0b371219accf56d4d3f0abe653380e`; no remote status checks are configured
+- PR #11 merged into `main` as `dbc3bc0a0575be1a625807e71be79510b5114be8` on 2026-08-05 (`2026-08-05T20:17:22Z`) using expected-head protection; local `HEAD`, local `main`, `origin/main`, and live GitHub `refs/heads/main` all matched that merge before this phase-boundary documentation commit, and the verified head is an ancestor of it
+- `docs/specs/BACKLOG.md` now holds no unstarted scoped work. Every item the product source defined has been specified, implemented, verified, and merged
+- Exact next action: leave the UI-overhaul work unstarted and unlisted until it is separately scoped, specified, and approved. It has no agreed outcome, dependency, or decision yet, so a backlog entry for it would be a placeholder rather than a task
+- Explicitly not started: the later UI-overhaul phase
 
 ### Phase 13 merged checkpoint
 
@@ -247,7 +252,7 @@ The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716c
 
 ## Active blocker
 
-No active blocker. Phase 14 is implemented and verified locally; publication is next.
+No active blocker. Phase 14 is merged and complete, and no scoped backlog work remains.
 
 ## Known decisions
 
@@ -266,6 +271,15 @@ No active blocker. Phase 14 is implemented and verified locally; publication is 
 3. Continue excluding `.agents/` and `.codex/` from product/documentation commits.
 
 ## Last verification
+
+Phase 14 publication checkpoint completed 2026-08-05:
+
+- Pushed `agent/phase14-paced-breathing` through verification-state commit `f83da2dcdd0b371219accf56d4d3f0abe653380e`.
+- GitHub PR #11 was opened as draft, marked ready, and confirmed `CLEAN`/`MERGEABLE` at that exact head.
+- PR #11 merged into `main` as `dbc3bc0a0575be1a625807e71be79510b5114be8` with expected-head protection.
+- Local `main` fast-forwarded from `82ca7041120df0903738645f1a6d46cec44a2fb6` to `dbc3bc0a0575be1a625807e71be79510b5114be8`; `HEAD`, local `main`, `origin/main`, and live `git ls-remote origin refs/heads/main` all matched before this phase-boundary documentation commit, and the verified head is an ancestor of the merge.
+- No Android oracle was rerun for the GitHub merge or this documentation-only checkpoint because the application/test tree is the exact verified PR head plus GitHub's merge commit.
+- Expected untracked `.agents/` and `.codex/` remain excluded; no other local change was present before this documentation update.
 
 Phase 14 final local verification completed 2026-08-05 for implementation commit `570a2fe` plus the critical-review follow-up on `agent/phase14-paced-breathing`:
 
