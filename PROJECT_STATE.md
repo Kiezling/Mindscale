@@ -8,7 +8,20 @@ Build MindScale as a native Android application using Kotlin, Jetpack Compose, M
 
 The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716ca7343`: `SPEC.md` is the rationale and `MindScale v2.dc.html` is the visual/behavioral reference for Track, Full Log, Insights, Report, Safety card, Profile, and Settings. A local exported handoff is available at `C:\Users\mckie\Downloads\MindScale-handoff\mindscale\project\`; its `MindScale v2.dc.html` is the primary implementation reference. Repository specs under `docs/specs/` govern native implementation after human approval.
 
-## Current phase: Phase 11 clinician summary and Profile foundation merged and complete
+## Current phase: Phase 12 local import and restore — spec frozen
+
+- Phase 12 branch: `agent/phase12-import-restore`, created from synchronized `main` at `ce5913341461725c3ad59b697a4e994e501fa046`
+- Starting synchronization: `HEAD`, local `main`, local `origin/main`, and live GitHub `refs/heads/main` all resolved to `ce5913341461725c3ad59b697a4e994e501fa046` before branching
+- Governing spec: `docs/specs/SPEC-import-restore.md` — `FROZEN — APPROVED`; D-1 through D-12 frozen on 2026-08-04 before application-code edits
+- Selected work: the next ordered backlog item, safe local import and restore for MindScale's own JSON backup and records CSV formats
+- Reconciled boundary: two never-blended actions — replace-only JSON restore for backup versions 3/4/5 with verbatim ids and disclosed defaults, and add-only records CSV import; total rejection of every malformed, ambiguous, duplicate, conflicting, oversized, unsupported, or future-version file; mandatory size limit, strict UTF-8, bounded hand-written parsers, preview, and explicit confirmation before one checked atomic Room transaction
+- Approval gate satisfied: the user granted full Phase 12 ownership and authorized decisions, implementation, verification, commits, pushes, PR readiness, merge, and final synchronization without another routine pause
+- Frozen constraints: no schema change, migration, downgrade path, destructive fallback, dependency, permission, network, account, analytics, or toolchain change; imported PHQ-8/GAD-7 totals retain fixed external provenance and are never scored or interpreted; raw untrusted file content never enters `SavedStateHandle`
+- Expected untracked paths remain `.agents/` and `.codex/`; they are excluded from product/documentation scope
+- Exact next action: implement the frozen spec in task order 2 through 9, then run the full oracle and installed-app matrix
+- Explicitly not started: Safety, paced breathing, and the later UI-overhaul phase
+
+### Phase 11 merged checkpoint
 
 - Phase 11 branch: `agent/phase11-clinician-report-profile`, created from synchronized `main` at `9d8cf4bd2dbd3834e2094c81f63e838d6348bdb5`
 - Starting synchronization: `HEAD`, local `main`, local `origin/main`, and live GitHub `refs/heads/main` all resolved to `9d8cf4bd2dbd3834e2094c81f63e838d6348bdb5` before branching
@@ -182,7 +195,7 @@ The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716c
 
 ## Active blocker
 
-No active blocker. Phase 10 is merged and complete.
+No active blocker. Phase 11 is merged and complete; Phase 12 is specified and in implementation.
 
 ## Known decisions
 
@@ -196,10 +209,19 @@ No active blocker. Phase 10 is merged and complete.
 
 ## Next tasks
 
-1. Keep clinician Report/Profile, import/restore, Safety, and breathing work unstarted in `docs/specs/BACKLOG.md` until separately assigned and specified.
-2. Continue excluding `.agents/` and `.codex/` from product/documentation commits.
+1. Implement `docs/specs/SPEC-import-restore.md` tasks 2 through 9, then run the full oracle and installed-app matrix and one critical review.
+2. Keep Safety, paced breathing, and the UI-overhaul work unstarted in `docs/specs/BACKLOG.md` until separately assigned and specified.
+3. Continue excluding `.agents/` and `.codex/` from product/documentation commits.
 
 ## Last verification
+
+Phase 12 starting-state verification completed 2026-08-04 before application-code edits:
+
+- `git status --short --branch` showed synchronized `main` with only the expected untracked `.agents/` and `.codex/` directories.
+- `HEAD`, local `main`, local `origin/main`, and live `git ls-remote origin refs/heads/main` all resolved to `ce5913341461725c3ad59b697a4e994e501fa046`.
+- Branch `agent/phase12-import-restore` was created from that exact head.
+- `AGENTS.md`, `CLAUDE.md`, `PROJECT_STATE.md`, all `FAILED_PATHS.md` headings, `docs/DECISIONS.md`, `docs/specs/BACKLOG.md`, and the Phase 4 and Phase 11 data/export specs were reconciled, along with the live Room schema-5 entities, converters, migrations, `DataControlDao`, `DataExport.kt` encoders, `SettingsViewModel`/`SettingsScreen` Activity Result handling, `MainActivity` wiring, and the exported schema JSONs, before freezing D-012.
+- No Gradle oracle was rerun for this documentation-only freeze; the merged Phase 11 application tree and its verification evidence below remain unchanged.
 
 Phase 10 publication checkpoint completed 2026-08-04:
 
@@ -398,7 +420,7 @@ Results:
 ## Known coverage gaps and backlog
 
 - Phase 1 backdate/edit/note dialog-open restoration is implemented and verified by Phase 7; see `docs/specs/SPEC-track-dialog-restoration.md`.
-- JSON/CSV import remains deferred; Phase 4 exports are one-way until a separately approved validation/merge/rollback spec exists.
+- JSON/CSV import is specified by `docs/specs/SPEC-import-restore.md` and under implementation in Phase 12; exports remain one-way until that phase is verified and merged.
 - The time-weighted/hold episode model and Phase 2 onset reconciliation are implemented and verified by `docs/specs/SPEC-insights-foundation.md`.
 - Gold/ink theming is implemented; approved typography assets remain a future design decision.
 - Full Log import/export and clinician-report data actions remain deferred; no inert controls are shown.
