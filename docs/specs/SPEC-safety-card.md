@@ -1,12 +1,16 @@
 # SPEC-safety-card: Native Safety card and personal safety plan
 
-Status: FROZEN — APPROVED
+Status: IMPLEMENTED — VERIFIED LOCALLY
 
 Owner: Claude Code agent under full Phase 13 ownership granted by the user on 2026-08-05
 
 Date: 2026-08-05
 
-Last verified commit: `5eb10e497e328fb09dcf8254e7d5271c09cca1eb` (synchronized `main` at branch creation)
+Last verified commit: `bad6c8d` on `agent/phase13-safety-card` (frozen from synchronized `main` at `5eb10e497e328fb09dcf8254e7d5271c09cca1eb`)
+
+Implementation amendments to the frozen interfaces are recorded in `docs/DECISIONS.md`,
+D-013: the DAO ordering correction (SQL cannot express canonical step order), the
+`PlanFieldResult` return type, and the version-conditional restore-preview copy.
 
 ## Purpose
 
@@ -538,60 +542,60 @@ Amended existing contracts (additive only):
 
 ## Acceptance criteria
 
-- [ ] UNIT: `SAFETY_STEPS` equals the six canonical steps in `SafetyPlanStep.entries` order,
+- [x] UNIT: `SAFETY_STEPS` equals the six canonical steps in `SafetyPlanStep.entries` order,
       asserted element by element with exact heading and hint strings.
-- [ ] UNIT: every `SafetyCopy` constant equals its frozen string exactly (literal-text
+- [x] UNIT: every `SafetyCopy` constant equals its frozen string exactly (literal-text
       assertions, the Phase 11 clinician-grammar pattern).
-- [ ] UNIT: `dialString` strips formatting, preserves `+ * # , ;`, and returns `null` for a
+- [x] UNIT: `dialString` strips formatting, preserves `+ * # , ;`, and returns `null` for a
       number with no digit.
-- [ ] UNIT: `unavailableMessage` returns the frozen dial/text/page strings.
-- [ ] UNIT: `validatePlanText` rejects blank, whitespace-only, over-200-code-point, and
+- [x] UNIT: `unavailableMessage` returns the frozen dial/text/page strings.
+- [x] UNIT: `validatePlanText` rejects blank, whitespace-only, over-200-code-point, and
       multi-line input and trims accepted input.
-- [ ] UNIT: `validatePlanPhone` accepts a formatted number on the two contact steps, rejects
+- [x] UNIT: `validatePlanPhone` accepts a formatted number on the two contact steps, rejects
       any phone on the other four, rejects letters, and rejects over 40 code points.
-- [ ] UNIT: `encodeBackup` emits `"version": 6` and a `safetyPlan` array ordered by step,
+- [x] UNIT: `encodeBackup` emits `"version": 6` and a `safetyPlan` array ordered by step,
       position, then id; re-encoding a parsed backup reproduces the input byte for byte.
-- [ ] UNIT: `parseBackup` accepts a version-6 file, restores plan items verbatim, rejects a
+- [x] UNIT: `parseBackup` accepts a version-6 file, restores plan items verbatim, rejects a
       version-7 file with `NEWER_VERSION`, and restores versions 3/4/5 with an empty plan.
-- [ ] UNIT: `parseBackup` totally rejects a version-6 file with a bad step name, a
+- [x] UNIT: `parseBackup` totally rejects a version-6 file with a bad step name, a
       non-contiguous position, a phone on a non-contact step, an over-length text, or more
       than the per-step/total limits.
-- [ ] UNIT: the restore preview contains the frozen version-6 and pre-version-6 safety-plan
+- [x] UNIT: the restore preview contains the frozen version-6 and pre-version-6 safety-plan
       lines with exact counts and correct singular/plural.
-- [ ] UNIT: `encodeRecordsCsv` output is unchanged by the presence of plan items.
-- [ ] UNIT: the clinician summary text contains no plan text or phone number when the plan
+- [x] UNIT: `encodeRecordsCsv` output is unchanged by the presence of plan items.
+- [x] UNIT: the clinician summary text contains no plan text or phone number when the plan
       is populated.
-- [ ] UNIT: `SafetyViewModel` add/edit/delete produce the expected state, surface validation
+- [x] UNIT: `SafetyViewModel` add/edit/delete produce the expected state, surface validation
       errors, and renumber positions after a delete; a DAO failure leaves the editor open
       with a retryable error.
-- [ ] INSTRUMENTED: `intentFor` produces `ACTION_DIAL` with `tel:988`, `ACTION_SENDTO` with
+- [x] INSTRUMENTED: `intentFor` produces `ACTION_DIAL` with `tel:988`, `ACTION_SENDTO` with
       `smsto:988`, and `ACTION_VIEW` with the Find A Helpline URL; a repository-wide check
       asserts `ACTION_CALL` appears in no source file.
-- [ ] INSTRUMENTED: `SafetyPlanDao` add/edit/delete/renumber round-trips, and Room migration
+- [x] INSTRUMENTED: `SafetyPlanDao` add/edit/delete/renumber round-trips, and Room migration
       5→6 and 1→6 succeed with `safety_plan_items` present and prior data intact.
-- [ ] INSTRUMENTED: `replaceEverything` with a version-6 payload inserts plan ids verbatim
+- [x] INSTRUMENTED: `replaceEverything` with a version-6 payload inserts plan ids verbatim
       and rolls back entirely on a post-mutation count mismatch; `addRecords` leaves the
       plan untouched; `eraseEverythingAndResetSettings` deletes every item and reports the
       count.
-- [ ] UI: the Track footer link and the Profile row open Safety, and Back returns to the
+- [x] UI: the Track footer link and the Profile row open Safety, and Back returns to the
       opening destination after rotation.
-- [ ] UI/ACCESSIBILITY: all six headings carry `heading()` semantics in canonical order;
+- [x] UI/ACCESSIBILITY: all six headings carry `heading()` semantics in canonical order;
       every action has a ≥48 dp target; the Call button is absent for a contact without a
       dialable number; the action-unavailable message is a polite live region.
-- [ ] UI: a missing dialer shows the frozen `dialUnavailable` message with the number still
+- [x] UI: a missing dialer shows the frozen `dialUnavailable` message with the number still
       visible, and the app does not crash.
-- [ ] LINT/BUILD: `.\gradlew.bat test`, `.\gradlew.bat lint` (0 errors, warnings at or below
+- [x] LINT/BUILD: `.\gradlew.bat test`, `.\gradlew.bat lint` (0 errors, warnings at or below
       the 22-warning baseline), and `.\gradlew.bat assembleDebug` pass.
-- [ ] MANUAL: on the API 36 emulator — reach Safety from both entry points and back; tap
+- [x] MANUAL: on the API 36 emulator — reach Safety from both entry points and back; tap
       every resource action and cancel in the dialer/messaging app without dialling; compare
       every on-screen string against this spec; add, edit, and delete plan items in all six
       steps; verify light and dark, 200% font, and landscape with nothing clipped; walk
       TalkBack reading order; export a backup and confirm version 6 with the plan; restore a
       version-5 backup and confirm the disclosed empty plan; erase and confirm the plan
       count in the dialog.
-- [ ] FAILURE: an import whose plan violates any rule is rejected in full with nothing
+- [x] FAILURE: an import whose plan violates any rule is rejected in full with nothing
       written; a Room write failure keeps the editor open and retryable.
-- [ ] BOUNDARY: no `ACTION_CALL`, no new permission, no new dependency, no toolchain change,
+- [x] BOUNDARY: no `ACTION_CALL`, no new permission, no new dependency, no toolchain change,
       no records-CSV change, no paced-breathing or UI-overhaul work, and no code path that
       reads recorded data to decide anything on the Safety screen.
 
