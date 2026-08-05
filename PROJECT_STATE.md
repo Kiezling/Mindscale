@@ -8,7 +8,7 @@ Build MindScale as a native Android application using Kotlin, Jetpack Compose, M
 
 The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716ca7343`: `SPEC.md` is the rationale and `MindScale v2.dc.html` is the visual/behavioral reference for Track, Full Log, Insights, Report, Safety card, Profile, and Settings. A local exported handoff is available at `C:\Users\mckie\Downloads\MindScale-handoff\mindscale\project\`; its `MindScale v2.dc.html` is the primary implementation reference. Repository specs under `docs/specs/` govern native implementation after human approval.
 
-## Current phase: Phase 13 native Safety card — implemented and verified locally
+## Current phase: Phase 13 native Safety card merged and complete
 
 - Phase 13 branch: `agent/phase13-safety-card`, created from synchronized `main` at `5eb10e497e328fb09dcf8254e7d5271c09cca1eb`
 - Starting synchronization: `HEAD`, local `main`, local `origin/main`, and live GitHub `refs/heads/main` all resolved to `5eb10e497e328fb09dcf8254e7d5271c09cca1eb` before branching
@@ -26,7 +26,11 @@ The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716c
 - One defect was caught by installed-app inspection rather than by tests: the restore preview's "It contains …" line claimed a pre-version-6 backup held a safety plan. The clause is now version-conditional and pinned by `ImportPreflightTest`
 - Three frozen-interface amendments are recorded under D-013: the corrected DAO ordering (SQL cannot express canonical step order), the `PlanFieldResult` return type, and the preview copy correction
 - Honest gaps: spoken TalkBack output was not audited, only semantic order and live regions; no fuzzing campaign was run against version-6 plan payloads; the emergency-number sentence is copy only and was not exercised against a real emergency dialer by design; crisis-resource currency is a point-in-time fact checked on 2026-08-05 and surfaced in-app by `SafetyCopy.VERIFIED_ON`, so it needs periodic re-verification rather than being permanently correct
-- Exact next action: publish `agent/phase13-safety-card`, open and merge its PR, then synchronize `main`
+- Verification-state commit: `de950e47f03266671e9b2e191e96b6f1e4b6928d`
+- Phase 13 PR #10 was opened as draft, marked ready, and verified `CLEAN`/`MERGEABLE` at exact head `de950e47f03266671e9b2e191e96b6f1e4b6928d`; no remote status checks are configured
+- PR #10 merged into `main` as `c6f0989e5344f094eb1fe9d3e365c2df0cee3e4a` on 2026-08-05 (`2026-08-05T14:13:49Z`) using expected-head protection; local `HEAD`, local `main`, `origin/main`, and live GitHub `refs/heads/main` all matched that merge before this phase-boundary documentation commit, and the verified head is an ancestor of it
+- Exact next action after the phase boundary: leave paced breathing and the UI-overhaul work unstarted until each is separately scoped, specified, and approved
+- Explicitly not started: paced breathing and the later UI-overhaul phase
 
 ### Phase 12 merged checkpoint
 
@@ -223,7 +227,7 @@ The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716c
 
 ## Active blocker
 
-No active blocker. Phase 12 is merged and complete; Phase 13's specification is frozen and implementation is next.
+No active blocker. Phase 13 is merged and complete.
 
 ## Known decisions
 
@@ -242,6 +246,15 @@ No active blocker. Phase 12 is merged and complete; Phase 13's specification is 
 3. Continue excluding `.agents/` and `.codex/` from product/documentation commits.
 
 ## Last verification
+
+Phase 13 publication checkpoint completed 2026-08-05:
+
+- Pushed `agent/phase13-safety-card` through verification-state commit `de950e47f03266671e9b2e191e96b6f1e4b6928d`.
+- GitHub PR #10 was opened as draft, marked ready, and confirmed `CLEAN`/`MERGEABLE` at that exact head.
+- PR #10 merged into `main` as `c6f0989e5344f094eb1fe9d3e365c2df0cee3e4a` with expected-head protection.
+- Local `main` fast-forwarded from `5eb10e497e328fb09dcf8254e7d5271c09cca1eb` to `c6f0989e5344f094eb1fe9d3e365c2df0cee3e4a`; `HEAD`, local `main`, `origin/main`, and live `git ls-remote origin refs/heads/main` all matched before this phase-boundary documentation commit, and the verified head is an ancestor of the merge.
+- No Android oracle was rerun for the GitHub merge or this documentation-only checkpoint because the application/test tree is the exact verified PR head plus GitHub's merge commit.
+- Expected untracked `.agents/` and `.codex/` remain excluded; no other local change was present before this documentation update.
 
 Phase 13 final local verification completed 2026-08-05 for implementation commit `bad6c8d` on `agent/phase13-safety-card`:
 
@@ -495,6 +508,7 @@ Results:
 - The time-weighted/hold episode model and Phase 2 onset reconciliation are implemented and verified by `docs/specs/SPEC-insights-foundation.md`.
 - Gold/ink theming is implemented; approved typography assets remain a future design decision.
 - Full Log import/export and clinician-report data actions remain deferred; no inert controls are shown.
+- The Safety card and the user's own Stanley-Brown safety plan are implemented and merged by Phase 13; see `docs/specs/SPEC-safety-card.md`. Its crisis resources were verified on 2026-08-05 and carry a visible in-app check date, so currency is a maintenance obligation rather than a settled fact.
 
 ## Handoff checklist
 
