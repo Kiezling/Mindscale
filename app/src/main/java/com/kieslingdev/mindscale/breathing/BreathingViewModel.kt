@@ -114,6 +114,21 @@ class BreathingViewModel(
      */
     fun leaveScreen() = finish(BreathingStage.Idle)
 
+    /**
+     * Ends a running session and writes **nothing**. Used only when the user has just
+     * erased everything: an erase is a request to delete all of it, so completing a
+     * pending write afterwards would resurrect a row into a table the transaction just
+     * cleared. There is currently no in-app path from the breathing screen to the erase
+     * dialog, but this does not rely on that — a future navigation change must not be able
+     * to reopen the hazard (Phase 14 review, non-blocking finding 3).
+     */
+    fun discardSession() {
+        session = null
+        ticker?.cancel()
+        ticker = null
+        _uiState.update { it.copy(stage = BreathingStage.Idle, message = null) }
+    }
+
     fun dismissMessage() = _uiState.update { it.copy(message = null) }
 
     private fun publish(started: RunningSession, elapsedMillis: Long) {

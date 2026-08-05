@@ -69,9 +69,10 @@ fun MindScaleApp(
     LaunchedEffect(eraseRevision) {
         if (eraseRevision > 0 && eraseRevision != handledEraseRevision) {
             // An erase or restore navigates back to Track from wherever the user was. A
-            // session running at that moment is ended and recorded like any other, rather
-            // than being left running against a screen that is no longer there.
-            breathingViewModel.leaveScreen()
+            // session running at that moment is dropped without being written: the user
+            // just asked for everything to be deleted, so completing a pending write would
+            // put a row back into a table the transaction has already cleared.
+            breathingViewModel.discardSession()
             destinationStackState = AppDestination.TRACK.name
             settingsFocusName = SettingsFocus.TOP.name
             handledEraseRevision = eraseRevision

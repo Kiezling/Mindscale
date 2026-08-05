@@ -1,5 +1,6 @@
 package com.kieslingdev.mindscale.breathing
 
+import com.kieslingdev.mindscale.settings.ImportMessages
 import java.util.Locale
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -100,7 +101,7 @@ class BreathingContentTest {
             "hold", "retention", "retain", "fast breathing", "hyperventil"
         )
 
-        visibleStrings().forEach { text ->
+        (visibleStrings() + disclosureStrings()).forEach { text ->
             val folded = text.lowercase(Locale.ROOT)
             banned.forEach { word ->
                 assertFalse(
@@ -117,7 +118,24 @@ class BreathingContentTest {
         val strings = visibleStrings()
         assertEquals(25, strings.size)
         assertFalse(strings.any { it.isBlank() })
+        assertEquals(4, disclosureStrings().size)
+        assertFalse(disclosureStrings().any { it.isBlank() })
     }
+
+    /**
+     * Breathing is also named outside `BreathingCopy`: in the restore preview, in the two
+     * import result messages, and in the erase dialog. Those are factual disclosures rather
+     * than product copy, but the same rule applies to them, and the Phase 14 review noted
+     * that the scan above would not have caught a claim introduced there. The two
+     * `SettingsScreen` composable sentences are not reachable from the JVM and are pinned
+     * instead by `SettingsImportScreenTest`.
+     */
+    private fun disclosureStrings(): List<String> = listOf(
+        ImportMessages.restored(1, 1, 1, 1, 1, 1),
+        ImportMessages.restored(0, 0, 0, 0, 0, 0),
+        ImportMessages.added(2, 2, 2, 2),
+        ImportMessages.added(0, 0, 0, 1)
+    )
 
     private fun visibleStrings(): List<String> = listOf(
         BreathingCopy.TOP_BAR_TITLE,

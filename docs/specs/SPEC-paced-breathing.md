@@ -1,12 +1,19 @@
 # SPEC-paced-breathing: Optional paced-breathing object
 
-Status: FROZEN — APPROVED
+Status: IMPLEMENTED — VERIFIED LOCALLY
 
 Owner: Claude Code agent under full Phase 14 ownership granted by the user on 2026-08-05
 
 Date: 2026-08-05
 
-Last verified commit: N/A (frozen from synchronized `main` at `82ca7041120df0903738645f1a6d46cec44a2fb6`)
+Last verified commit: `570a2fe` on `agent/phase14-paced-breathing` plus the critical-review
+follow-up (frozen from synchronized `main` at `82ca7041120df0903738645f1a6d46cec44a2fb6`;
+frozen documentation commit `0e71f16`)
+
+Two amendments to this spec are recorded in `docs/DECISIONS.md`, D-014: the explicit
+descending order of the backup's `breathingSessions` array (D-9's wording did not state a
+direction), and `discardSession()`, which drops rather than records a session that was
+running when the user erased everything.
 
 ## Purpose
 
@@ -244,7 +251,10 @@ ALTER TABLE track_settings ADD COLUMN breathingOn INTEGER NOT NULL DEFAULT 1;
 
 **JSON backup version 7.** `MAX_BACKUP_VERSION` becomes `7`; `MIN_BACKUP_VERSION` stays `3`.
 `encodeBackup` writes `"version": 7`, a `"breathingSessions"` array after `safetyPlan`
-ordered by `startedAt` then `id`, and a `"breathingOn"` key inside `settings`. Exact-key
+ordered by `startedAt` **descending** then `id` descending — newest first, matching every
+other collection in the file and the DAO's own ordering, so a re-export of a restored
+backup is byte-identical to the file it came from — and a `"breathingOn"` key inside
+`settings`. Exact-key
 equality per version is extended, never weakened: a version-7 file must contain both keys,
 and a version 3–6 file must not. Versions 3–6 restore with an empty session list and
 `breathingOn` at its model default, both disclosed verbatim in the preview before anything
@@ -572,75 +582,75 @@ Amended existing contracts (additive only):
 
 ## Acceptance criteria
 
-- [ ] UNIT: `BreathPhase.entries` has exactly two elements, `INHALE` then `EXHALE`;
+- [x] UNIT: `BreathPhase.entries` has exactly two elements, `INHALE` then `EXHALE`;
       `INHALE_MILLIS == 4500L`, `EXHALE_MILLIS == 6500L`, `CYCLE_MILLIS == 11000L`, and
       `60_000.0 / CYCLE_MILLIS` is within 5.0..6.0 breaths per minute with
       `EXHALE_MILLIS >= INHALE_MILLIS`.
-- [ ] UNIT: `BreathingPacer.frameAt` returns the correct phase, phase-elapsed, and cycle
+- [x] UNIT: `BreathingPacer.frameAt` returns the correct phase, phase-elapsed, and cycle
       count at 0, 4499, 4500, 10999, 11000, and 599 999 ms, and rejects a negative elapsed.
-- [ ] UNIT: `animationMillisFor` returns 0 when the animator scale is 0 and the phase
+- [x] UNIT: `animationMillisFor` returns 0 when the animator scale is 0 and the phase
       duration otherwise.
-- [ ] UNIT: `BREATHING_LENGTHS_MINUTES == listOf(1, 3, 5, 10)`.
-- [ ] UNIT: every `BreathingCopy` constant and function result equals its frozen string
+- [x] UNIT: `BREATHING_LENGTHS_MINUTES == listOf(1, 3, 5, 10)`.
+- [x] UNIT: every `BreathingCopy` constant and function result equals its frozen string
       exactly (literal-text assertions), including the singular/plural length forms.
-- [ ] UNIT: no `BreathingCopy` string contains any of a frozen banned-word list covering
+- [x] UNIT: no `BreathingCopy` string contains any of a frozen banned-word list covering
       efficacy verbs, science-backing language, and protocol names.
-- [ ] UNIT: `BreathingViewModel` with a fake clock and fake DAO records a session on natural
+- [x] UNIT: `BreathingViewModel` with a fake clock and fake DAO records a session on natural
       completion with `endedAt - startedAt` exactly the chosen duration; on `stop()`
       mid-session with the real partial elapsed; and on `leaveScreen()` mid-session. It
       records nothing when the screen is opened and closed without starting, nothing on a
       second `stop()`, and reports `SAVE_FAILED` when the DAO throws.
-- [ ] UNIT: a wall-clock jump between start and end does not change the recorded interval,
+- [x] UNIT: a wall-clock jump between start and end does not change the recorded interval,
       and an overshooting monotonic reading is clamped to the chosen total.
-- [ ] UNIT: `BreathingViewModel` has exactly one constructor whose parameter types are
+- [x] UNIT: `BreathingViewModel` has exactly one constructor whose parameter types are
       exactly `BreathingSessionDao` and `BreathingClock` (reflection).
-- [ ] UNIT: a source scan over the `breathing` package finds no recorded-data DAO or engine
+- [x] UNIT: a source scan over the `breathing` package finds no recorded-data DAO or engine
       type name in code, and no retention/fast-breathing token; the comment stripper is
       itself tested.
-- [ ] UNIT: `encodeBackup` emits `"version": 7`, a `breathingSessions` array ordered by
+- [x] UNIT: `encodeBackup` emits `"version": 7`, a `breathingSessions` array ordered by
       `startedAt` then `id`, and `breathingOn` inside `settings`; re-encoding a parsed
       backup reproduces the input byte for byte.
-- [ ] UNIT: `parseBackup` accepts a version-7 file, rejects version 8 with `NEWER_VERSION`,
+- [x] UNIT: `parseBackup` accepts a version-7 file, rejects version 8 with `NEWER_VERSION`,
       restores versions 3–6 with an empty session list and the default `breathingOn`, and
       totally rejects a version-7 file with a negative interval, an over-length interval, a
       duplicate id, or a missing/extra key.
-- [ ] UNIT: `encodeRecordsCsv` writes `breathing,<start>,<end>,,,,,` rows, the header is
+- [x] UNIT: `encodeRecordsCsv` writes `breathing,<start>,<end>,,,,,` rows, the header is
       byte-identical to the frozen constant, and a records CSV without breathing rows still
       parses.
-- [ ] UNIT: `parseRecordsCsv` accepts `breathing` rows, rejects one with a non-empty
+- [x] UNIT: `parseRecordsCsv` accepts `breathing` rows, rejects one with a non-empty
       intensity/kind/chips/note/text column, rejects a missing `end_timestamp`, and rejects
       an interval outside the permitted bounds.
-- [ ] UNIT: the restore preview contains the frozen version-7 and pre-version-7 breathing
+- [x] UNIT: the restore preview contains the frozen version-7 and pre-version-7 breathing
       lines with exact counts and correct singular/plural.
-- [ ] UNIT: the clinician summary text is byte-identical with and without breathing sessions
+- [x] UNIT: the clinician summary text is byte-identical with and without breathing sessions
       present.
-- [ ] INSTRUMENTED: `BreathingSessionDao` insert/count round-trips, and Room migration 6→7
+- [x] INSTRUMENTED: `BreathingSessionDao` insert/count round-trips, and Room migration 6→7
       and 1→7 succeed with `breathing_sessions` and `track_settings.breathingOn` present and
       prior data intact.
-- [ ] INSTRUMENTED: `replaceEverything` with a version-7 payload inserts session ids
+- [x] INSTRUMENTED: `replaceEverything` with a version-7 payload inserts session ids
       verbatim and rolls back entirely on a post-mutation count mismatch; `addRecords`
       appends sessions; `eraseEverythingAndResetSettings` deletes them and reports the count.
-- [ ] UI: the Track link opens the breathing screen and Back returns to Track after
+- [x] UI: the Track link opens the breathing screen and Back returns to Track after
       rotation; the link is absent when the setting is off and absent while paused.
-- [ ] UI: picking a length starts the pacer, the cue advances `In` → `Out`, `Stop` returns
+- [x] UI: picking a length starts the pacer, the cue advances `In` → `Out`, `Stop` returns
       to the finished state, and a completed session shows `Done`.
-- [ ] UI/ACCESSIBILITY: the cue is a polite live region with the frozen spoken
+- [x] UI/ACCESSIBILITY: the cue is a polite live region with the frozen spoken
       descriptions; the circle carries no semantics; every control is ≥48 dp; the frozen
       screen copy is present verbatim; the layout scrolls with nothing clipped at 200% font
       and in landscape.
-- [ ] LINT/BUILD: `.\gradlew.bat test`, `.\gradlew.bat lint` (0 errors, warnings at or
+- [x] LINT/BUILD: `.\gradlew.bat test`, `.\gradlew.bat lint` (0 errors, warnings at or
       below the 22-warning baseline), and `.\gradlew.bat assembleDebug` pass.
-- [ ] MANUAL: on the API 36 emulator — reach the pacer from Track and back; run a full
+- [x] MANUAL: on the API 36 emulator — reach the pacer from Track and back; run a full
       session at each of the four lengths and time the cycle against a stopwatch; compare
       every on-screen string against D-12; confirm no efficacy claim anywhere; log a 10 and
       confirm nothing is offered, in every app state; verify light/dark, 200% font,
       landscape, and TalkBack reading order; export a backup and a CSV and confirm the
       session rows; restore a version-6 backup and confirm the disclosed empty session list;
       erase and confirm the session count in the dialog.
-- [ ] FAILURE: an import whose breathing data violates any rule is rejected in full with
+- [x] FAILURE: an import whose breathing data violates any rule is rejected in full with
       nothing written; a failed session insert shows `SAVE_FAILED` and leaves the screen
       usable.
-- [ ] BOUNDARY: no new permission, dependency, or toolchain change; no records-CSV header
+- [x] BOUNDARY: no new permission, dependency, or toolchain change; no records-CSV header
       change; no haptic, audio, notification, alarm, wake lock, or background worker; no
       breathing value in the Full Log, Insights, or the clinician summary; no code path that
       reads recorded data to decide anything in the breathing feature; no UI-overhaul work.

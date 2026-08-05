@@ -226,6 +226,49 @@ class BreathingViewModelTest {
         }
     }
 
+    /**
+     * An erase is a request to delete everything. A session that was running when it ran
+     * must not be written back into the table the transaction just cleared, and the fix
+     * must not depend on the current navigation topology making that unreachable.
+     */
+    @Test
+    fun discardingAfterAnEraseWritesNothingAndReturnsToIdle() = runTest {
+        val vm = viewModel()
+        vm.start(5)
+        dispatcher.scheduler.advanceTimeBy(30_000L)
+        vm.discardSession()
+        dispatcher.scheduler.advanceTimeBy(60_000L)
+        dispatcher.scheduler.runCurrent()
+
+        assertTrue("an erased session must leave no row", dao.inserted.isEmpty())
+        assertEquals(BreathingStage.Idle, vm.uiState.value.stage)
+    }
+
+    @Test
+    fun discardingWhenNothingIsRunningIsSafe() = runTest {
+        val vm = viewModel()
+        vm.discardSession()
+        vm.discardSession()
+        dispatcher.scheduler.runCurrent()
+
+        assertTrue(dao.inserted.isEmpty())
+        assertEquals(BreathingStage.Idle, vm.uiState.value.stage)
+    }
+
+    /** A discard must also stop the ticker, not merely detach the session. */
+    @Test
+    fun discardingStopsThePacer() = runTest {
+        val vm = viewModel()
+        vm.start(1)
+        dispatcher.scheduler.advanceTimeBy(5_000L)
+        vm.discardSession()
+        dispatcher.scheduler.advanceTimeBy(120_000L)
+        dispatcher.scheduler.runCurrent()
+
+        assertEquals(BreathingStage.Idle, vm.uiState.value.stage)
+        assertTrue(dao.inserted.isEmpty())
+    }
+
     @Test
     fun aFailedWriteIsReportedRatherThanSilentlyDropped() = runTest {
         dao.failInsert = true
