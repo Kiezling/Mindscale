@@ -8,7 +8,23 @@ Build MindScale as a native Android application using Kotlin, Jetpack Compose, M
 
 The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716ca7343`: `SPEC.md` is the rationale and `MindScale v2.dc.html` is the visual/behavioral reference for Track, Full Log, Insights, Report, Safety card, Profile, and Settings. A local exported handoff is available at `C:\Users\mckie\Downloads\MindScale-handoff\mindscale\project\`; its `MindScale v2.dc.html` is the primary implementation reference. Repository specs under `docs/specs/` govern native implementation after human approval.
 
-## Current phase: Phase 13 native Safety card merged and complete
+## Current phase: Phase 14 optional paced-breathing object — specification frozen
+
+- Phase 14 branch: `agent/phase14-paced-breathing`, created from synchronized `main` at `82ca7041120df0903738645f1a6d46cec44a2fb6`
+- Starting synchronization: `HEAD`, local `main`, local `origin/main`, and live GitHub `refs/heads/main` all resolved to `82ca7041120df0903738645f1a6d46cec44a2fb6` before branching
+- Governing spec: `docs/specs/SPEC-paced-breathing.md` — `FROZEN — APPROVED`; D-1 through D-14 frozen on 2026-08-05 before application-code edits
+- Selected work: the final scoped backlog item — an optional paced-breathing object with a session entity/export migration and a no-claims, never-auto-offered native pacer
+- Reconciled boundary: one fixed-cadence pacing circle (4500 ms in, 6500 ms out, 11 000 ms cycle, 5.45 br/min) with exactly two phases and no configurability; 1/3/5/10 minute choices with nothing preselected; no claim of any kind anywhere; reachable only by a user tap on a Track link gated on the `breathingOn` setting and the paused state
+- Non-inference guarantee, structural not conventional: `BreathingViewModel` takes `BreathingSessionDao` and `BreathingClock` and nothing else, `BreathingSessionDao` exposes only `insert` and `count` with no observing read, and a source scan plus a constructor-reflection test enforce that no recorded value can reach the screen. This mirrors Phase 13's `SafetyPlanDao`-only pattern
+- Safety basis for the never-auto-offered rule: Schmidt 2000 found breathing retraining trending toward poorer outcomes in panic and Barlow discourages respiratory control as a safety behavior, so a pacer keyed to a rating is both an inference MindScale does not make and a plausible harm — not a matter of taste
+- Evidence honestly reconciled: Fincham's 2023 meta-analysis had mostly-inactive controls, and the same team's two placebo-controlled trials were both null (coherent ~5.5 br/min vs 12 br/min placebo, n=400/4wk; high-ventilation vs 15 br/min placebo, n=200/3wk); STARS found fast equal to slow. The working hypothesis is paced attention interrupting rumination, not respiration. Nothing in the UI cites, quotes, or alludes to any of it
+- Prototype reconciliation recorded rather than inherited: cadence, length set, toggle copy, and the instruction line are adopted verbatim; the completion-only session record, the 66-second "1 min" overshoot, the stored `minutes` field, and the always-plural running readout are each rejected with reasons in D-014
+- Approval gate satisfied: the user granted full Phase 14 ownership and authorized decisions, implementation, verification, commits, pushes, PR readiness, merge, and final synchronization without another routine pause
+- Frozen constraints: additive Room 6→7 and JSON backup v7 only; the records CSV header stays byte-identical and gains only a `breathing` row type accepted by both export and import; no dependency, permission, network, account, analytics, haptic, audio, notification, wake lock, background worker, destructive migration, or toolchain change; no Full Log, Insights, or clinician-summary surface; no UI-overhaul work
+- Expected untracked paths remain `.agents/` and `.codex/`; they are excluded from product/documentation scope
+- Exact next action: implement task 1 of the spec's decomposition (Room 6→7 entity, DAO, migration, `breathingOn` column, exported schema 7)
+
+### Phase 13 merged checkpoint
 
 - Phase 13 branch: `agent/phase13-safety-card`, created from synchronized `main` at `5eb10e497e328fb09dcf8254e7d5271c09cca1eb`
 - Starting synchronization: `HEAD`, local `main`, local `origin/main`, and live GitHub `refs/heads/main` all resolved to `5eb10e497e328fb09dcf8254e7d5271c09cca1eb` before branching
@@ -227,7 +243,7 @@ The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716c
 
 ## Active blocker
 
-No active blocker. Phase 13 is merged and complete.
+No active blocker. The Phase 14 specification is frozen; implementation is next.
 
 ## Known decisions
 
@@ -241,11 +257,22 @@ No active blocker. Phase 13 is merged and complete.
 
 ## Next tasks
 
-1. Keep paced breathing and the UI-overhaul work unstarted in `docs/specs/BACKLOG.md` until each is separately assigned and specified.
-2. Re-verify the crisis resources in `SafetyCopy` against their operator sources before any future release, and update `SafetyCopy.VERIFIED_ON` in the same edit. Hotline numbers and coverage change; a stale number in a safety feature is a real harm, not a cosmetic bug.
-3. Continue excluding `.agents/` and `.codex/` from product/documentation commits.
+1. Implement `docs/specs/SPEC-paced-breathing.md` in its frozen task order, then run the full oracle sweep and installed-app inspection.
+2. Keep the UI-overhaul work unstarted and unlisted until it is separately scoped, specified, and approved.
+3. Re-verify the crisis resources in `SafetyCopy` against their operator sources before any future release, and update `SafetyCopy.VERIFIED_ON` in the same edit. Hotline numbers and coverage change; a stale number in a safety feature is a real harm, not a cosmetic bug.
+4. Continue excluding `.agents/` and `.codex/` from product/documentation commits.
 
 ## Last verification
+
+Phase 14 starting-state verification completed 2026-08-05 before application-code edits:
+
+- `git status --short --branch` showed synchronized `main` with only the expected untracked `.agents/` and `.codex/` directories.
+- `HEAD`, local `main`, local `origin/main`, and live `git ls-remote origin refs/heads/main` all resolved to `82ca7041120df0903738645f1a6d46cec44a2fb6`.
+- Branch `agent/phase14-paced-breathing` was created from that exact head.
+- `AGENTS.md`, `CLAUDE.md`, `PROJECT_STATE.md`, all `FAILED_PATHS.md` headings including the two 2026-08-05 environment entries, `docs/DECISIONS.md` D-001 through D-013, `docs/specs/BACKLOG.md`, and `docs/specs/SPEC-safety-card.md` were reconciled as the closest precedent for a non-inferential, never-auto-triggered object with its own persistence and export contract.
+- The product handoff's `SPEC.md` "Breathing" section was reread in full, and the prototype's complete breathing implementation was read at `MindScale v2.dc.html` lines 167–171 (Track entry), 714–735 (overlay markup), 761–762 (`BREATH`/`LENS`), 1052–1067 (`startBreathe`), 1075 and 1084 (JSON/CSV export rows), 1640 (settings toggle), and 1665 (erase reset), then reconciled against MindScale's measurement-only, non-inferential identity rather than carried forward.
+- The live `MindScaleApp` destination stack, `TrackScreen` footer and paused gating, `TrackUiState`, `TrackSettings`/`TrackSettingsDao`, `MindScaleDatabase` schema 6, `Migrations`, `DataControlDao`, `ImportPayloads`, `ImportModels`, `DataExport`, `BackupImport`, `ImportPreflight`, `RecordsCsvImport`, `SafetyViewModel`, `NoAutoDialSourceTest`, and `MainActivity` were read before freezing D-014.
+- No Gradle oracle was rerun for this documentation-only freeze; the merged Phase 13 application tree and its verification evidence below remain unchanged.
 
 Phase 13 publication checkpoint completed 2026-08-05:
 
