@@ -57,7 +57,7 @@ class BackupImportTest {
         )
     )
 
-    private fun v5(): String = encodeBackup(snapshot, exportedAt)
+    private fun currentBackup(): String = encodeBackup(snapshot, exportedAt)
 
     private fun parse(text: String) = parseBackup(text, now, zone)
 
@@ -68,8 +68,8 @@ class BackupImportTest {
 
     @Test
     fun acceptsTheCurrentExportAndPreservesEveryField() {
-        val payload = accepted(v5())
-        assertEquals(5, payload.version)
+        val payload = accepted(currentBackup())
+        assertEquals(6, payload.version)
         assertEquals(exportedAt, payload.exportedAt)
         assertEquals(listOf(2L, 1L), payload.entries.map { it.id })
         assertEquals("line 1\nline 2", payload.entries.first().note)
@@ -86,7 +86,7 @@ class BackupImportTest {
 
     @Test
     fun restoreThenExportIsByteIdenticalExceptExportedAt() {
-        val original = v5()
+        val original = currentBackup()
         val payload = accepted(original)
         val reexported = encodeBackup(
             DataSnapshot(
@@ -105,7 +105,7 @@ class BackupImportTest {
     @Test
     fun defaultsNotStoredInAnyBackupAreReset() {
         val payload = accepted(
-            v5().replace("\"paused\": false", "\"paused\": true")
+            currentBackup().replace("\"paused\": false", "\"paused\": true")
         )
         assertEquals(0L, payload.settings.checkinAt)
         assertEquals(false, payload.settings.sleepIntroShown)
@@ -138,7 +138,7 @@ class BackupImportTest {
     fun refusesAFutureVersionWithItsOwnMessage() {
         assertEquals(
             ImportMessages.NEWER_VERSION,
-            rejection(v5().replace("\"version\": 5", "\"version\": 6"))
+            rejection(currentBackup().replace("\"version\": 6", "\"version\": 7"))
         )
     }
 
@@ -174,11 +174,11 @@ class BackupImportTest {
     fun refusesUnknownExtraAndMissingKeys() {
         assertEquals(
             ImportMessages.BACKUP_SHAPE,
-            rejection(v5().replace("\"exportedAt\":", "\"exportedAtUnknown\":"))
+            rejection(currentBackup().replace("\"exportedAt\":", "\"exportedAtUnknown\":"))
         )
         assertEquals(
             ImportMessages.BACKUP_SHAPE,
-            rejection(v5().replace("\"version\": 5,", "\"version\": 5, \"extra\": 1,"))
+            rejection(currentBackup().replace("\"version\": 6,", "\"version\": 6, \"extra\": 1,"))
         )
         // A version-5 file may not omit a version-5 collection and be silently defaulted.
         assertEquals(
@@ -189,31 +189,31 @@ class BackupImportTest {
 
     @Test
     fun refusesUnknownEnumNames() {
-        assertEquals(ImportMessages.BACKUP_SHAPE, rejection(v5().replace("\"DARK\"", "\"NEON\"")))
-        assertEquals(ImportMessages.BACKUP_SHAPE, rejection(v5().replace("\"WAKE\"", "\"DOZE\"")))
-        assertEquals(ImportMessages.BACKUP_SHAPE, rejection(v5().replace("\"PHQ_8\"", "\"PHQ_9\"")))
-        assertEquals(ImportMessages.BACKUP_SHAPE, rejection(v5().replace("\"holdHours\": 12", "\"holdHours\": 10")))
+        assertEquals(ImportMessages.BACKUP_SHAPE, rejection(currentBackup().replace("\"DARK\"", "\"NEON\"")))
+        assertEquals(ImportMessages.BACKUP_SHAPE, rejection(currentBackup().replace("\"WAKE\"", "\"DOZE\"")))
+        assertEquals(ImportMessages.BACKUP_SHAPE, rejection(currentBackup().replace("\"PHQ_8\"", "\"PHQ_9\"")))
+        assertEquals(ImportMessages.BACKUP_SHAPE, rejection(currentBackup().replace("\"holdHours\": 12", "\"holdHours\": 10")))
     }
 
     @Test
     fun refusesNullWhereTheModelIsNotNullable() {
-        assertEquals(ImportMessages.BACKUP_SHAPE, rejection(v5().replace("\"intensity\": 7", "\"intensity\": null")))
-        assertEquals(ImportMessages.BACKUP_SHAPE, rejection(v5().replace("\"displayName\": \"Ada L\"", "\"displayName\": null")))
+        assertEquals(ImportMessages.BACKUP_SHAPE, rejection(currentBackup().replace("\"intensity\": 7", "\"intensity\": null")))
+        assertEquals(ImportMessages.BACKUP_SHAPE, rejection(currentBackup().replace("\"displayName\": \"Ada L\"", "\"displayName\": null")))
     }
 
     @Test
     fun refusesValuesOutsideFrozenBounds() {
-        assertEquals(ImportMessages.UNSTORABLE_VALUE, rejection(v5().replace("\"intensity\": 7", "\"intensity\": 11")))
-        assertEquals(ImportMessages.UNSTORABLE_VALUE, rejection(v5().replace("\"intensity\": 7", "\"intensity\": -1")))
-        assertEquals(ImportMessages.UNSTORABLE_VALUE, rejection(v5().replace("\"id\": 2,", "\"id\": 0,")))
-        assertEquals(ImportMessages.UNSTORABLE_VALUE, rejection(v5().replace("\"total\": 12", "\"total\": 25")))
-        assertTrue(parse(v5().replace("\"total\": 12", "\"total\": 24")) is ParseResult.Ok)
-        assertTrue(parse(v5().replace("\"total\": 12", "\"total\": 0")) is ParseResult.Ok)
+        assertEquals(ImportMessages.UNSTORABLE_VALUE, rejection(currentBackup().replace("\"intensity\": 7", "\"intensity\": 11")))
+        assertEquals(ImportMessages.UNSTORABLE_VALUE, rejection(currentBackup().replace("\"intensity\": 7", "\"intensity\": -1")))
+        assertEquals(ImportMessages.UNSTORABLE_VALUE, rejection(currentBackup().replace("\"id\": 2,", "\"id\": 0,")))
+        assertEquals(ImportMessages.UNSTORABLE_VALUE, rejection(currentBackup().replace("\"total\": 12", "\"total\": 25")))
+        assertTrue(parse(currentBackup().replace("\"total\": 12", "\"total\": 24")) is ParseResult.Ok)
+        assertTrue(parse(currentBackup().replace("\"total\": 12", "\"total\": 0")) is ParseResult.Ok)
     }
 
     @Test
     fun gad7UsesItsOwnFrozenRange() {
-        val gad = v5().replace("\"PHQ_8\"", "\"GAD_7\"")
+        val gad = currentBackup().replace("\"PHQ_8\"", "\"GAD_7\"")
         assertTrue(parse(gad.replace("\"total\": 12", "\"total\": 21")) is ParseResult.Ok)
         assertEquals(
             ImportMessages.UNSTORABLE_VALUE,
@@ -225,15 +225,15 @@ class BackupImportTest {
     fun refusesFutureTimestampsAndAssessmentDates() {
         assertEquals(
             ImportMessages.UNSTORABLE_VALUE,
-            rejection(v5().replace("\"2026-08-02T10:00:00Z\"", "\"2030-01-01T00:00:00Z\""))
+            rejection(currentBackup().replace("\"2026-08-02T10:00:00Z\"", "\"2030-01-01T00:00:00Z\""))
         )
         assertEquals(
             ImportMessages.UNSTORABLE_VALUE,
-            rejection(v5().replace("\"assessedDate\": \"2026-08-01\"", "\"assessedDate\": \"2030-01-01\""))
+            rejection(currentBackup().replace("\"assessedDate\": \"2026-08-01\"", "\"assessedDate\": \"2030-01-01\""))
         )
         // Up to a day of exporting-device clock skew is tolerated, and only that.
         assertTrue(
-            parse(v5().replace("\"2026-08-02T10:00:00Z\"", "\"2026-09-01T12:00:00Z\"")) is ParseResult.Ok
+            parse(currentBackup().replace("\"2026-08-02T10:00:00Z\"", "\"2026-09-01T12:00:00Z\"")) is ParseResult.Ok
         )
     }
 
@@ -241,7 +241,7 @@ class BackupImportTest {
     fun acceptsTheMicrosecondExportedAtThatTheExporterActuallyWrites() {
         // `encodeBackup` writes `Instant.now()`, which carries microsecond precision on
         // API 26+. A real device export was rejected before this was allowed.
-        val real = v5().replace("\"2026-08-03T12:34:56Z\"", "\"2026-08-05T04:03:37.707072Z\"")
+        val real = currentBackup().replace("\"2026-08-03T12:34:56Z\"", "\"2026-08-05T04:03:37.707072Z\"")
         val payload = accepted(real)
         assertEquals(Instant.parse("2026-08-05T04:03:37.707072Z"), payload.exportedAt)
         assertEquals(real, encodeBackup(snapshot, payload.exportedAt))
@@ -251,45 +251,45 @@ class BackupImportTest {
     fun refusesNonCanonicalOrSubMillisecondInstants() {
         assertEquals(
             ImportMessages.BACKUP_SHAPE,
-            rejection(v5().replace("\"2026-08-02T10:00:00Z\"", "\"2026-08-02T10:00:00.000Z\""))
+            rejection(currentBackup().replace("\"2026-08-02T10:00:00Z\"", "\"2026-08-02T10:00:00.000Z\""))
         )
         assertEquals(
             ImportMessages.UNSTORABLE_VALUE,
-            rejection(v5().replace("\"2026-08-02T10:00:00Z\"", "\"2026-08-02T10:00:00.000000001Z\""))
+            rejection(currentBackup().replace("\"2026-08-02T10:00:00Z\"", "\"2026-08-02T10:00:00.000000001Z\""))
         )
     }
 
     @Test
     fun refusesControlCharactersThatWouldCorruptStoredFields() {
         // U+001F is the chips delimiter; one embedded separator would split a stored chip.
-        assertEquals(ImportMessages.UNSTORABLE_VALUE, rejection(v5().replace("\"work\"", "\"wo\\u001frk\"")))
-        assertEquals(ImportMessages.UNSTORABLE_VALUE, rejection(v5().replace("\"Ada L\"", "\"Ada\\nL\"")))
-        assertEquals(ImportMessages.UNSTORABLE_VALUE, rejection(v5().replace("cannot get out of bed", "cannot\\u0007stop")))
-        assertEquals(ImportMessages.UNSTORABLE_VALUE, rejection(v5().replace("dose, changed", "dose\\u0000changed")))
+        assertEquals(ImportMessages.UNSTORABLE_VALUE, rejection(currentBackup().replace("\"work\"", "\"wo\\u001frk\"")))
+        assertEquals(ImportMessages.UNSTORABLE_VALUE, rejection(currentBackup().replace("\"Ada L\"", "\"Ada\\nL\"")))
+        assertEquals(ImportMessages.UNSTORABLE_VALUE, rejection(currentBackup().replace("cannot get out of bed", "cannot\\u0007stop")))
+        assertEquals(ImportMessages.UNSTORABLE_VALUE, rejection(currentBackup().replace("dose, changed", "dose\\u0000changed")))
     }
 
     @Test
     fun keepsMultiLineNotesBecauseTrackStoresThem() {
-        assertEquals("line 1\nline 2", accepted(v5()).entries.first().note)
-        assertTrue(parse(v5().replace("line 1\\nline 2", "a\\tb\\r\\nc")) is ParseResult.Ok)
+        assertEquals("line 1\nline 2", accepted(currentBackup()).entries.first().note)
+        assertTrue(parse(currentBackup().replace("line 1\\nline 2", "a\\tb\\r\\nc")) is ParseResult.Ok)
     }
 
     @Test
     fun refusesValuesTheAppsOwnValidatorsWouldReject() {
-        assertEquals(ImportMessages.UNSTORABLE_VALUE, rejection(v5().replace("\"Ada L\"", "\" Ada L \"")))
-        assertEquals(ImportMessages.UNSTORABLE_VALUE, rejection(v5().replace("dose, changed", " dose ")))
-        assertEquals(ImportMessages.UNSTORABLE_VALUE, rejection(v5().replace("\"work\", \"poor sleep\"", "\"work\", \"WORK\"")))
-        assertEquals(ImportMessages.UNSTORABLE_VALUE, rejection(v5().replace("\"work\", \"poor sleep\"", "")))
+        assertEquals(ImportMessages.UNSTORABLE_VALUE, rejection(currentBackup().replace("\"Ada L\"", "\" Ada L \"")))
+        assertEquals(ImportMessages.UNSTORABLE_VALUE, rejection(currentBackup().replace("dose, changed", " dose ")))
+        assertEquals(ImportMessages.UNSTORABLE_VALUE, rejection(currentBackup().replace("\"work\", \"poor sleep\"", "\"work\", \"WORK\"")))
+        assertEquals(ImportMessages.UNSTORABLE_VALUE, rejection(currentBackup().replace("\"work\", \"poor sleep\"", "")))
         assertEquals(
             ImportMessages.UNSTORABLE_VALUE,
-            rejection(v5().replace("\"Ada L\"", "\"" + "n".repeat(MAX_DISPLAY_NAME_CODE_POINTS + 1) + "\""))
+            rejection(currentBackup().replace("\"Ada L\"", "\"" + "n".repeat(MAX_DISPLAY_NAME_CODE_POINTS + 1) + "\""))
         )
     }
 
     @Test
     fun refusesDuplicateIdsAndDuplicateAssessments() {
-        assertEquals(ImportMessages.duplicates(1), rejection(v5().replace("\"id\": 1,", "\"id\": 2,")))
-        val twoScores = v5().replace(
+        assertEquals(ImportMessages.duplicates(1), rejection(currentBackup().replace("\"id\": 1,", "\"id\": 2,")))
+        val twoScores = currentBackup().replace(
             "\"externalScores\": [",
             "\"externalScores\": [\n    {\"id\": 9, \"instrument\": \"PHQ_8\", \"total\": 3, " +
                 "\"assessedDate\": \"2026-08-01\", \"provenance\": " +
@@ -302,23 +302,23 @@ class BackupImportTest {
     fun requiresTheFrozenExternalProvenance() {
         assertEquals(
             ImportMessages.BACKUP_SHAPE,
-            rejection(v5().replace("\"EXTERNALLY_OBTAINED_USER_ENTERED\"", "\"CALCULATED_BY_MINDSCALE\""))
+            rejection(currentBackup().replace("\"EXTERNALLY_OBTAINED_USER_ENTERED\"", "\"CALCULATED_BY_MINDSCALE\""))
         )
         assertEquals(
             com.kieslingdev.mindscale.data.ExternalScoreProvenance.EXTERNALLY_OBTAINED_USER_ENTERED,
-            accepted(v5()).externalScores.single().provenance
+            accepted(currentBackup()).externalScores.single().provenance
         )
     }
 
     @Test
     fun refusesOverlappingOrDoublyOpenSleepPeriods() {
-        val overlapping = v5().replace(
+        val overlapping = currentBackup().replace(
             "\"sleeps\": [",
             "\"sleeps\": [\n    {\"id\": 7, \"start\": \"2026-08-02T01:00:00Z\", \"end\": \"2026-08-02T09:00:00Z\"},"
         )
         assertEquals(ImportMessages.SLEEP_OVERLAP, rejection(overlapping))
 
-        val twoOpen = v5()
+        val twoOpen = currentBackup()
             .replace("\"end\": \"2026-08-02T06:00:00Z\"", "\"end\": null")
             .replace(
                 "\"sleeps\": [",
@@ -331,7 +331,7 @@ class BackupImportTest {
     fun refusesASleepThatEndsBeforeItStarts() {
         assertEquals(
             ImportMessages.UNSTORABLE_VALUE,
-            rejection(v5().replace("\"end\": \"2026-08-02T06:00:00Z\"", "\"end\": \"2026-08-01T06:00:00Z\""))
+            rejection(currentBackup().replace("\"end\": \"2026-08-02T06:00:00Z\"", "\"end\": \"2026-08-01T06:00:00Z\""))
         )
     }
 

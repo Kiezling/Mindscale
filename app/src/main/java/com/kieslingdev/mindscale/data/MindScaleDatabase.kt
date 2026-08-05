@@ -14,16 +14,18 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         Marker::class,
         TrackSettings::class,
         UserProfile::class,
-        ExternalScore::class
+        ExternalScore::class,
+        SafetyPlanItem::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = true
 )
 @TypeConverters(
     ChipsConverter::class,
     EntryKindConverter::class,
     SettingsConverters::class,
-    ExternalScoreConverters::class
+    ExternalScoreConverters::class,
+    SafetyPlanConverters::class
 )
 abstract class MindScaleDatabase : RoomDatabase() {
     abstract fun entryDao(): EntryDao
@@ -33,6 +35,7 @@ abstract class MindScaleDatabase : RoomDatabase() {
     abstract fun dataControlDao(): DataControlDao
     abstract fun episodeSourceDao(): EpisodeSourceDao
     abstract fun profileDao(): ProfileDao
+    abstract fun safetyPlanDao(): SafetyPlanDao
 
     companion object {
         const val NAME = "mindscale.db"
@@ -60,7 +63,9 @@ abstract class MindScaleDatabase : RoomDatabase() {
         /** Manual singleton construction (no DI framework, per Invariant 11 / D-3). */
         fun build(context: Context): MindScaleDatabase =
             Room.databaseBuilder(context.applicationContext, MindScaleDatabase::class.java, NAME)
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                .addMigrations(
+                    MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6
+                )
                 .addCallback(seedSettingsCallback)
                 .build()
     }

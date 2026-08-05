@@ -57,6 +57,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kieslingdev.mindscale.data.Entry
 import com.kieslingdev.mindscale.data.EntryKind
 import com.kieslingdev.mindscale.data.HourFormat
+import androidx.compose.foundation.layout.heightIn
+import com.kieslingdev.mindscale.safety.SafetyCopy
 import com.kieslingdev.mindscale.settings.SettingsFocus
 import com.kieslingdev.mindscale.settings.vocabularyForEntry
 import com.kieslingdev.mindscale.ui.theme.intensityColor
@@ -87,13 +89,15 @@ private val EntryDateTimeTwentyFourHourFormatter: DateTimeFormatter =
 fun TrackRoute(
     viewModel: TrackViewModel,
     modifier: Modifier = Modifier,
-    onOpenSettings: (SettingsFocus) -> Unit = {}
+    onOpenSettings: (SettingsFocus) -> Unit = {},
+    onOpenSafety: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     TrackScreen(
         uiState = uiState,
         onEvent = viewModel::onEvent,
         onOpenSettings = onOpenSettings,
+        onOpenSafety = onOpenSafety,
         modifier = modifier
     )
 }
@@ -106,11 +110,12 @@ fun TrackScreen(
     uiState: TrackUiState,
     onEvent: (TrackEvent) -> Unit,
     modifier: Modifier = Modifier,
-    onOpenSettings: (SettingsFocus) -> Unit = {}
+    onOpenSettings: (SettingsFocus) -> Unit = {},
+    onOpenSafety: () -> Unit = {}
 ) {
     Box(modifier = modifier.fillMaxSize()) {
         LazyColumn(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize().testTag("track_screen"),
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
@@ -189,6 +194,13 @@ fun TrackScreen(
                     )
                 }
             }
+
+            // Unconditional, including while paused, and last so it never competes with
+            // logging. Its presence depends on nothing recorded — that is the whole point
+            // (`docs/specs/SPEC-safety-card.md`, D-6).
+            item(key = "safety_link") {
+                SafetyLink(onOpenSafety = onOpenSafety)
+            }
         }
     }
 
@@ -224,6 +236,26 @@ private fun ToastBanner(toast: String?) {
                 .fillMaxWidth()
                 .padding(vertical = 10.dp, horizontal = 16.dp)
         )
+    }
+}
+
+/**
+ * The always-available way into the Safety card. It is never a dialog, never triggered,
+ * and never gated on a rating, pattern, or count — MindScale does not assess risk.
+ */
+@Composable
+private fun SafetyLink(onOpenSafety: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.Center
+    ) {
+        TextButton(
+            onClick = onOpenSafety,
+            modifier = Modifier
+                .heightIn(min = 48.dp)
+                .testTag("safety_link")
+                .semantics { contentDescription = SafetyCopy.TRACK_LINK_DESCRIPTION }
+        ) { Text(SafetyCopy.TRACK_LINK) }
     }
 }
 

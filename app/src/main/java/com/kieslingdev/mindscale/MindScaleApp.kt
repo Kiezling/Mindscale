@@ -38,10 +38,13 @@ import com.kieslingdev.mindscale.settings.SettingsViewModel
 import com.kieslingdev.mindscale.report.ProfileRoute
 import com.kieslingdev.mindscale.report.ReportProfileViewModel
 import com.kieslingdev.mindscale.report.ReportRoute
+import com.kieslingdev.mindscale.safety.SafetyCopy
+import com.kieslingdev.mindscale.safety.SafetyRoute
+import com.kieslingdev.mindscale.safety.SafetyViewModel
 import com.kieslingdev.mindscale.track.TrackRoute
 import com.kieslingdev.mindscale.track.TrackViewModel
 
-enum class AppDestination { TRACK, LOG, INSIGHTS, PROFILE, REPORT, SETTINGS }
+enum class AppDestination { TRACK, LOG, INSIGHTS, PROFILE, REPORT, SETTINGS, SAFETY }
 
 @Composable
 fun MindScaleApp(
@@ -50,6 +53,7 @@ fun MindScaleApp(
     insightsViewModel: InsightsViewModel,
     settingsViewModel: SettingsViewModel,
     reportProfileViewModel: ReportProfileViewModel,
+    safetyViewModel: SafetyViewModel,
     eraseRevision: Long = 0
 ) {
     var destinationStackState by rememberSaveable { mutableStateOf(AppDestination.TRACK.name) }
@@ -104,7 +108,13 @@ fun MindScaleApp(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    if (destination in setOf(AppDestination.PROFILE, AppDestination.REPORT, AppDestination.SETTINGS)) {
+                    if (destination in setOf(
+                            AppDestination.PROFILE,
+                            AppDestination.REPORT,
+                            AppDestination.SETTINGS,
+                            AppDestination.SAFETY
+                        )
+                    ) {
                         TextButton(onClick = ::navigateBack, modifier = Modifier.testTag("overlay_back")) {
                             Text("Back")
                         }
@@ -119,6 +129,7 @@ fun MindScaleApp(
                             AppDestination.PROFILE -> "Profile"
                             AppDestination.REPORT -> "Clinician summary"
                             AppDestination.SETTINGS -> "Settings"
+                            AppDestination.SAFETY -> SafetyCopy.TOP_BAR_TITLE
                         },
                         style = MaterialTheme.typography.titleMedium
                     )
@@ -168,6 +179,7 @@ fun MindScaleApp(
             AppDestination.TRACK -> TrackRoute(
                 trackViewModel,
                 onOpenSettings = ::openSettings,
+                onOpenSafety = { openOverlay(AppDestination.SAFETY) },
                 modifier = Modifier.padding(innerPadding)
             )
             AppDestination.LOG -> LogRoute(logViewModel, Modifier.padding(innerPadding))
@@ -180,6 +192,7 @@ fun MindScaleApp(
                 viewModel = reportProfileViewModel,
                 onOpenReport = { openOverlay(AppDestination.REPORT) },
                 onOpenSettings = { openSettings(SettingsFocus.TOP) },
+                onOpenSafety = { openOverlay(AppDestination.SAFETY) },
                 modifier = Modifier.padding(innerPadding)
             )
             AppDestination.REPORT -> ReportRoute(
@@ -190,6 +203,10 @@ fun MindScaleApp(
             AppDestination.SETTINGS -> SettingsRoute(
                 settingsViewModel,
                 focus = SettingsFocus.valueOf(settingsFocusName),
+                modifier = Modifier.padding(innerPadding)
+            )
+            AppDestination.SAFETY -> SafetyRoute(
+                safetyViewModel,
                 modifier = Modifier.padding(innerPadding)
             )
         }

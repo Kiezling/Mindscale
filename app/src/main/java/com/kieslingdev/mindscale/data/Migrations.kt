@@ -92,3 +92,22 @@ val MIGRATION_4_5: Migration = object : Migration(4, 5) {
         )
     }
 }
+
+/**
+ * Phase 13 additive-only safety plan. One new table; no existing table, column, row, or
+ * index is altered, so a 5→6 upgrade cannot lose anything. There is no seed row: an empty
+ * plan is the correct and expected starting state, and MindScale never pressures the user
+ * to fill one in (`docs/specs/SPEC-safety-card.md`, D-9).
+ */
+val MIGRATION_5_6: Migration = object : Migration(5, 6) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS safety_plan_items (" +
+                "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                "step TEXT NOT NULL, " +
+                "position INTEGER NOT NULL, " +
+                "text TEXT NOT NULL, " +
+                "phone TEXT)"
+        )
+    }
+}

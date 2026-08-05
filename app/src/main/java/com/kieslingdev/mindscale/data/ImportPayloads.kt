@@ -24,7 +24,9 @@ data class BackupPayload(
     val markers: List<Marker>,
     val settings: TrackSettings,
     val profile: UserProfile,
-    val externalScores: List<ExternalScore>
+    val externalScores: List<ExternalScore>,
+    /** Empty for versions 3, 4, and 5, which predate the safety plan (Phase 13, D-9). */
+    val safetyPlan: List<SafetyPlanItem> = emptyList()
 )
 
 data class RecordsPayload(
@@ -44,7 +46,9 @@ data class ImportCounts(
     val entries: Int,
     val sleeps: Int,
     val markers: Int,
-    val externalScores: Int
+    val externalScores: Int,
+    /** Only a restore ever writes these; a records CSV import always reports zero. */
+    val safetyPlanItems: Int = 0
 )
 
 /**

@@ -7,6 +7,7 @@ import com.kieslingdev.mindscale.data.Entry
 import com.kieslingdev.mindscale.data.ExternalInstrument
 import com.kieslingdev.mindscale.data.ExternalScore
 import com.kieslingdev.mindscale.data.Marker
+import com.kieslingdev.mindscale.data.SafetyPlanItem
 import com.kieslingdev.mindscale.data.ProfileDao
 import com.kieslingdev.mindscale.data.ProfileStats
 import com.kieslingdev.mindscale.data.SleepInterval
@@ -278,6 +279,11 @@ private class FakeDataControlDao(private val profileDao: FakeProfileDao) : DataC
     override suspend fun deleteSleeps(): Int = 0
     override suspend fun deleteMarkers(): Int = 0
     override suspend fun deleteExternalScores(): Int = 0
+    override suspend fun allSafetyPlanItems(): List<SafetyPlanItem> = emptyList()
+    override suspend fun safetyPlanItemCount(): Int = 0
+    override suspend fun deleteSafetyPlanItems(): Int = 0
+    override suspend fun insertSafetyPlanItems(items: List<SafetyPlanItem>): List<Long> =
+        emptyList()
     override suspend fun resetSettings(defaults: TrackSettings): Int = 1
     override suspend fun resetProfile(defaults: UserProfile): Int = 1
     override suspend fun insertEntries(entries: List<Entry>): List<Long> = emptyList()

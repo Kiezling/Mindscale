@@ -1,6 +1,6 @@
 # MindScale project state
 
-Last updated: 2026-08-04
+Last updated: 2026-08-05
 
 ## Goal
 
@@ -8,7 +8,27 @@ Build MindScale as a native Android application using Kotlin, Jetpack Compose, M
 
 The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716ca7343`: `SPEC.md` is the rationale and `MindScale v2.dc.html` is the visual/behavioral reference for Track, Full Log, Insights, Report, Safety card, Profile, and Settings. A local exported handoff is available at `C:\Users\mckie\Downloads\MindScale-handoff\mindscale\project\`; its `MindScale v2.dc.html` is the primary implementation reference. Repository specs under `docs/specs/` govern native implementation after human approval.
 
-## Current phase: Phase 12 local import and restore merged and complete
+## Current phase: Phase 13 native Safety card — implemented and verified locally
+
+- Phase 13 branch: `agent/phase13-safety-card`, created from synchronized `main` at `5eb10e497e328fb09dcf8254e7d5271c09cca1eb`
+- Starting synchronization: `HEAD`, local `main`, local `origin/main`, and live GitHub `refs/heads/main` all resolved to `5eb10e497e328fb09dcf8254e7d5271c09cca1eb` before branching
+- Governing spec: `docs/specs/SPEC-safety-card.md` — `IMPLEMENTED — VERIFIED LOCALLY`; D-1 through D-11 frozen on 2026-08-05 before application-code edits; frozen documentation commit `040403f`, verified implementation commit `bad6c8d`
+- Selected work: the Safety half of the next ordered backlog item — a reachable Safety card with verified crisis resources and the user's own locally stored Stanley-Brown safety plan
+- Reconciled boundary: the card is calm reference content plus the user's own writing. It is never triggered, ordered, filtered, or surfaced by any rating, episode, count, streak, or inference; `SafetyViewModel` depends on `SafetyPlanDao` alone so it structurally cannot read recorded data
+- Crisis resources verified 2026-08-05 from operator and funding-agency sources, not from model memory: 988 Suicide & Crisis Lifeline (US) and 9-8-8 Suicide Crisis Helpline (Canada) by call and text, plus Find A Helpline for elsewhere. No country count is frozen into the copy because the directory's own pages disagree on it
+- Region approach: MindScale has no network, no location permission, and no reliable country signal, so it shows one clearly labeled resource set with plain coverage wording and a static international directory pointer, and never infers a region
+- Phone actions are `ACTION_DIAL`/`ACTION_SENDTO`/`ACTION_VIEW` hand-offs built with `Uri.fromParts`; `ACTION_CALL` is forbidden, no `CALL_PHONE` or other permission is added, and there is deliberately no emergency-number button
+- Off-ramp finding: the "low-frequency off-ramp follow-on" clause is already delivered by Phase 2's check-in/paused banners and Phase 4's `SettingsFocus.DATA` one-screen pause/export/erase. Phase 13 adds nothing to it, and adding a Safety link to those data-conditioned banners was considered and rejected
+- Approval gate satisfied: the user granted full Phase 13 ownership and authorized decisions, implementation, verification, commits, pushes, PR readiness, merge, and final synchronization without another routine pause
+- Frozen constraints: additive Room 5→6 and JSON backup v6 only; records CSV, clinician summary, and every share/copy action stay free of plan content; no dependency, permission, network, account, analytics, destructive migration, or toolchain change; no paced-breathing or UI-overhaul work
+- Expected untracked paths remain `.agents/` and `.codex/`; they are excluded from product/documentation scope
+- Verification: 306/306 JVM tests, lint with 0 errors and the unchanged 22-warning baseline, debug assembly, confirmed API 36 emulator, 157/157 connected tests, `git diff --check`, the full installed-app Safety matrix, and one critical review that returned APPROVE with no blocking finding
+- One defect was caught by installed-app inspection rather than by tests: the restore preview's "It contains …" line claimed a pre-version-6 backup held a safety plan. The clause is now version-conditional and pinned by `ImportPreflightTest`
+- Three frozen-interface amendments are recorded under D-013: the corrected DAO ordering (SQL cannot express canonical step order), the `PlanFieldResult` return type, and the preview copy correction
+- Honest gaps: spoken TalkBack output was not audited, only semantic order and live regions; no fuzzing campaign was run against version-6 plan payloads; the emergency-number sentence is copy only and was not exercised against a real emergency dialer by design; crisis-resource currency is a point-in-time fact checked on 2026-08-05 and surfaced in-app by `SafetyCopy.VERIFIED_ON`, so it needs periodic re-verification rather than being permanently correct
+- Exact next action: publish `agent/phase13-safety-card`, open and merge its PR, then synchronize `main`
+
+### Phase 12 merged checkpoint
 
 - Phase 12 branch: `agent/phase12-import-restore`, created from synchronized `main` at `ce5913341461725c3ad59b697a4e994e501fa046`
 - Starting synchronization: `HEAD`, local `main`, local `origin/main`, and live GitHub `refs/heads/main` all resolved to `ce5913341461725c3ad59b697a4e994e501fa046` before branching
@@ -203,7 +223,7 @@ The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716c
 
 ## Active blocker
 
-No active blocker. Phase 12 is merged and complete.
+No active blocker. Phase 12 is merged and complete; Phase 13's specification is frozen and implementation is next.
 
 ## Known decisions
 
@@ -217,10 +237,33 @@ No active blocker. Phase 12 is merged and complete.
 
 ## Next tasks
 
-1. Keep the Safety card, paced breathing, and the UI-overhaul work unstarted in `docs/specs/BACKLOG.md` until each is separately assigned and specified. Backlog order is Safety, then paced breathing.
-2. Continue excluding `.agents/` and `.codex/` from product/documentation commits.
+1. Keep paced breathing and the UI-overhaul work unstarted in `docs/specs/BACKLOG.md` until each is separately assigned and specified.
+2. Re-verify the crisis resources in `SafetyCopy` against their operator sources before any future release, and update `SafetyCopy.VERIFIED_ON` in the same edit. Hotline numbers and coverage change; a stale number in a safety feature is a real harm, not a cosmetic bug.
+3. Continue excluding `.agents/` and `.codex/` from product/documentation commits.
 
 ## Last verification
+
+Phase 13 final local verification completed 2026-08-05 for implementation commit `bad6c8d` on `agent/phase13-safety-card`:
+
+- `test`: 306/306 JVM tests passed across 25 suites; 0 failures, errors, or skips.
+- `lint`: passed with 0 errors and the same 22 existing warnings. One new `UseKtx` warning was removed at the source by using `String.toUri()` instead of `Uri.parse` for the directory link, rather than suppressed.
+- `assembleDebug`: passed.
+- `adb devices -l`: intended `MindScale_API_36` API 36 emulator connected as `emulator-5554`.
+- `connectedDebugAndroidTest`: 157/157 passed; 0 failures or skips.
+- `git diff --check`: passed.
+- Installed-app inspection covered: reaching Safety from the Track footer link and from the Profile row and returning with Back; every on-screen string compared against the frozen spec; `Call 988` opening the dialer pre-filled at 988 with `dumpsys telecom` confirming no call was placed; `Text 988` opening Messages with no body; the directory button handing off to Chrome; adding a contact with a number and its `Call Sam` pre-filling 555-0100; dark mode at 200% font and landscape at 200% font both reflowing with nothing clipped; a version-6 backup exported containing the plan verbatim; the erase dialog disclosing "your safety plan (1 line)"; and a version-5 restore disclosing then producing an empty plan. Emulator font scale, night mode, and rotation were restored to `1.0`, `no`, and automatic, and the two backup files created during inspection were deleted.
+- Two production defects were found by installed-app inspection rather than by tests: the restore preview claimed a pre-version-6 backup contained a safety plan, and the deletion sentence read redundantly as "N safety plan lines" where "safety plan" was already the subject. Both are fixed and pinned by `ImportPreflightTest`.
+- Critical review returned APPROVE with no blocking finding. Its one non-blocking note — that 48 dp width relied on a Material3 default rather than an assertion — was closed by adding explicit `assertWidthIsAtLeast` coverage for the narrow Add/Edit/Delete controls.
+- No manifest, permission, dependency, or toolchain file changed. Room advanced additively 5→6 with exported schema 6; the records CSV format is byte-identical.
+
+Phase 13 starting-state verification completed 2026-08-05 before application-code edits:
+
+- `git status --short --branch` showed synchronized `main` with only the expected untracked `.agents/` and `.codex/` directories.
+- `HEAD`, local `main`, local `origin/main`, and live `git fetch`-refreshed `origin/main` all resolved to `5eb10e497e328fb09dcf8254e7d5271c09cca1eb`.
+- Branch `agent/phase13-safety-card` was created from that exact head.
+- `AGENTS.md`, `CLAUDE.md`, `PROJECT_STATE.md`, all `FAILED_PATHS.md` headings, `docs/DECISIONS.md` D-001 through D-012, `docs/specs/BACKLOG.md`, and the product handoff's `SPEC.md` and `MindScale v2.dc.html` Safety/check-in/paused/Profile markup were reconciled, along with the live `MindScaleApp` destination stack, `TrackScreen` paused and check-in banners, `TrackSettings`/`TrackSettingsDao`, `ProfileScreen`, `MindScaleDatabase` schema 5, `DataControlDao`, `ImportPayloads`, `DataExport`, `BackupImport`, `ImportModels`, and `ImportPreflight`, before freezing D-013.
+- Every crisis number, service name, and coverage claim was verified on 2026-08-05 from `988lifeline.org`, `988lifeline.org/help-yourself/deaf-hard-of-hearing/`, `samhsa.gov/find-help/988`, `988.ca`, `camh.ca`, `crtc.gc.ca`, and `findahelpline.com` rather than carried forward from model memory.
+- No Gradle oracle was rerun for this documentation-only freeze; the merged Phase 12 application tree and its verification evidence below remain unchanged.
 
 Phase 12 publication checkpoint completed 2026-08-05:
 

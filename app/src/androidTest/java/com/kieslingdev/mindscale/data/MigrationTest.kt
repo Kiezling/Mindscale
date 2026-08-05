@@ -267,6 +267,74 @@ class MigrationTest {
         assertVersion5Chain(db, 33, 7)
     }
 
+    /**
+     * Phase 13's 5→6 step is one new table and nothing else, so every version-5 row must
+     * survive untouched and the plan must start empty — MindScale never seeds a safety
+     * plan or pressures anyone to fill one in.
+     */
+    @Test
+    fun migrate5To6_preservesVersion5Data_andAddsAnEmptySafetyPlan() {
+        var db = helper.createDatabase(TEST_DB, 5)
+        db.execSQL("INSERT INTO entries (id, ts, value, chips, note, kind) VALUES (41, 1000, 7, '', 'keep', NULL)")
+        db.execSQL(
+            "INSERT INTO track_settings " +
+                "(id, sleepOn, askChips, paused, checkinAt, sleepIntroShown, themeMode, hourFormat, " +
+                "anchor2, anchor5, anchor8, onsetChips, hideNotes, anchorPromptDone, holdDuration) " +
+                "VALUES (0, 1, 0, 0, 0, 0, 'DARK', 'TWENTY_FOUR', '', '', '', '', 0, 0, 'TWENTY_FOUR')"
+        )
+        db.execSQL("INSERT INTO user_profile (id, displayName) VALUES (0, 'Ada')")
+        db.close()
+
+        db = helper.runMigrationsAndValidate(TEST_DB, 6, true, MIGRATION_5_6)
+
+        db.query("SELECT value, note FROM entries WHERE id = 41").use { c ->
+            assertTrue(c.moveToFirst())
+            assertEquals(7, c.getInt(0))
+            assertEquals("keep", c.getString(1))
+        }
+        db.query("SELECT themeMode, holdDuration FROM track_settings WHERE id = 0").use { c ->
+            assertTrue(c.moveToFirst())
+            assertEquals("DARK", c.getString(0))
+            assertEquals("TWENTY_FOUR", c.getString(1))
+        }
+        db.query("SELECT displayName FROM user_profile WHERE id = 0").use { c ->
+            assertTrue(c.moveToFirst())
+            assertEquals("Ada", c.getString(0))
+        }
+        db.query("SELECT COUNT(*) FROM safety_plan_items").use { c ->
+            assertTrue(c.moveToFirst())
+            assertEquals(0, c.getInt(0))
+        }
+        // The new table really accepts the shape the entity declares.
+        db.execSQL(
+            "INSERT INTO safety_plan_items (id, step, position, text, phone) " +
+                "VALUES (1, 'PEOPLE_FOR_HELP', 0, 'Sam', '555-0100')"
+        )
+        db.query("SELECT step, position, text, phone FROM safety_plan_items WHERE id = 1").use { c ->
+            assertTrue(c.moveToFirst())
+            assertEquals("PEOPLE_FOR_HELP", c.getString(0))
+            assertEquals(0, c.getInt(1))
+            assertEquals("Sam", c.getString(2))
+            assertEquals("555-0100", c.getString(3))
+        }
+    }
+
+    @Test
+    fun migrate1To6_runsEveryAdditiveStep() {
+        var db = helper.createDatabase(TEST_DB, 1)
+        db.execSQL("INSERT INTO entries (id, ts, value, chips, note) VALUES (42, 77, 8, '', NULL)")
+        db.close()
+        db = helper.runMigrationsAndValidate(
+            TEST_DB, 6, true,
+            MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6
+        )
+        assertVersion5Chain(db, 42, 8)
+        db.query("SELECT COUNT(*) FROM safety_plan_items").use { c ->
+            assertTrue(c.moveToFirst())
+            assertEquals(0, c.getInt(0))
+        }
+    }
+
     private fun assertVersion5Chain(db: androidx.sqlite.db.SupportSQLiteDatabase, entryId: Long, value: Int) {
         db.query("SELECT value FROM entries WHERE id = $entryId").use { c ->
             assertTrue(c.moveToFirst())

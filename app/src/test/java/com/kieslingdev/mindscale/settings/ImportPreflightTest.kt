@@ -6,6 +6,8 @@ import com.kieslingdev.mindscale.data.EntryKind
 import com.kieslingdev.mindscale.data.ExternalInstrument
 import com.kieslingdev.mindscale.data.ExternalScore
 import com.kieslingdev.mindscale.data.Marker
+import com.kieslingdev.mindscale.data.SafetyPlanItem
+import com.kieslingdev.mindscale.data.SafetyPlanStep
 import com.kieslingdev.mindscale.data.RecordSnapshot
 import com.kieslingdev.mindscale.data.RecordsPayload
 import com.kieslingdev.mindscale.data.SleepInterval
@@ -121,19 +123,41 @@ class ImportPreflightTest {
     @Test
     fun restorePreviewStatesExactCountsAndEveryDisclosedDefault() {
         val preview = previewOf(
-            ImportPayload.Restore(backup(version = 5, scores = 1)),
-            RecordCounts(entries = 3, sleeps = 2, markers = 1, externalScores = 4)
+            ImportPayload.Restore(backup(version = 6, scores = 1, planItems = 2)),
+            RecordCounts(entries = 3, sleeps = 2, markers = 1, externalScores = 4, safetyPlanItems = 5)
         )
         assertEquals("Restore from backup", preview.title)
         assertEquals("Replace everything", preview.confirmLabel)
         val text = preview.lines.joinToString("\n")
-        assertTrue(text.contains("version 5, created 2026-08-03T12:34:56Z"))
-        assertTrue(text.contains("It contains 1 rating, 1 sleep period, 1 marked event, and 1 externally obtained total"))
-        assertTrue(text.contains("permanently delete 3 ratings, 2 sleep periods, 1 marked event, and 4 externally obtained totals"))
+        assertTrue(text.contains("version 6, created 2026-08-03T12:34:56Z"))
+        assertTrue(text.contains("It contains 1 rating, 1 sleep period, 1 marked event, and 1 externally obtained total, plus your settings, Profile name, and safety plan."))
+        assertTrue(text.contains("permanently delete 3 ratings, 2 sleep periods, 1 marked event, and 4 externally obtained totals, and will replace your settings, Profile name, and safety plan."))
         assertTrue(text.contains("Check-in time, the sleep introduction flag, and the anchor prompt flag are not stored in any backup file."))
+        assertTrue(text.contains("This backup contains 2 safety plan lines. Your current safety plan of 5 lines is permanently deleted."))
         assertTrue(text.contains("MindScale did not administer or calculate them."))
         assertTrue(text.endsWith("Nothing has changed yet."))
         assertFalse(text.contains("predates"))
+    }
+
+    /**
+     * A restore that silently emptied a safety plan would be the worst kind of quiet data
+     * loss, so a pre-version-6 backup says so before anything is written (Phase 13, D-9).
+     */
+    @Test
+    fun aBackupWithoutASafetyPlanSaysSoBeforeAnythingIsWritten() {
+        val text = previewOf(
+            ImportPayload.Restore(backup(version = 5)),
+            RecordCounts(safetyPlanItems = 1)
+        ).lines.joinToString("\n")
+        assertTrue(
+            text.contains(
+                "This backup predates the safety plan. Your safety plan of 1 line is " +
+                    "permanently deleted and nothing replaces it."
+            )
+        )
+        // A pre-version-6 file must not be described as containing a safety plan.
+        assertTrue(text.contains("plus your settings and Profile name."))
+        assertFalse(text.contains("plus your settings, Profile name, and safety plan."))
     }
 
     @Test
@@ -179,7 +203,8 @@ class ImportPreflightTest {
             addAll(previewOf(ImportPayload.Restore(backup(version = 3, scores = 1)), RecordCounts(1, 1, 1, 1)).lines)
             addAll(previewOf(ImportPayload.Restore(backup(version = 5, scores = 1)), RecordCounts(1, 1, 1, 1)).lines)
             addAll(previewOf(ImportPayload.Merge(RecordsPayload(emptyList(), emptyList(), emptyList())), RecordCounts()).lines)
-            add(ImportMessages.restored(1, 1, 1, 1))
+            addAll(previewOf(ImportPayload.Restore(backup(version = 6, scores = 1)), RecordCounts(1, 1, 1, 1, 1)).lines)
+            add(ImportMessages.restored(1, 1, 1, 1, 1))
             add(ImportMessages.added(2, 2, 2))
             addAll(
                 listOf(
@@ -195,6 +220,10 @@ class ImportPreflightTest {
                 )
             )
         }.joinToString("\n").lowercase()
+            // "safe" is banned as reassurance ("your data is safe"). Phase 13 introduced
+            // "safety plan" as the name of a stored thing, which is a noun, not a claim,
+            // so it is removed before the scan rather than weakening the ban itself.
+            .replace("safety plan", "")
 
         banned.forEach { word ->
             assertFalse("Import copy must not contain \"$word\"", copy.contains(word))
@@ -203,7 +232,15 @@ class ImportPreflightTest {
 
     private fun emptySnapshot() = RecordSnapshot(emptyList(), emptyList(), emptyList())
 
-    private fun backup(version: Int, scores: Int = 0) = BackupPayload(
+    private fun backup(version: Int, scores: Int = 0, planItems: Int = 0) = BackupPayload(
+        safetyPlan = (0 until planItems).map {
+            SafetyPlanItem(
+                id = 40L + it,
+                step = SafetyPlanStep.WARNING_SIGNS,
+                position = it,
+                text = "sign $it"
+            )
+        },
         version = version,
         exportedAt = Instant.parse("2026-08-03T12:34:56Z"),
         entries = listOf(Entry(id = 1, ts = 1_000, value = 4)),

@@ -104,7 +104,7 @@ class SettingsImportViewModelTest {
 
         assertNull(vm.uiState.value.pendingImport)
         assertNull(vm.uiState.value.importError)
-        assertEquals(ImportMessages.restored(1, 1, 1, 1), vm.uiState.value.message)
+        assertEquals(ImportMessages.restored(1, 1, 1, 1, 0), vm.uiState.value.message)
         assertEquals(listOf(11L), data.entries.map { it.id })
         assertEquals(listOf(12L), data.sleeps.map { it.id })
         assertEquals(listOf(13L), data.markers.map { it.id })

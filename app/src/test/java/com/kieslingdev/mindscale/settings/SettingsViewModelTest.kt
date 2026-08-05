@@ -6,6 +6,7 @@ import com.kieslingdev.mindscale.data.Entry
 import com.kieslingdev.mindscale.data.ExternalScore
 import com.kieslingdev.mindscale.data.Marker
 import com.kieslingdev.mindscale.data.HoldDuration
+import com.kieslingdev.mindscale.data.SafetyPlanItem
 import com.kieslingdev.mindscale.data.SleepInterval
 import com.kieslingdev.mindscale.data.TrackSettings
 import com.kieslingdev.mindscale.data.UserProfile
@@ -137,6 +138,7 @@ internal class FakeDataControlDao : DataControlDao {
     var settings = TrackSettings()
     var profile = UserProfile()
     val externalScores = mutableListOf<ExternalScore>()
+    val safetyPlan = mutableListOf<SafetyPlanItem>()
     var eraseCalls = 0
     var failInsert = false
     private var nextId = 100L
@@ -156,6 +158,9 @@ internal class FakeDataControlDao : DataControlDao {
     override suspend fun insertExternalScores(scores: List<ExternalScore>): List<Long> =
         insert(scores, this.externalScores) { it.copy(id = generated(it.id)) }
 
+    override suspend fun insertSafetyPlanItems(items: List<SafetyPlanItem>): List<Long> =
+        insert(items, this.safetyPlan) { it.copy(id = generated(it.id)) }
+
     private fun <T> insert(incoming: List<T>, into: MutableList<T>, assign: (T) -> T): List<Long> {
         if (failInsert && incoming.isNotEmpty()) error("insert failed")
         return incoming.map { row ->
@@ -166,6 +171,7 @@ internal class FakeDataControlDao : DataControlDao {
                 is SleepInterval -> stored.id
                 is Marker -> stored.id
                 is ExternalScore -> stored.id
+                is SafetyPlanItem -> stored.id
                 else -> 0L
             }
         }
@@ -181,11 +187,16 @@ internal class FakeDataControlDao : DataControlDao {
     override suspend fun settings(): TrackSettings = settings
     override suspend fun profile(): UserProfile = profile
     override suspend fun allExternalScores(): List<ExternalScore> = externalScores.toList()
+    override suspend fun allSafetyPlanItems(): List<SafetyPlanItem> =
+        safetyPlan.sortedWith(compareBy({ it.position }, { it.id }))
+    override suspend fun safetyPlanItemCount(): Int = safetyPlan.size
     override suspend fun deleteEntries(): Int = entries.size.also { entries.clear() }
     override suspend fun deleteSleeps(): Int = sleeps.size.also { sleeps.clear() }
     override suspend fun deleteMarkers(): Int = markers.size.also { markers.clear() }
     override suspend fun deleteExternalScores(): Int =
         externalScores.size.also { externalScores.clear() }
+    override suspend fun deleteSafetyPlanItems(): Int =
+        safetyPlan.size.also { safetyPlan.clear() }
     override suspend fun resetSettings(defaults: TrackSettings): Int {
         eraseCalls += 1
         settings = defaults

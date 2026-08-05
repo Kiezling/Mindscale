@@ -116,14 +116,21 @@ private fun restorePreview(backup: BackupPayload, existing: RecordCounts): Impor
     val lines = ArrayList<String>()
     lines += "This file is a MindScale backup, version ${backup.version}, " +
         "created ${backup.exportedAt}."
+    // Only a version-6 file actually carries a plan. Saying "plus your ... safety plan"
+    // about an older backup would claim the file holds something it cannot.
+    val alsoContains = if (backup.version >= 6) {
+        "plus your settings, Profile name, and safety plan."
+    } else {
+        "plus your settings and Profile name."
+    }
     lines += "It contains ${count(backup.entries.size, ImportMessages::ratings)}, " +
         "${sleepCount(backup.sleeps.size)}, ${markerCount(backup.markers.size)}, and " +
-        "${scoreCount(backup.externalScores.size)}, plus your settings and Profile name."
+        "${scoreCount(backup.externalScores.size)}, $alsoContains"
     lines += "Restoring replaces everything currently on this device. MindScale will " +
         "permanently delete ${count(existing.entries, ImportMessages::ratings)}, " +
         "${sleepCount(existing.sleeps)}, ${markerCount(existing.markers)}, and " +
-        "${scoreCount(existing.externalScores)}, and will replace your settings and " +
-        "Profile name."
+        "${scoreCount(existing.externalScores)}, and will replace your settings, " +
+        "Profile name, and safety plan."
     lines += "Check-in time, the sleep introduction flag, and the anchor prompt flag are " +
         "not stored in any backup file. They return to their defaults."
     if (backup.version < 4) {
@@ -133,6 +140,14 @@ private fun restorePreview(backup: BackupPayload, existing: RecordCounts): Impor
     if (backup.version < 5) {
         lines += "This backup predates Profile and externally obtained totals. Your " +
             "Profile name will be empty and no totals will be restored."
+    }
+    if (backup.version < 6) {
+        lines += "This backup predates the safety plan. Your safety plan of " +
+            "${lineCount(existing.safetyPlanItems)} is permanently deleted and nothing " +
+            "replaces it."
+    } else {
+        lines += "This backup contains ${planCount(backup.safetyPlan.size)}. Your current " +
+            "safety plan of ${lineCount(existing.safetyPlanItems)} is permanently deleted."
     }
     if (backup.externalScores.isNotEmpty()) {
         lines += "Totals entered by you from results obtained elsewhere. MindScale did " +
@@ -154,8 +169,8 @@ private fun mergePreview(records: RecordsPayload): ImportPreview = ImportPreview
         "This file is a MindScale records CSV.",
         "It will add ${count(records.entries.size, ImportMessages::ratings)}, " +
             "${sleepCount(records.sleeps.size)}, and ${markerCount(records.markers.size)}.",
-        "Nothing is deleted. Your settings, Profile name, and externally obtained totals " +
-            "are not changed. A records CSV does not contain them.",
+        "Nothing is deleted. Your settings, Profile name, externally obtained totals, and " +
+            "safety plan are not changed. A records CSV does not contain them.",
         "Nothing has changed yet."
     ),
     confirmLabel = "Add these records"
@@ -166,3 +181,7 @@ private fun sleepCount(value: Int) = "$value sleep ${ImportMessages.periods(valu
 private fun markerCount(value: Int) = "$value marked ${ImportMessages.events(value)}"
 private fun scoreCount(value: Int) =
     "$value externally obtained ${ImportMessages.totals(value)}"
+private fun planCount(value: Int) = "$value safety plan ${ImportMessages.lines(value)}"
+
+/** Used where "safety plan" is already the subject, so the noun is not repeated. */
+private fun lineCount(value: Int) = "$value ${ImportMessages.lines(value)}"

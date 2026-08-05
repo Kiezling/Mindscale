@@ -5,6 +5,8 @@ import com.kieslingdev.mindscale.data.Entry
 import com.kieslingdev.mindscale.data.ExternalInstrument
 import com.kieslingdev.mindscale.data.ExternalScore
 import com.kieslingdev.mindscale.data.Marker
+import com.kieslingdev.mindscale.data.SafetyPlanItem
+import com.kieslingdev.mindscale.data.SafetyPlanStep
 import com.kieslingdev.mindscale.data.SleepInterval
 import com.kieslingdev.mindscale.data.TrackSettings
 import com.kieslingdev.mindscale.data.UserProfile
@@ -19,6 +21,47 @@ import org.junit.Test
 
 class ClinicianReportTest {
     private val generatedAt = Instant.parse("2026-08-04T12:00:00Z")
+
+    /**
+     * The Report is a boundary object a user hands to a clinician. The safety plan holds
+     * contacts' phone numbers and means-restriction details, so it never enters the
+     * summary text even though `DataSnapshot` now carries it
+     * (`docs/specs/SPEC-safety-card.md`, D-5, Invariant 10).
+     */
+    @Test
+    fun theSafetyPlanNeverEntersTheClinicianSummary() {
+        val plan = listOf(
+            SafetyPlanItem(1, SafetyPlanStep.PEOPLE_FOR_HELP, 0, "Sam Rivera", "+1 555 010 0199"),
+            SafetyPlanItem(2, SafetyPlanStep.ENVIRONMENT_SAFETY, 0, "Sam keeps the spare keys")
+        )
+        val text = buildClinicianReport(
+            DataSnapshot(
+                entries = emptyList(),
+                sleeps = emptyList(),
+                markers = emptyList(),
+                settings = TrackSettings(),
+                safetyPlan = plan
+            ),
+            InsightRange.THIRTY_DAYS,
+            generatedAt,
+            ZoneOffset.UTC
+        ).text
+
+        assertFalse(text.contains("Sam Rivera"))
+        assertFalse(text.contains("+1 555 010 0199"))
+        assertFalse(text.contains("spare keys"))
+        assertFalse(text.lowercase().contains("safety plan"))
+        assertEquals(
+            "A populated plan must not change the summary at all",
+            buildClinicianReport(
+                DataSnapshot(emptyList(), emptyList(), emptyList(), TrackSettings()),
+                InsightRange.THIRTY_DAYS,
+                generatedAt,
+                ZoneOffset.UTC
+            ).text,
+            text
+        )
+    }
 
     @Test
     fun emptyThirtyDayReportIsExactAndNonInferential() {

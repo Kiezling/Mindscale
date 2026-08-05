@@ -91,6 +91,9 @@ class ProfileReportScreenTest {
         composeTestRule.activityRule.scenario.recreate()
 
         composeTestRule.onNodeWithTag("profile_screen").assertExists()
+        // Profile restores its scroll position, so the name field is not composed until
+        // we scroll back to it. Do not assume it is on screen after recreation.
+        scrollTo("profile_name")
         composeTestRule.onNodeWithTag("profile_name").assertTextContains("Ada draft")
         scrollTo("score_form")
         composeTestRule.onNodeWithTag("score_instrument_GAD_7").assertIsSelected()

@@ -40,7 +40,7 @@ class DataExportTest {
         val first = encodeBackup(snapshot, at)
         assertEquals(first, encodeBackup(snapshot, at))
         assertTrue(first.contains("\"format\": \"mindscale-backup\""))
-        assertTrue(first.contains("\"version\": 5"))
+        assertTrue(first.contains("\"version\": 6"))
         assertTrue(first.contains("\"holdHours\": 16"))
         assertTrue(first.contains("line 1\\n\\\"quoted\\\""))
         assertTrue(first.contains("\"kind\": \"WAKE\""))

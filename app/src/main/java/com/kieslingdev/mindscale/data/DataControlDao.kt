@@ -12,14 +12,16 @@ data class DataSnapshot(
     val markers: List<Marker>,
     val settings: TrackSettings,
     val profile: UserProfile = UserProfile(),
-    val externalScores: List<ExternalScore> = emptyList()
+    val externalScores: List<ExternalScore> = emptyList(),
+    val safetyPlan: List<SafetyPlanItem> = emptyList()
 )
 
 data class EraseCounts(
     val entries: Int,
     val sleeps: Int,
     val markers: Int,
-    val externalScores: Int = 0
+    val externalScores: Int = 0,
+    val safetyPlanItems: Int = 0
 )
 
 @Dao
@@ -42,6 +44,14 @@ interface DataControlDao {
     @Query("SELECT * FROM external_scores ORDER BY assessedEpochDay DESC, id DESC")
     suspend fun allExternalScores(): List<ExternalScore>
 
+    /**
+     * Ordered by position then id only. Canonical Stanley-Brown step order is applied in
+     * Kotlin by `groupedByStep()`, never in SQL — the step is stored as its name, and
+     * alphabetical order is not canonical order (Phase 13, D-4).
+     */
+    @Query("SELECT * FROM safety_plan_items ORDER BY position ASC, id ASC")
+    suspend fun allSafetyPlanItems(): List<SafetyPlanItem>
+
     @Query("DELETE FROM entries")
     suspend fun deleteEntries(): Int
 
@@ -53,6 +63,12 @@ interface DataControlDao {
 
     @Query("DELETE FROM external_scores")
     suspend fun deleteExternalScores(): Int
+
+    @Query("DELETE FROM safety_plan_items")
+    suspend fun deleteSafetyPlanItems(): Int
+
+    @Query("SELECT COUNT(*) FROM safety_plan_items")
+    suspend fun safetyPlanItemCount(): Int
 
     @Update
     suspend fun resetSettings(defaults: TrackSettings): Int
@@ -68,7 +84,8 @@ interface DataControlDao {
             allMarkers(),
             settings(),
             profile(),
-            allExternalScores()
+            allExternalScores(),
+            allSafetyPlanItems()
         )
 
     @Insert
@@ -82,6 +99,9 @@ interface DataControlDao {
 
     @Insert
     suspend fun insertExternalScores(scores: List<ExternalScore>): List<Long>
+
+    @Insert
+    suspend fun insertSafetyPlanItems(items: List<SafetyPlanItem>): List<Long>
 
     @Query("SELECT COUNT(*) FROM sleeps WHERE endTs IS NULL")
     suspend fun openSleepCount(): Int
@@ -115,6 +135,7 @@ interface DataControlDao {
         deleteSleeps()
         deleteMarkers()
         deleteExternalScores()
+        deleteSafetyPlanItems()
         check(resetSettings(payload.settings.copy(id = 0)) == 1) {
             "Canonical settings row is missing"
         }
@@ -124,9 +145,12 @@ interface DataControlDao {
         val counts = insertRecords(
             payload.entries, payload.sleeps, payload.markers, payload.externalScores
         )
+        val planIds = insertSafetyPlanItems(payload.safetyPlan)
+        check(planIds.all { it > 0L }) { "An imported safety plan line was not inserted" }
         verifyInvariants(counts, payload.entries.size, payload.sleeps.size, payload.markers.size)
         check(counts.externalScores == payload.externalScores.size) { "External total count changed" }
-        return counts
+        check(safetyPlanItemCount() == payload.safetyPlan.size) { "Safety plan line count changed" }
+        return counts.copy(safetyPlanItems = planIds.size)
     }
 
     /**
@@ -175,7 +199,8 @@ interface DataControlDao {
             deleteEntries(),
             deleteSleeps(),
             deleteMarkers(),
-            deleteExternalScores()
+            deleteExternalScores(),
+            deleteSafetyPlanItems()
         )
         check(resetSettings(TrackSettings()) == 1) { "Canonical settings row is missing" }
         check(resetProfile(UserProfile()) == 1) { "Canonical profile row is missing" }
