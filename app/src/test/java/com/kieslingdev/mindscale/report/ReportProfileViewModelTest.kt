@@ -280,4 +280,11 @@ private class FakeDataControlDao(private val profileDao: FakeProfileDao) : DataC
     override suspend fun deleteExternalScores(): Int = 0
     override suspend fun resetSettings(defaults: TrackSettings): Int = 1
     override suspend fun resetProfile(defaults: UserProfile): Int = 1
+    override suspend fun insertEntries(entries: List<Entry>): List<Long> = emptyList()
+    override suspend fun insertSleeps(sleeps: List<SleepInterval>): List<Long> = emptyList()
+    override suspend fun insertMarkers(markers: List<Marker>): List<Long> = emptyList()
+    override suspend fun insertExternalScores(scores: List<ExternalScore>): List<Long> = emptyList()
+    override suspend fun openSleepCount(): Int = 0
+    override suspend fun settingsRowCount(): Int = 1
+    override suspend fun profileRowCount(): Int = 1
 }

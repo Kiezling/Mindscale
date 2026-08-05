@@ -4,9 +4,11 @@ import com.kieslingdev.mindscale.data.DEFAULT_ONSET_CHIPS
 import com.kieslingdev.mindscale.data.TrackSettings
 import java.util.Locale
 
-private const val MAX_ANCHOR_CODE_POINTS = 160
-private const val MAX_CHIP_CODE_POINTS = 32
-private const val MAX_CHIPS = 20
+// Shared with Phase 12 import so an imported value must satisfy the same limits the
+// app's own write paths enforce (docs/specs/SPEC-import-restore.md, D-5).
+const val MAX_ANCHOR_CODE_POINTS = 160
+const val MAX_CHIP_CODE_POINTS = 32
+const val MAX_ONSET_WORDS = 20
 
 data class AnchorDraft(val anchor2: String = "", val anchor5: String = "", val anchor8: String = "")
 
@@ -35,7 +37,7 @@ fun normalizeOnsetWords(draft: String): ValidationResult<List<String>> {
     val normalized = unique.values.toList()
     return when {
         normalized.isEmpty() -> ValidationResult.Invalid("Keep at least one onset word.")
-        normalized.size > MAX_CHIPS -> ValidationResult.Invalid("Use no more than 20 onset words.")
+        normalized.size > MAX_ONSET_WORDS -> ValidationResult.Invalid("Use no more than 20 onset words.")
         normalized.any { it.codePointCount() > MAX_CHIP_CODE_POINTS } ->
             ValidationResult.Invalid("Each onset word must be 32 characters or fewer.")
         else -> ValidationResult.Valid(normalized)

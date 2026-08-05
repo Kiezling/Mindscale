@@ -61,7 +61,10 @@ class MainActivity : ComponentActivity() {
                     settingsDao = database.trackSettingsDao(),
                     dataControlDao = database.dataControlDao(),
                     savedStateHandle = extras.createSavedStateHandle(),
-                    onEraseCompleted = { reportProfileViewModel.clearAfterErase() }
+                    onEraseCompleted = { reportProfileViewModel.clearAfterErase() },
+                    // A restore replaces the Profile row and every external total, so the
+                    // same sensitive draft/id state the erase path clears is stale here too.
+                    onDataReplaced = { reportProfileViewModel.clearAfterErase() }
                 ) as T
             }
         }

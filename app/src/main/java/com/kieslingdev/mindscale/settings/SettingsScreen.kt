@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
@@ -29,7 +30,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -41,6 +44,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 enum class SettingsFocus { TOP, ANCHORS, DATA }
+
+private val BACKUP_IMPORT_MIME_TYPES = arrayOf("application/json")
+private val RECORDS_IMPORT_MIME_TYPES =
+    arrayOf("text/csv", "text/comma-separated-values", "text/plain")
 
 @Composable
 fun SettingsRoute(
@@ -96,6 +103,41 @@ fun SettingsRoute(
             if (pending.kind == ExportKind.RECORDS) csvLauncher.launch(pending.filename)
             else jsonLauncher.launch(pending.filename)
         }
+    }
+
+    // Read-only document access. No persistable permission is taken, no storage
+    // permission is declared, and content is validated regardless of the declared MIME
+    // type because providers routinely mislabel CSV (Phase 12, D-11).
+    // Lint cannot follow the deferred opener across the lambda boundary. The stream is
+    // opened lazily on the ViewModel's IO context and always closed there by
+    // `open().use(::readBoundedUtf8)`, which is covered by SettingsImportViewModelTest.
+    @Suppress("Recycle")
+    val backupImportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri == null) viewModel.importPickerCanceled()
+        else viewModel.importFileSelected(ImportKind.BACKUP_RESTORE) {
+            context.contentResolver.openInputStream(uri) ?: error("No stream")
+        }
+    }
+    @Suppress("Recycle")
+    val recordsImportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri == null) viewModel.importPickerCanceled()
+        else viewModel.importFileSelected(ImportKind.RECORDS_MERGE) {
+            context.contentResolver.openInputStream(uri) ?: error("No stream")
+        }
+    }
+
+    val importLaunch = uiState.importLaunch
+    LaunchedEffect(importLaunch) {
+        when (importLaunch) {
+            ImportKind.BACKUP_RESTORE -> backupImportLauncher.launch(BACKUP_IMPORT_MIME_TYPES)
+            ImportKind.RECORDS_MERGE -> recordsImportLauncher.launch(RECORDS_IMPORT_MIME_TYPES)
+            null -> return@LaunchedEffect
+        }
+        viewModel.importLaunchHandled()
     }
 
     SettingsScreen(uiState = uiState, focus = focus, viewModel = viewModel, modifier = modifier)
@@ -244,6 +286,51 @@ fun SettingsScreen(
                 if (uiState.preparingExport) Text("Preparing export…")
             }
         }
+        item(key = "import") {
+            SettingsSection("Bring data back") {
+                Text(
+                    "Restoring a backup replaces everything on this device. Importing a " +
+                        "records CSV only adds ratings, sleep, and marked events. MindScale " +
+                        "shows exactly what will change and waits for you to confirm."
+                )
+                TextButton(
+                    onClick = viewModel::requestBackupRestore,
+                    modifier = Modifier
+                        .heightIn(min = 48.dp)
+                        .testTag("import_backup")
+                        .semantics { contentDescription = "Restore from a MindScale JSON backup" }
+                ) { Text("Restore from backup") }
+                TextButton(
+                    onClick = viewModel::requestRecordsImport,
+                    modifier = Modifier
+                        .heightIn(min = 48.dp)
+                        .testTag("import_records")
+                        .semantics { contentDescription = "Import a MindScale records CSV" }
+                ) { Text("Import records") }
+                if (uiState.importing) {
+                    Text(
+                        "Checking that file…",
+                        modifier = Modifier
+                            .testTag("import_progress")
+                            .semantics { liveRegion = LiveRegionMode.Polite }
+                    )
+                }
+                uiState.importError?.let { error ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            error,
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("import_error")
+                                .semantics { liveRegion = LiveRegionMode.Polite }
+                        )
+                        TextButton(onClick = viewModel::dismissImportError) { Text("Dismiss") }
+                    }
+                }
+            }
+        }
         uiState.readError?.let { error ->
             item(key = "read_error") {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -263,6 +350,48 @@ fun SettingsScreen(
                 }
             }
         }
+    }
+
+    uiState.pendingImport?.let { pending ->
+        AlertDialog(
+            onDismissRequest = viewModel::cancelImport,
+            title = { Text(pending.preview.title) },
+            text = {
+                // Scrollable so the whole factual preview stays readable at 200% font
+                // scale, in landscape, and on small screens. No fixed height cap: the
+                // dialog already constrains its body, and capping it pushed the
+                // permanent-deletion sentence below the fold at large font sizes while
+                // leaving the confirm action visible.
+                Column(
+                    modifier = Modifier
+                        .verticalScroll(rememberScrollState())
+                        .testTag("import_preview"),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    pending.preview.lines.forEach { Text(it) }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = viewModel::confirmImport,
+                    enabled = !uiState.importing,
+                    modifier = Modifier
+                        .heightIn(min = 48.dp)
+                        .testTag("confirm_import")
+                ) { Text(pending.preview.confirmLabel) }
+            },
+            dismissButton = {
+                // Disabled once the mutation is running: the transaction can no longer be
+                // cancelled, so offering Cancel would misreport what happened to the data.
+                TextButton(
+                    onClick = viewModel::cancelImport,
+                    enabled = !uiState.importing,
+                    modifier = Modifier
+                        .heightIn(min = 48.dp)
+                        .testTag("cancel_import")
+                ) { Text("Cancel") }
+            }
+        )
     }
 
     uiState.eraseConfirmation?.let { confirmation ->
