@@ -8,7 +8,27 @@ Build MindScale as a native Android application using Kotlin, Jetpack Compose, M
 
 The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716ca7343`: `SPEC.md` is the rationale and `MindScale v2.dc.html` is the visual/behavioral reference for Track, Full Log, Insights, Report, Safety card, Profile, and Settings. A local exported handoff is available at `C:\Users\mckie\Downloads\MindScale-handoff\mindscale\project\`; its `MindScale v2.dc.html` is the primary implementation reference. Repository specs under `docs/specs/` govern native implementation after human approval.
 
-## Current phase: Phase 13 native Safety card merged and complete
+## Current phase: Phase 14 optional paced-breathing object — implemented and verified locally
+
+- Phase 14 branch: `agent/phase14-paced-breathing`, created from synchronized `main` at `82ca7041120df0903738645f1a6d46cec44a2fb6`
+- Starting synchronization: `HEAD`, local `main`, local `origin/main`, and live GitHub `refs/heads/main` all resolved to `82ca7041120df0903738645f1a6d46cec44a2fb6` before branching
+- Governing spec: `docs/specs/SPEC-paced-breathing.md` — `IMPLEMENTED — VERIFIED LOCALLY`; D-1 through D-14 frozen on 2026-08-05 before application-code edits; frozen documentation commit `0e71f16`, verified implementation commit `570a2fe`
+- Selected work: the final scoped backlog item — an optional paced-breathing object with a session entity/export migration and a no-claims, never-auto-offered native pacer
+- Reconciled boundary: one fixed-cadence pacing circle (4500 ms in, 6500 ms out, 11 000 ms cycle, 5.45 br/min) with exactly two phases and no configurability; 1/3/5/10 minute choices with nothing preselected; no claim of any kind anywhere; reachable only by a user tap on a Track link gated on the `breathingOn` setting and the paused state
+- Non-inference guarantee, structural not conventional: `BreathingViewModel` takes `BreathingSessionDao` and `BreathingClock` and nothing else, `BreathingSessionDao` exposes only `insert` and `count` with no observing read, and a source scan plus a constructor-reflection test enforce that no recorded value can reach the screen. This mirrors Phase 13's `SafetyPlanDao`-only pattern
+- Safety basis for the never-auto-offered rule: Schmidt 2000 found breathing retraining trending toward poorer outcomes in panic and Barlow discourages respiratory control as a safety behavior, so a pacer keyed to a rating is both an inference MindScale does not make and a plausible harm — not a matter of taste
+- Evidence honestly reconciled: Fincham's 2023 meta-analysis had mostly-inactive controls, and the same team's two placebo-controlled trials were both null (coherent ~5.5 br/min vs 12 br/min placebo, n=400/4wk; high-ventilation vs 15 br/min placebo, n=200/3wk); STARS found fast equal to slow. The working hypothesis is paced attention interrupting rumination, not respiration. Nothing in the UI cites, quotes, or alludes to any of it
+- Prototype reconciliation recorded rather than inherited: cadence, length set, toggle copy, and the instruction line are adopted verbatim; the completion-only session record, the 66-second "1 min" overshoot, the stored `minutes` field, and the always-plural running readout are each rejected with reasons in D-014
+- Approval gate satisfied: the user granted full Phase 14 ownership and authorized decisions, implementation, verification, commits, pushes, PR readiness, merge, and final synchronization without another routine pause
+- Frozen constraints: additive Room 6→7 and JSON backup v7 only; the records CSV header stays byte-identical and gains only a `breathing` row type accepted by both export and import; no dependency, permission, network, account, analytics, haptic, audio, notification, wake lock, background worker, destructive migration, or toolchain change; no Full Log, Insights, or clinician-summary surface; no UI-overhaul work
+- Expected untracked paths remain `.agents/` and `.codex/`; they are excluded from product/documentation scope
+- Verification: 370/370 JVM tests, lint with 0 errors and the unchanged 22-warning baseline, debug assembly, confirmed API 36 emulator, 187/187 connected tests, `git diff --check`, the full installed-app breathing matrix, and one critical review that returned APPROVE with no blocking finding
+- One production defect was caught by installed-app inspection rather than by tests: the Settings data-section copy still said a records CSV contains "ratings, sleep, and marked events only", which became false once breathing sessions were written into it. Both that sentence and the matching import sentence are corrected and pinned by `SettingsImportScreenTest`
+- The critical review returned APPROVE with three non-blocking findings, all closed rather than deferred: the banned-word scan now also covers the breathing disclosure strings outside `BreathingCopy`; the backup array's descending order is now explicit in D-9; and `discardSession()` replaces `leaveScreen()` on the erase path so a session running during an erase is dropped rather than written back into a just-cleared table
+- Honest gaps: spoken TalkBack output was not audited, only semantic order, content descriptions, and the live region; a session in progress is lost on process death, disclosed on screen by `BreathingCopy.RECORDING`; backgrounding does not stop a running session, and whether the user was watching is deliberately not inferred; breathing sessions appear in no in-app view and have no per-session delete, so erase and replace-only restore are the removal paths; overlapping sessions are deliberately not rejected on import; the device cadence check confirmed alternating phases on an ~11-second cycle but `uiautomator` dump latency is too coarse to resolve the 4500/6500 ms boundaries, which are pinned by unit tests and by the exact stored intervals instead
+- Exact next action: publish the branch, open and merge the PR, then leave the UI-overhaul work unstarted until it is separately scoped, specified, and approved
+
+### Phase 13 merged checkpoint
 
 - Phase 13 branch: `agent/phase13-safety-card`, created from synchronized `main` at `5eb10e497e328fb09dcf8254e7d5271c09cca1eb`
 - Starting synchronization: `HEAD`, local `main`, local `origin/main`, and live GitHub `refs/heads/main` all resolved to `5eb10e497e328fb09dcf8254e7d5271c09cca1eb` before branching
@@ -227,7 +247,7 @@ The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716c
 
 ## Active blocker
 
-No active blocker. Phase 13 is merged and complete.
+No active blocker. Phase 14 is implemented and verified locally; publication is next.
 
 ## Known decisions
 
@@ -241,11 +261,34 @@ No active blocker. Phase 13 is merged and complete.
 
 ## Next tasks
 
-1. Keep paced breathing and the UI-overhaul work unstarted in `docs/specs/BACKLOG.md` until each is separately assigned and specified.
+1. Keep the UI-overhaul work unstarted and unlisted until it is separately scoped, specified, and approved.
 2. Re-verify the crisis resources in `SafetyCopy` against their operator sources before any future release, and update `SafetyCopy.VERIFIED_ON` in the same edit. Hotline numbers and coverage change; a stale number in a safety feature is a real harm, not a cosmetic bug.
 3. Continue excluding `.agents/` and `.codex/` from product/documentation commits.
 
 ## Last verification
+
+Phase 14 final local verification completed 2026-08-05 for implementation commit `570a2fe` plus the critical-review follow-up on `agent/phase14-paced-breathing`:
+
+- `test`: 370/370 JVM tests passed across 35 suites; 0 failures, errors, or skips (306 before this phase).
+- `lint`: passed with 0 errors and the same 22 existing warnings. No new warning was introduced or suppressed.
+- `assembleDebug`: passed.
+- `adb devices -l`: intended `MindScale_API_36` API 36 emulator connected as `emulator-5554`.
+- `connectedDebugAndroidTest`: 187/187 passed; 0 failures or skips (157 before this phase).
+- `git diff --check`: passed with only the configured LF-to-CRLF notices.
+- Installed-app inspection covered: the Track link rendering above the Safety link with the frozen copy and content description; every on-screen string on the pacer compared against D-12; a full session at all four offered lengths, whose exported CSV intervals were exactly 60.000 s, 180.000 s, 300.000 s, and 600.000 s; the cue alternating In/Out on an approximately 11-second cycle; the static chosen-length readout rather than a countdown; logging a 10 and then a 9 and confirming no pacer, prompt, dialog, or breathing node appeared anywhere; the Settings toggle hiding the link when off and the paused state hiding it while the unconditional Safety link stayed; dark mode at 200% font and landscape at 200% font both reflowing with nothing clipped; the semantic reading order with the circle contributing no node at all; a version-7 backup containing `breathingOn` and a newest-first `breathingSessions` array; the erase dialog disclosing "4 breathing sessions"; a version-5 restore disclosing "This backup predates paced breathing" with the exact count; a version-7 restore returning every session with its id verbatim and re-exporting identically; a records CSV whose four breathing rows were rejected in full as already present; a non-canonical instant rejected by the strict CSV validator; and an additive import adding 4 breathing sessions after an erase. Emulator font scale, night mode, and rotation were restored to `1.0`, `no`, and automatic, the six export files created during inspection were deleted, and the app's data was cleared.
+- One production defect was found by installed-app inspection rather than by tests: the Settings data-section sentence still read "Records CSV contains ratings, sleep, and marked events only", which became false the moment breathing sessions were written into that file, and the matching import sentence had the same omission. Both are corrected and pinned by `SettingsImportScreenTest`.
+- Critical review returned APPROVE with no blocking finding. All three non-blocking findings were closed rather than deferred: the banned-word scan was extended to the breathing disclosure strings that live outside `BreathingCopy`; D-9's `breathingSessions` ordering is now explicitly descending; and `discardSession()` was added so a session running when the user erases everything is dropped instead of being written back into a table the erase transaction had already cleared.
+- No manifest, permission, dependency, or toolchain file changed. Room advanced additively 6→7 with exported schema 7, and the records CSV header is byte-identical.
+
+Phase 14 starting-state verification completed 2026-08-05 before application-code edits:
+
+- `git status --short --branch` showed synchronized `main` with only the expected untracked `.agents/` and `.codex/` directories.
+- `HEAD`, local `main`, local `origin/main`, and live `git ls-remote origin refs/heads/main` all resolved to `82ca7041120df0903738645f1a6d46cec44a2fb6`.
+- Branch `agent/phase14-paced-breathing` was created from that exact head.
+- `AGENTS.md`, `CLAUDE.md`, `PROJECT_STATE.md`, all `FAILED_PATHS.md` headings including the two 2026-08-05 environment entries, `docs/DECISIONS.md` D-001 through D-013, `docs/specs/BACKLOG.md`, and `docs/specs/SPEC-safety-card.md` were reconciled as the closest precedent for a non-inferential, never-auto-triggered object with its own persistence and export contract.
+- The product handoff's `SPEC.md` "Breathing" section was reread in full, and the prototype's complete breathing implementation was read at `MindScale v2.dc.html` lines 167–171 (Track entry), 714–735 (overlay markup), 761–762 (`BREATH`/`LENS`), 1052–1067 (`startBreathe`), 1075 and 1084 (JSON/CSV export rows), 1640 (settings toggle), and 1665 (erase reset), then reconciled against MindScale's measurement-only, non-inferential identity rather than carried forward.
+- The live `MindScaleApp` destination stack, `TrackScreen` footer and paused gating, `TrackUiState`, `TrackSettings`/`TrackSettingsDao`, `MindScaleDatabase` schema 6, `Migrations`, `DataControlDao`, `ImportPayloads`, `ImportModels`, `DataExport`, `BackupImport`, `ImportPreflight`, `RecordsCsvImport`, `SafetyViewModel`, `NoAutoDialSourceTest`, and `MainActivity` were read before freezing D-014.
+- No Gradle oracle was rerun for this documentation-only freeze; the merged Phase 13 application tree and its verification evidence below remain unchanged.
 
 Phase 13 publication checkpoint completed 2026-08-05:
 
@@ -508,6 +551,7 @@ Results:
 - The time-weighted/hold episode model and Phase 2 onset reconciliation are implemented and verified by `docs/specs/SPEC-insights-foundation.md`.
 - Gold/ink theming is implemented; approved typography assets remain a future design decision.
 - Full Log import/export and clinician-report data actions remain deferred; no inert controls are shown.
+- The optional paced-breathing object is implemented by Phase 14; see `docs/specs/SPEC-paced-breathing.md`. Sessions are exported facts only: they appear in the JSON backup, the records CSV, the restore preview, and the erase dialog, and deliberately in no in-app view, with no per-session delete. A future Full Log row type for them would need its own edit, delete, and filter contract, and any Insights view of them is rejected outright rather than deferred, because a chart placing sessions beside intensity would manufacture the causal reading two placebo-controlled trials failed to support.
 - The Safety card and the user's own Stanley-Brown safety plan are implemented and merged by Phase 13; see `docs/specs/SPEC-safety-card.md`. Its crisis resources were verified on 2026-08-05 and carry a visible in-app check date, so currency is a maintenance obligation rather than a settled fact.
 
 ## Handoff checklist

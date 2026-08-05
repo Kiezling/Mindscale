@@ -26,20 +26,24 @@ data class BackupPayload(
     val profile: UserProfile,
     val externalScores: List<ExternalScore>,
     /** Empty for versions 3, 4, and 5, which predate the safety plan (Phase 13, D-9). */
-    val safetyPlan: List<SafetyPlanItem> = emptyList()
+    val safetyPlan: List<SafetyPlanItem> = emptyList(),
+    /** Empty for versions 3 through 6, which predate paced breathing (Phase 14, D-9). */
+    val breathingSessions: List<BreathingSession> = emptyList()
 )
 
 data class RecordsPayload(
     val entries: List<Entry>,
     val sleeps: List<SleepInterval>,
-    val markers: List<Marker>
+    val markers: List<Marker>,
+    val breathingSessions: List<BreathingSession> = emptyList()
 )
 
 /** The record tables an additive import must be checked against. */
 data class RecordSnapshot(
     val entries: List<Entry>,
     val sleeps: List<SleepInterval>,
-    val markers: List<Marker>
+    val markers: List<Marker>,
+    val breathingSessions: List<BreathingSession> = emptyList()
 )
 
 data class ImportCounts(
@@ -48,7 +52,9 @@ data class ImportCounts(
     val markers: Int,
     val externalScores: Int,
     /** Only a restore ever writes these; a records CSV import always reports zero. */
-    val safetyPlanItems: Int = 0
+    val safetyPlanItems: Int = 0,
+    /** Written by both paths: a restore replaces them, a records CSV appends them. */
+    val breathingSessions: Int = 0
 )
 
 /**

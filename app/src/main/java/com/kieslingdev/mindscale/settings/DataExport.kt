@@ -15,7 +15,7 @@ fun recordsFilename(at: Instant): String = "mindscale-records-${FilenameFormatte
 fun encodeBackup(snapshot: DataSnapshot, exportedAt: Instant): String = buildString {
     append("{\n")
     append("  \"format\": \"mindscale-backup\",\n")
-    append("  \"version\": 6,\n")
+    append("  \"version\": 7,\n")
     append("  \"exportedAt\": ").appendJson(exportedAt.toString()).append(",\n")
     append("  \"entries\": [")
     snapshot.entries.forEachIndexed { index, entry ->
@@ -57,7 +57,8 @@ fun encodeBackup(snapshot: DataSnapshot, exportedAt: Instant): String = buildStr
     append("\n    \"askChips\": ${s.askChips},")
     append("\n    \"hideNotes\": ${s.hideNotes},")
     append("\n    \"paused\": ${s.paused},")
-    append("\n    \"holdHours\": ${s.holdDuration.hours}")
+    append("\n    \"holdHours\": ${s.holdDuration.hours},")
+    append("\n    \"breathingOn\": ${s.breathingOn}")
     append("\n  },\n")
     append("  \"profile\": {\"displayName\": ").appendJson(snapshot.profile.displayName).append("},\n")
     append("  \"externalScores\": [")
@@ -90,6 +91,23 @@ fun encodeBackup(snapshot: DataSnapshot, exportedAt: Instant): String = buildStr
                 .append(", \"phone\": ").appendNullableJson(item.phone).append('}')
         }
     if (snapshot.safetyPlan.isNotEmpty()) append('\n').append("  ")
+    // Newest first, matching every other collection in this file, so a re-export of a
+    // restored backup is byte-identical to the file it came from (Phase 14, D-9).
+    append("],\n  \"breathingSessions\": [")
+    snapshot.breathingSessions
+        .sortedWith(
+            compareByDescending<com.kieslingdev.mindscale.data.BreathingSession> { it.startedAt }
+                .thenByDescending { it.id }
+        )
+        .forEachIndexed { index, session ->
+            if (index > 0) append(',')
+            append("\n    {\"id\": ${session.id}, \"start\": ")
+                .appendJson(Instant.ofEpochMilli(session.startedAt).toString())
+                .append(", \"end\": ")
+                .appendJson(Instant.ofEpochMilli(session.endedAt).toString())
+                .append('}')
+        }
+    if (snapshot.breathingSessions.isNotEmpty()) append('\n').append("  ")
     append("]\n}")
 }
 
@@ -109,6 +127,15 @@ fun encodeRecordsCsv(snapshot: DataSnapshot): String = buildString {
     }
     snapshot.markers.forEach { marker ->
         appendCsvRow("marker", Instant.ofEpochMilli(marker.ts).toString(), "", "", "", "", "", marker.text)
+    }
+    // A breathing session is an interval, so it reuses the two columns `sleep` already
+    // uses. The header is unchanged byte for byte: adding a column would make every
+    // previously exported CSV unimportable (Phase 14, D-9, Invariant 10).
+    snapshot.breathingSessions.forEach { session ->
+        appendCsvRow(
+            "breathing", Instant.ofEpochMilli(session.startedAt).toString(),
+            Instant.ofEpochMilli(session.endedAt).toString(), "", "", "", "", ""
+        )
     }
 }
 

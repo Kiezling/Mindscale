@@ -46,6 +46,8 @@ class FakeTrackSettingsDao(initial: TrackSettings = TrackSettings()) : TrackSett
 
     override suspend fun setHoldDuration(duration: HoldDuration): Int = commit { it.copy(holdDuration = duration) }
 
+    override suspend fun setBreathingOn(enabled: Boolean): Int = commit { it.copy(breathingOn = enabled) }
+
     override suspend fun update(settings: TrackSettings) {
         updateCalls += settings
         settingsFlow.value = settings

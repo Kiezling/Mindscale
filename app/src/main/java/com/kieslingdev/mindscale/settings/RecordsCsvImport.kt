@@ -1,5 +1,6 @@
 package com.kieslingdev.mindscale.settings
 
+import com.kieslingdev.mindscale.data.BreathingSession
 import com.kieslingdev.mindscale.data.Entry
 import com.kieslingdev.mindscale.data.EntryKind
 import com.kieslingdev.mindscale.data.Marker
@@ -46,6 +47,7 @@ private fun readRecords(text: String, now: Instant): RecordsPayload {
     val entries = ArrayList<Entry>()
     val sleeps = ArrayList<SleepInterval>()
     val markers = ArrayList<Marker>()
+    val breathingSessions = ArrayList<BreathingSession>()
 
     rows.drop(1).forEach { row ->
         if (row.fields.size != CSV_HEADER_FIELDS.size) reject(ImportMessages.invalidCsv(row.line))
@@ -53,18 +55,25 @@ private fun readRecords(text: String, now: Instant): RecordsPayload {
             "rating" -> entries += readRating(row, now)
             "sleep" -> sleeps += readSleep(row, now)
             "marker" -> markers += readMarker(row, now)
+            "breathing" -> breathingSessions += readBreathing(row, now)
             else -> reject(ImportMessages.invalidCsv(row.line))
         }
     }
 
     if (entries.size > MAX_RECORDS_PER_COLLECTION || sleeps.size > MAX_RECORDS_PER_COLLECTION ||
         markers.size > MAX_RECORDS_PER_COLLECTION ||
-        entries.size + sleeps.size + markers.size > MAX_TOTAL_RECORDS
+        breathingSessions.size > MAX_RECORDS_PER_COLLECTION ||
+        entries.size + sleeps.size + markers.size + breathingSessions.size > MAX_TOTAL_RECORDS
     ) {
         reject(ImportMessages.TOO_MANY_RECORDS)
     }
 
-    return RecordsPayload(entries = entries, sleeps = sleeps, markers = markers)
+    return RecordsPayload(
+        entries = entries,
+        sleeps = sleeps,
+        markers = markers,
+        breathingSessions = breathingSessions
+    )
 }
 
 private fun readRating(row: CsvRow, now: Instant): Entry {
@@ -97,6 +106,21 @@ private fun readMarker(row: CsvRow, now: Instant): Marker {
         ts = requireInstantMillis(row.required(TIMESTAMP), now, ImportMessages.invalidCsv(row.line)),
         text = requireMarkerText(row.required(TEXT))
     )
+}
+
+/**
+ * A breathing session is an interval, so it reuses the same two columns as `sleep` and,
+ * unlike sleep, requires both: the pacer never leaves a session open
+ * (`docs/specs/SPEC-paced-breathing.md`, D-9).
+ */
+private fun readBreathing(row: CsvRow, now: Instant): BreathingSession {
+    row.requireEmpty(INTENSITY, KIND, CHIPS, NOTE, TEXT)
+    val startedAt =
+        requireInstantMillis(row.required(TIMESTAMP), now, ImportMessages.invalidCsv(row.line))
+    val endedAt =
+        requireInstantMillis(row.required(END_TIMESTAMP), now, ImportMessages.invalidCsv(row.line))
+    requireBreathingBounds(startedAt, endedAt)
+    return BreathingSession(startedAt = startedAt, endedAt = endedAt)
 }
 
 /** A field that does not apply to this row type must be empty; a value there is ambiguous. */

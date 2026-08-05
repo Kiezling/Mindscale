@@ -335,6 +335,90 @@ class MigrationTest {
         }
     }
 
+    /**
+     * Phase 14 is additive: one new table and one new settings column. Existing records,
+     * settings, Profile, and safety plan must survive untouched, and `breathingOn` must
+     * default to on for an upgrading user so they see the same starting state as a fresh
+     * install (`docs/specs/SPEC-paced-breathing.md`, D-8, D-9).
+     */
+    @Test
+    fun migrate6To7_preservesVersion6Data_andAddsBreathingOnAndAnEmptySessionTable() {
+        var db = helper.createDatabase(TEST_DB, 6)
+        db.execSQL("INSERT INTO entries (id, ts, value, chips, note, kind) VALUES (51, 900, 6, '', 'keep', NULL)")
+        // `MigrationTestHelper.createDatabase` does not run the creation callback, so the
+        // canonical rows are inserted here the same way the version-5 test does it.
+        db.execSQL(
+            "INSERT INTO track_settings " +
+                "(id, sleepOn, askChips, paused, checkinAt, sleepIntroShown, themeMode, hourFormat, " +
+                "anchor2, anchor5, anchor8, onsetChips, hideNotes, anchorPromptDone, holdDuration) " +
+                "VALUES (0, 1, 0, 0, 0, 0, 'DARK', 'TWENTY_FOUR', '', '', '', '', 0, 0, 'TWENTY_FOUR')"
+        )
+        db.execSQL("INSERT INTO user_profile (id, displayName) VALUES (0, 'Ada')")
+        db.execSQL(
+            "INSERT INTO safety_plan_items (id, step, position, text, phone) " +
+                "VALUES (1, 'PEOPLE_FOR_HELP', 0, 'Sam', '555-0100')"
+        )
+        db.close()
+
+        db = helper.runMigrationsAndValidate(TEST_DB, 7, true, MIGRATION_6_7)
+
+        db.query("SELECT value, note FROM entries WHERE id = 51").use { c ->
+            assertTrue(c.moveToFirst())
+            assertEquals(6, c.getInt(0))
+            assertEquals("keep", c.getString(1))
+        }
+        db.query("SELECT themeMode, holdDuration, breathingOn FROM track_settings WHERE id = 0").use { c ->
+            assertTrue(c.moveToFirst())
+            assertEquals("DARK", c.getString(0))
+            assertEquals("TWENTY_FOUR", c.getString(1))
+            assertEquals("breathingOn must default to on for an upgrading user", 1, c.getInt(2))
+        }
+        db.query("SELECT displayName FROM user_profile WHERE id = 0").use { c ->
+            assertTrue(c.moveToFirst())
+            assertEquals("Ada", c.getString(0))
+        }
+        db.query("SELECT text FROM safety_plan_items WHERE id = 1").use { c ->
+            assertTrue(c.moveToFirst())
+            assertEquals("Sam", c.getString(0))
+        }
+        db.query("SELECT COUNT(*) FROM breathing_sessions").use { c ->
+            assertTrue(c.moveToFirst())
+            assertEquals(0, c.getInt(0))
+        }
+        // The new table really accepts the shape the entity declares.
+        db.execSQL("INSERT INTO breathing_sessions (id, startedAt, endedAt) VALUES (1, 1000, 61000)")
+        db.query("SELECT startedAt, endedAt FROM breathing_sessions WHERE id = 1").use { c ->
+            assertTrue(c.moveToFirst())
+            assertEquals(1000L, c.getLong(0))
+            assertEquals(61000L, c.getLong(1))
+        }
+    }
+
+    @Test
+    fun migrate1To7_runsEveryAdditiveStep() {
+        var db = helper.createDatabase(TEST_DB, 1)
+        db.execSQL("INSERT INTO entries (id, ts, value, chips, note) VALUES (43, 88, 9, '', NULL)")
+        db.close()
+        db = helper.runMigrationsAndValidate(
+            TEST_DB, 7, true,
+            MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6,
+            MIGRATION_6_7
+        )
+        assertVersion5Chain(db, 43, 9)
+        db.query("SELECT COUNT(*) FROM safety_plan_items").use { c ->
+            assertTrue(c.moveToFirst())
+            assertEquals(0, c.getInt(0))
+        }
+        db.query("SELECT COUNT(*) FROM breathing_sessions").use { c ->
+            assertTrue(c.moveToFirst())
+            assertEquals(0, c.getInt(0))
+        }
+        db.query("SELECT breathingOn FROM track_settings WHERE id = 0").use { c ->
+            assertTrue(c.moveToFirst())
+            assertEquals(1, c.getInt(0))
+        }
+    }
+
     private fun assertVersion5Chain(db: androidx.sqlite.db.SupportSQLiteDatabase, entryId: Long, value: Int) {
         db.query("SELECT value FROM entries WHERE id = $entryId").use { c ->
             assertTrue(c.moveToFirst())

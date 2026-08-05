@@ -1,5 +1,6 @@
 package com.kieslingdev.mindscale.settings
 
+import com.kieslingdev.mindscale.breathing.MAX_BREATHING_SESSION_MILLIS
 import com.kieslingdev.mindscale.data.SleepInterval
 import java.time.Instant
 import java.time.LocalDate
@@ -132,6 +133,24 @@ internal fun requireAssessedEpochDay(raw: String, now: Instant, zone: ZoneId): L
 
 internal fun requireSleepBounds(startTs: Long, endTs: Long?) {
     if (endTs != null && endTs < startTs) reject(ImportMessages.UNSTORABLE_VALUE)
+}
+
+/**
+ * A breathing session must be a session MindScale itself could have produced: never
+ * backwards, and never longer than the longest length the pacer offers
+ * (`docs/specs/SPEC-paced-breathing.md`, D-9, Invariant 6).
+ *
+ * A zero-length session is permitted deliberately. Tapping a length and stopping
+ * immediately is a real thing a person can do, and the app records it rather than deciding
+ * how much breathing counts.
+ *
+ * Overlap between sessions is deliberately not checked. Unlike sleep, breathing has no
+ * open-interval invariant to protect, and inventing one would reject files MindScale could
+ * legitimately have produced across a restore boundary.
+ */
+internal fun requireBreathingBounds(startedAt: Long, endedAt: Long) {
+    if (endedAt < startedAt) reject(ImportMessages.UNSTORABLE_VALUE)
+    if (endedAt - startedAt > MAX_BREATHING_SESSION_MILLIS) reject(ImportMessages.UNSTORABLE_VALUE)
 }
 
 /**

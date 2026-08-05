@@ -15,9 +15,10 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         TrackSettings::class,
         UserProfile::class,
         ExternalScore::class,
-        SafetyPlanItem::class
+        SafetyPlanItem::class,
+        BreathingSession::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = true
 )
 @TypeConverters(
@@ -36,6 +37,7 @@ abstract class MindScaleDatabase : RoomDatabase() {
     abstract fun episodeSourceDao(): EpisodeSourceDao
     abstract fun profileDao(): ProfileDao
     abstract fun safetyPlanDao(): SafetyPlanDao
+    abstract fun breathingSessionDao(): BreathingSessionDao
 
     companion object {
         const val NAME = "mindscale.db"
@@ -52,9 +54,9 @@ abstract class MindScaleDatabase : RoomDatabase() {
                 super.onCreate(db)
                 db.execSQL(
                     "INSERT INTO track_settings (id, sleepOn, askChips, paused, checkinAt, sleepIntroShown, " +
-                        "themeMode, hourFormat, anchor2, anchor5, anchor8, onsetChips, hideNotes, anchorPromptDone, holdDuration) " +
+                        "themeMode, hourFormat, anchor2, anchor5, anchor8, onsetChips, hideNotes, anchorPromptDone, holdDuration, breathingOn) " +
                         "VALUES (0, 1, 0, 0, 0, 0, 'SYSTEM', 'TWELVE', '', '', '', " +
-                        "'${DEFAULT_ONSET_CHIPS.joinToString("\u001F").replace("'", "''")}', 0, 0, 'SIXTEEN')"
+                        "'${DEFAULT_ONSET_CHIPS.joinToString("\u001F").replace("'", "''")}', 0, 0, 'SIXTEEN', 1)"
                 )
                 db.execSQL("INSERT INTO user_profile (id, displayName) VALUES (0, '')")
             }
@@ -64,7 +66,8 @@ abstract class MindScaleDatabase : RoomDatabase() {
         fun build(context: Context): MindScaleDatabase =
             Room.databaseBuilder(context.applicationContext, MindScaleDatabase::class.java, NAME)
                 .addMigrations(
-                    MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6
+                    MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6,
+                    MIGRATION_6_7
                 )
                 .addCallback(seedSettingsCallback)
                 .build()

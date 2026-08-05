@@ -52,6 +52,65 @@ class NavigationTest {
         composeTestRule.onNodeWithTag("numpad_key_1").assertExists()
     }
 
+    /**
+     * The pacer is an overlay reached by one tap and left by Back, like Safety, Profile,
+     * and the Report (`docs/specs/SPEC-paced-breathing.md`, D-7).
+     */
+    @Test
+    fun pacedBreathingOpensFromTrackAndBackReturnsToTrack() {
+        composeTestRule.onNodeWithTag("track_screen")
+            .performScrollToNode(hasTestTag("breathing_link"))
+        composeTestRule.onNodeWithTag("breathing_link").performClick()
+        composeTestRule.onNodeWithTag("breathing_screen").assertExists()
+        composeTestRule.onNodeWithTag("main_navigation").assertDoesNotExist()
+
+        pressBack()
+
+        composeTestRule.onNodeWithTag("numpad_key_1").assertExists()
+    }
+
+    /**
+     * A rotation must not end a session. This is the reason the session lives in the
+     * ViewModel and is not wired to `onDispose` or `ON_STOP`, both of which fire here
+     * (`docs/specs/SPEC-paced-breathing.md`, D-6).
+     */
+    @Test
+    fun theBreathingDestination_survivesActivityRecreation() {
+        composeTestRule.onNodeWithTag("track_screen")
+            .performScrollToNode(hasTestTag("breathing_link"))
+        composeTestRule.onNodeWithTag("breathing_link").performClick()
+        composeTestRule.onNodeWithTag("breathing_screen").assertExists()
+
+        composeTestRule.activityRule.scenario.recreate()
+
+        composeTestRule.onNodeWithTag("breathing_screen").assertExists()
+        pressBack()
+        composeTestRule.onNodeWithTag("numpad_key_1").assertExists()
+    }
+
+    /**
+     * The one path that must never exist: logging a high intensity opens no pacer, shows no
+     * prompt, and changes nothing about how the link is presented
+     * (`docs/specs/SPEC-paced-breathing.md`, D-10, Invariant 3).
+     */
+    @Test
+    fun loggingAHighIntensityNeverOffersThePacer() {
+        composeTestRule.onNodeWithTag("numpad_key_10").performClick()
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithTag("breathing_screen").assertDoesNotExist()
+        composeTestRule.onNodeWithTag("numpad_key_1").assertExists()
+
+        composeTestRule.onNodeWithTag("numpad_key_9").performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("breathing_screen").assertDoesNotExist()
+
+        // The link is exactly where it always is, reached only by a deliberate tap.
+        composeTestRule.onNodeWithTag("track_screen")
+            .performScrollToNode(hasTestTag("breathing_link"))
+        composeTestRule.onNodeWithTag("breathing_link").assertExists()
+    }
+
     @Test
     fun safetyCardOpensFromProfileAndBackReturnsToProfile() {
         composeTestRule.onNodeWithTag("profile_action").performClick()

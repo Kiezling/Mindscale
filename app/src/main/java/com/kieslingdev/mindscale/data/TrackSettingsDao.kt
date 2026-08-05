@@ -67,6 +67,9 @@ interface TrackSettingsDao {
     @Query("UPDATE track_settings SET holdDuration = :duration WHERE id = 0")
     suspend fun setHoldDuration(duration: HoldDuration): Int
 
+    @Query("UPDATE track_settings SET breathingOn = :enabled WHERE id = 0")
+    suspend fun setBreathingOn(enabled: Boolean): Int
+
     @Update
     suspend fun update(settings: TrackSettings)
 }

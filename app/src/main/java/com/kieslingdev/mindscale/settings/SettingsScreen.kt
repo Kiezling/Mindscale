@@ -36,6 +36,7 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.kieslingdev.mindscale.breathing.BreathingCopy
 import com.kieslingdev.mindscale.data.HourFormat
 import com.kieslingdev.mindscale.data.HoldDuration
 import com.kieslingdev.mindscale.data.ThemeMode
@@ -257,6 +258,14 @@ fun SettingsScreen(
                 viewModel::setHideNotes
             )
         }
+        item(key = "breathing") {
+            SettingSwitch(
+                BreathingCopy.SETTING_TITLE,
+                BreathingCopy.SETTING_DESCRIPTION,
+                uiState.settings.breathingOn,
+                viewModel::setBreathingOn
+            )
+        }
         item(key = "pause") {
             SettingSwitch(
                 if (uiState.settings.paused) "Tracking paused" else "Pause tracking",
@@ -270,9 +279,9 @@ fun SettingsScreen(
             SettingsSection("Your data") {
                 Text("Exports stay local and go only to the document location you choose.")
                 Text(
-                    "Records CSV contains ratings, sleep, and marked events only. It excludes your Profile name " +
-                        "and external PHQ-8/GAD-7 totals. JSON backup includes them; Clinician summary exports " +
-                        "the bounded factual summary."
+                    "Records CSV contains ratings, sleep, marked events, and breathing sessions only. It " +
+                        "excludes your Profile name and external PHQ-8/GAD-7 totals. JSON backup includes " +
+                        "them; Clinician summary exports the bounded factual summary."
                 )
                 TextButton(onClick = viewModel::requestBackup, modifier = Modifier.testTag("export_backup")) {
                     Text("Export backup")
@@ -290,8 +299,9 @@ fun SettingsScreen(
             SettingsSection("Bring data back") {
                 Text(
                     "Restoring a backup replaces everything on this device. Importing a " +
-                        "records CSV only adds ratings, sleep, and marked events. MindScale " +
-                        "shows exactly what will change and waits for you to confirm."
+                        "records CSV only adds ratings, sleep, marked events, and breathing " +
+                        "sessions. MindScale shows exactly what will change and waits for you " +
+                        "to confirm."
                 )
                 TextButton(
                     onClick = viewModel::requestBackupRestore,
@@ -402,9 +412,12 @@ fun SettingsScreen(
                 Text(
                     "This permanently deletes ${confirmation.entryCount} ratings, " +
                         "${confirmation.sleepCount} sleep intervals, and ${confirmation.markerCount} markers. " +
-                        "Your Profile name, all externally obtained totals, and your safety plan " +
+                        "Your Profile name, all externally obtained totals, your safety plan " +
                         "(${confirmation.safetyPlanItemCount} " +
-                        "${if (confirmation.safetyPlanItemCount == 1) "line" else "lines"}) are also deleted. " +
+                        "${if (confirmation.safetyPlanItemCount == 1) "line" else "lines"}), and " +
+                        "${confirmation.breathingSessionCount} breathing " +
+                        "${if (confirmation.breathingSessionCount == 1) "session" else "sessions"} " +
+                        "are also deleted. " +
                         "Anchors, custom words, preferences, drafts, and retained export text reset too."
                 )
             },

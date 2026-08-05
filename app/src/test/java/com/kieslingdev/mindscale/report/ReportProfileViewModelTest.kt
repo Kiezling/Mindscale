@@ -1,6 +1,7 @@
 package com.kieslingdev.mindscale.report
 
 import androidx.lifecycle.SavedStateHandle
+import com.kieslingdev.mindscale.data.BreathingSession
 import com.kieslingdev.mindscale.data.DataControlDao
 import com.kieslingdev.mindscale.data.DataSnapshot
 import com.kieslingdev.mindscale.data.Entry
@@ -283,6 +284,11 @@ private class FakeDataControlDao(private val profileDao: FakeProfileDao) : DataC
     override suspend fun safetyPlanItemCount(): Int = 0
     override suspend fun deleteSafetyPlanItems(): Int = 0
     override suspend fun insertSafetyPlanItems(items: List<SafetyPlanItem>): List<Long> =
+        emptyList()
+    override suspend fun allBreathingSessions(): List<BreathingSession> = emptyList()
+    override suspend fun breathingSessionCount(): Int = 0
+    override suspend fun deleteBreathingSessions(): Int = 0
+    override suspend fun insertBreathingSessions(sessions: List<BreathingSession>): List<Long> =
         emptyList()
     override suspend fun resetSettings(defaults: TrackSettings): Int = 1
     override suspend fun resetProfile(defaults: UserProfile): Int = 1

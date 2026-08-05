@@ -104,7 +104,7 @@ class SettingsImportViewModelTest {
 
         assertNull(vm.uiState.value.pendingImport)
         assertNull(vm.uiState.value.importError)
-        assertEquals(ImportMessages.restored(1, 1, 1, 1, 0), vm.uiState.value.message)
+        assertEquals(ImportMessages.restored(1, 1, 1, 1, 0, 0), vm.uiState.value.message)
         assertEquals(listOf(11L), data.entries.map { it.id })
         assertEquals(listOf(12L), data.sleeps.map { it.id })
         assertEquals(listOf(13L), data.markers.map { it.id })
@@ -135,7 +135,7 @@ class SettingsImportViewModelTest {
         vm.confirmImport()
         dispatcher.scheduler.advanceUntilIdle()
 
-        assertEquals(ImportMessages.added(0, 0, 1), vm.uiState.value.message)
+        assertEquals(ImportMessages.added(0, 0, 1, 0), vm.uiState.value.message)
         assertEquals(2, data.markers.size)
         assertEquals(1, data.entries.size)
         assertEquals("Kept", data.profile.displayName)
@@ -302,7 +302,7 @@ class SettingsImportViewModelTest {
 
         // The mutation completed, so the user is told exactly that — not that it was
         // cancelled while their records changed underneath them.
-        assertEquals(ImportMessages.added(0, 0, 1), vm.uiState.value.message)
+        assertEquals(ImportMessages.added(0, 0, 1, 0), vm.uiState.value.message)
         assertNull(vm.uiState.value.pendingImport)
         assertFalse(vm.uiState.value.importing)
         assertEquals(2, data.markers.size)

@@ -177,4 +177,36 @@ class SettingsImportScreenTest {
         composeTestRule.onNodeWithTag("import_error").assertIsDisplayed()
         composeTestRule.onNodeWithText(ImportMessages.READ_FAILED).assertExists()
     }
+
+    /**
+     * Both of these sentences enumerate what a records CSV holds, and Phase 14 added a
+     * fourth record type to it. Installed-app inspection caught them still claiming the
+     * old three, which would have told a user their breathing sessions were excluded from
+     * a file that in fact contains them (`docs/specs/SPEC-paced-breathing.md`, D-9).
+     */
+    @Test
+    fun theDataSectionSaysARecordsCsvCarriesBreathingSessions() {
+        setContent()
+
+        composeTestRule.onNodeWithTag("settings_screen")
+            .performScrollToNode(hasTestTag("export_records"))
+        composeTestRule.onNodeWithText(
+            "Records CSV contains ratings, sleep, marked events, and breathing sessions only. " +
+                "It excludes your Profile name and external PHQ-8/GAD-7 totals. JSON backup " +
+                "includes them; Clinician summary exports the bounded factual summary."
+        ).assertIsDisplayed()
+    }
+
+    @Test
+    fun theImportSectionSaysARecordsCsvAddsBreathingSessions() {
+        setContent()
+
+        composeTestRule.onNodeWithTag("settings_screen")
+            .performScrollToNode(hasTestTag("import_records"))
+        composeTestRule.onNodeWithText(
+            "Restoring a backup replaces everything on this device. Importing a records CSV " +
+                "only adds ratings, sleep, marked events, and breathing sessions. MindScale " +
+                "shows exactly what will change and waits for you to confirm."
+        ).assertIsDisplayed()
+    }
 }

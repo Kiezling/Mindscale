@@ -72,7 +72,8 @@ class ImportDaoTest {
             )
         ),
         settings: TrackSettings = TrackSettings(id = 0, anchor2 = "restored anchor", themeMode = ThemeMode.DARK),
-        profile: UserProfile = UserProfile(id = 0, displayName = "Restored Name")
+        profile: UserProfile = UserProfile(id = 0, displayName = "Restored Name"),
+        breathingSessions: List<BreathingSession> = emptyList()
     ) = BackupPayload(
         version = 5,
         exportedAt = java.time.Instant.parse("2026-08-04T00:00:00Z"),
@@ -81,7 +82,8 @@ class ImportDaoTest {
         markers = markers,
         settings = settings,
         profile = profile,
-        externalScores = externalScores
+        externalScores = externalScores,
+        breathingSessions = breathingSessions
     )
 
     // ---- 1: replaceEverything on a populated database ----
@@ -232,6 +234,113 @@ class ImportDaoTest {
     }
 
     // ---- 5: post-replace invariants ----
+
+    // ---- Phase 14: breathing sessions travel with both import paths ----
+
+    /**
+     * A restore replaces sessions with the file's, ids verbatim, exactly as it does every
+     * other record (`docs/specs/SPEC-paced-breathing.md`, D-9, Invariant 8).
+     */
+    @Test
+    fun replaceEverything_replacesBreathingSessionsWithTheFilesRowsVerbatim() = runBlocking {
+        seedPriorData()
+        database.breathingSessionDao().insert(BreathingSession(startedAt = 10, endedAt = 70))
+        assertEquals(1, dao().breathingSessionCount())
+
+        val counts = dao().replaceEverything(
+            backupPayload(
+                breathingSessions = listOf(
+                    BreathingSession(id = 105, startedAt = 6_000, endedAt = 66_000),
+                    BreathingSession(id = 106, startedAt = 70_000, endedAt = 70_000)
+                )
+            )
+        )
+
+        assertEquals(2, counts.breathingSessions)
+        val snapshot = dao().snapshot()
+        assertEquals(listOf(106L, 105L), snapshot.breathingSessions.map(BreathingSession::id))
+        assertEquals(
+            listOf(0L, 60_000L),
+            snapshot.breathingSessions.map { it.endedAt - it.startedAt }
+        )
+    }
+
+    /** A pre-version-7 backup carries none, so a restore leaves the device with none. */
+    @Test
+    fun replaceEverything_withNoBreathingSessions_clearsTheStoredOnes() = runBlocking {
+        database.breathingSessionDao().insert(BreathingSession(startedAt = 10, endedAt = 70))
+
+        val counts = dao().replaceEverything(backupPayload())
+
+        assertEquals(0, counts.breathingSessions)
+        assertEquals(0, dao().breathingSessionCount())
+    }
+
+    @Test
+    fun addRecords_appendsBreathingSessionsAndLeavesEverythingElseAlone() = runBlocking {
+        seedPriorData()
+        database.breathingSessionDao().insert(BreathingSession(startedAt = 10, endedAt = 70))
+        val before = dao().snapshot()
+
+        val counts = dao().addRecords(
+            RecordsPayload(
+                entries = emptyList(),
+                sleeps = emptyList(),
+                markers = emptyList(),
+                breathingSessions = listOf(BreathingSession(startedAt = 80_000, endedAt = 140_000))
+            )
+        ) { true }
+
+        assertEquals(1, counts.breathingSessions)
+        val after = dao().snapshot()
+        assertEquals(2, after.breathingSessions.size)
+        assertEquals(before.entries, after.entries)
+        assertEquals(before.sleeps, after.sleeps)
+        assertEquals(before.markers, after.markers)
+        assertEquals(before.settings, after.settings)
+        assertEquals(before.profile, after.profile)
+        assertEquals(before.externalScores, after.externalScores)
+        assertEquals(before.safetyPlan, after.safetyPlan)
+    }
+
+    @Test
+    fun addRecords_recheckFails_leavesBreathingSessionsUntouched() = runBlocking {
+        database.breathingSessionDao().insert(BreathingSession(startedAt = 10, endedAt = 70))
+
+        runCatching {
+            dao().addRecords(
+                RecordsPayload(
+                    entries = emptyList(),
+                    sleeps = emptyList(),
+                    markers = emptyList(),
+                    breathingSessions = listOf(BreathingSession(startedAt = 80_000, endedAt = 140_000))
+                )
+            ) { false }
+        }
+
+        assertEquals(1, dao().breathingSessionCount())
+    }
+
+    @Test
+    fun eraseEverything_deletesBreathingSessionsAndReportsTheCount() = runBlocking {
+        seedPriorData()
+        database.breathingSessionDao().insert(BreathingSession(startedAt = 10, endedAt = 70))
+        database.breathingSessionDao().insert(BreathingSession(startedAt = 80, endedAt = 140))
+
+        val counts = dao().eraseEverythingAndResetSettings()
+
+        assertEquals(2, counts.breathingSessions)
+        assertEquals(0, dao().breathingSessionCount())
+        // The setting returns to its default rather than being left where the user had it.
+        assertEquals(TrackSettings().breathingOn, dao().settings().breathingOn)
+    }
+
+    /** The record snapshot the CSV conflict re-check reads must include sessions. */
+    @Test
+    fun recordSnapshot_carriesTheStoredBreathingSessions() = runBlocking {
+        database.breathingSessionDao().insert(BreathingSession(startedAt = 10, endedAt = 70))
+        assertEquals(1, dao().recordSnapshot().breathingSessions.size)
+    }
 
     @Test
     fun afterReplaceEverything_snapshotHasExactlyOneSettingsAndProfileRow_andAtMostOneOpenSleep() = runBlocking {

@@ -42,11 +42,11 @@ class SafetyBackupTest {
     )
 
     @Test
-    fun exportIsVersionSixAndOrderedByCanonicalStepThenPosition() {
+    fun exportIsVersionSevenAndOrderedByCanonicalStepThenPosition() {
         // Deliberately shuffled: the encoder, not the caller, owns the order.
         val encoded = encodeBackup(snapshot(plan.reversed()), exportedAt)
 
-        assertTrue(encoded.contains("\"version\": 6,"))
+        assertTrue(encoded.contains("\"version\": 7,"))
         val steps = Regex("\"step\": \"([A-Z_]+)\"").findAll(encoded).map { it.groupValues[1] }
         assertEquals(
             listOf("WARNING_SIGNS", "WARNING_SIGNS", "PEOPLE_FOR_HELP", "ENVIRONMENT_SAFETY"),
@@ -73,10 +73,10 @@ class SafetyBackupTest {
     }
 
     @Test
-    fun aVersionSixBackupRoundTripsByteForByte() {
+    fun aVersionSevenBackupRoundTripsByteForByte() {
         val encoded = encodeBackup(snapshot(), exportedAt)
         val parsed = parseBackup(encoded) as ParseResult.Ok
-        assertEquals(6, parsed.value.version)
+        assertEquals(7, parsed.value.version)
         assertEquals(plan, parsed.value.safetyPlan)
         assertEquals(encoded, encodeBackup(snapshot(parsed.value.safetyPlan), exportedAt))
     }
@@ -90,14 +90,14 @@ class SafetyBackupTest {
     }
 
     @Test
-    fun aVersionSevenBackupIsRejectedAsNewer() {
-        val newer = encodeBackup(snapshot(), exportedAt).replace("\"version\": 6,", "\"version\": 7,")
+    fun aVersionEightBackupIsRejectedAsNewer() {
+        val newer = encodeBackup(snapshot(), exportedAt).replace("\"version\": 7,", "\"version\": 8,")
         val rejected = parseBackup(newer) as ParseResult.Rejected
         assertEquals(ImportMessages.NEWER_VERSION, rejected.message)
     }
 
     @Test
-    fun aVersionSixFileMissingTheSafetyPlanKeyIsRejected() {
+    fun aVersionSevenFileMissingTheSafetyPlanKeyIsRejected() {
         val encoded = encodeBackup(snapshot(emptyList()), exportedAt)
             .replace(",\n  \"safetyPlan\": []", "")
         val rejected = parseBackup(encoded) as ParseResult.Rejected
