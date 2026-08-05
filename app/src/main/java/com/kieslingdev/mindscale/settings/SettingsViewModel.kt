@@ -3,27 +3,41 @@ package com.kieslingdev.mindscale.settings
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.kieslingdev.mindscale.data.BackupPayload
 import com.kieslingdev.mindscale.data.DataControlDao
 import com.kieslingdev.mindscale.data.DEFAULT_ONSET_CHIPS
 import com.kieslingdev.mindscale.data.HourFormat
 import com.kieslingdev.mindscale.data.HoldDuration
+import com.kieslingdev.mindscale.data.ImportConflictException
+import com.kieslingdev.mindscale.data.RecordsPayload
 import com.kieslingdev.mindscale.data.SleepSettingOutcome
 import com.kieslingdev.mindscale.data.ThemeMode
 import com.kieslingdev.mindscale.data.TrackSettings
 import com.kieslingdev.mindscale.data.TrackSettingsDao
+import java.io.InputStream
 import java.time.Instant
+import java.time.ZoneId
+import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 private const val A2_KEY = "settings.anchor2"
 private const val A5_KEY = "settings.anchor5"
 private const val A8_KEY = "settings.anchor8"
 private const val CHIPS_KEY = "settings.chips"
+
+// The only two import primitives that may be persisted. Raw file bytes, decoded text,
+// parsed records, and preview payloads never enter saved state, which the system writes
+// to disk (Phase 12, D-9).
+private const val IMPORT_KIND_KEY = "settings.import.kind"
+private const val IMPORT_PREVIEW_PENDING_KEY = "settings.import.previewPending"
 
 enum class ExportKind { BACKUP, RECORDS, ERASE_BACKUP }
 
@@ -38,6 +52,13 @@ data class PendingDocument(
 
 data class EraseConfirmation(val entryCount: Int, val sleepCount: Int, val markerCount: Int)
 
+/** A validated, previewed import awaiting explicit confirmation (Phase 12, D-7). */
+data class PendingImport(
+    val kind: ImportKind,
+    val payload: ImportPayload,
+    val preview: ImportPreview
+)
+
 data class SettingsUiState(
     val settings: TrackSettings = TrackSettings(),
     val anchorDraft: AnchorDraft = AnchorDraft(),
@@ -50,7 +71,11 @@ data class SettingsUiState(
     val eraseConfirmation: EraseConfirmation? = null,
     val eraseRevision: Long = 0,
     val message: String? = null,
-    val readError: String? = null
+    val readError: String? = null,
+    val importLaunch: ImportKind? = null,
+    val importing: Boolean = false,
+    val pendingImport: PendingImport? = null,
+    val importError: String? = null
 )
 
 class SettingsViewModel(
@@ -58,7 +83,12 @@ class SettingsViewModel(
     private val dataControlDao: DataControlDao,
     private val savedStateHandle: SavedStateHandle = SavedStateHandle(),
     private val nowProvider: () -> Instant = Instant::now,
-    private val onEraseCompleted: () -> Unit = {}
+    private val onEraseCompleted: () -> Unit = {},
+    private val zoneProvider: () -> ZoneId = ZoneId::systemDefault,
+    private val onDataReplaced: () -> Unit = {},
+    // Injected so reading and parsing stay off the main thread in production and stay
+    // deterministic under test.
+    private val ioContext: CoroutineContext = Dispatchers.IO
 ) : ViewModel() {
 
     private val restoredAnchors = listOf(A2_KEY, A5_KEY, A8_KEY).any(savedStateHandle::contains)
@@ -71,13 +101,20 @@ class SettingsViewModel(
                 savedStateHandle[A5_KEY] ?: "",
                 savedStateHandle[A8_KEY] ?: ""
             ),
-            chipDraft = savedStateHandle[CHIPS_KEY] ?: ""
+            chipDraft = savedStateHandle[CHIPS_KEY] ?: "",
+            // A preview that did not survive recreation is reported, never silently
+            // reinstated from a persisted URI or a re-read of the file (D-9).
+            importError = if (savedStateHandle.get<Boolean>(IMPORT_PREVIEW_PENDING_KEY) == true) {
+                ImportMessages.PREVIEW_LOST
+            } else null
         )
     )
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
     private var settingsJob: Job? = null
+    private var importJob: Job? = null
 
     init {
+        clearImportSavedState()
         startSettingsCollection()
     }
 
@@ -296,7 +333,9 @@ class SettingsViewModel(
                 showMessage("Could not erase the data. Nothing was partially deleted.")
                 return@launch
             }
+            importJob?.cancel()
             clearDraftSavedState()
+            clearImportSavedState()
             _uiState.update {
                 it.copy(
                     anchorDraft = AnchorDraft(),
@@ -305,12 +344,212 @@ class SettingsViewModel(
                     retryDocument = null,
                     preparingExport = false,
                     eraseConfirmation = null,
+                    importLaunch = null,
+                    importing = false,
+                    pendingImport = null,
+                    importError = null,
                     eraseRevision = maxOf(it.eraseRevision + 1, nowProvider().toEpochMilli()),
                     message = "Everything on this device was erased"
                 )
             }
             runCatching(onEraseCompleted)
         }
+    }
+
+    // ---- Phase 12 import (docs/specs/SPEC-import-restore.md) ----
+
+    fun requestBackupRestore() = startImport(ImportKind.BACKUP_RESTORE)
+
+    fun requestRecordsImport() = startImport(ImportKind.RECORDS_MERGE)
+
+    private fun startImport(kind: ImportKind) {
+        val state = _uiState.value
+        if (state.importing || state.pendingImport != null || state.importLaunch != null) return
+        _uiState.update {
+            it.copy(importLaunch = kind, importError = null, message = null)
+        }
+    }
+
+    /** Consumes the one-shot launch signal so recreation cannot reopen the picker. */
+    fun importLaunchHandled() = _uiState.update { it.copy(importLaunch = null) }
+
+    fun importPickerCanceled() {
+        clearImportSavedState()
+        _uiState.update { it.copy(importLaunch = null, importing = false) }
+    }
+
+    /**
+     * Reads, decodes, parses, validates, and conflict-checks the chosen file entirely off
+     * the main thread, then publishes one immutable preview. Nothing here writes to Room.
+     * [open] is a read-only stream opener supplied by the Compose shell; the ViewModel
+     * never sees a URI, a filename, or a `ContentResolver`.
+     */
+    fun importFileSelected(kind: ImportKind, open: suspend () -> InputStream) {
+        if (_uiState.value.importing || _uiState.value.pendingImport != null) return
+        savedStateHandle[IMPORT_KIND_KEY] = kind.name
+        _uiState.update {
+            it.copy(importLaunch = null, importing = true, importError = null, message = null)
+        }
+        importJob?.cancel()
+        importJob = viewModelScope.launch {
+            val outcome = try {
+                withContext(ioContext) { preflight(kind, open) }
+            } catch (error: Throwable) {
+                if (error is CancellationException) throw error
+                ParseResult.Rejected(ImportMessages.READ_FAILED)
+            }
+            when (outcome) {
+                is ParseResult.Rejected -> {
+                    clearImportSavedState()
+                    _uiState.update { it.copy(importing = false, importError = outcome.message) }
+                }
+                is ParseResult.Ok -> {
+                    savedStateHandle[IMPORT_PREVIEW_PENDING_KEY] = true
+                    _uiState.update { it.copy(importing = false, pendingImport = outcome.value) }
+                }
+            }
+        }
+    }
+
+    private suspend fun preflight(
+        kind: ImportKind,
+        open: suspend () -> InputStream
+    ): ParseResult<PendingImport> {
+        val text = when (val read = open().use(::readBoundedUtf8)) {
+            is ParseResult.Rejected -> return read
+            is ParseResult.Ok -> read.value
+        }
+        val now = nowProvider()
+        return when (kind) {
+            ImportKind.BACKUP_RESTORE -> when (val parsed = parseBackup(text, now, zoneProvider())) {
+                is ParseResult.Rejected -> parsed
+                is ParseResult.Ok -> pendingRestore(parsed.value)
+            }
+            ImportKind.RECORDS_MERGE -> when (val parsed = parseRecordsCsv(text, now)) {
+                is ParseResult.Rejected -> parsed
+                is ParseResult.Ok -> when (
+                    val checked = checkRecordConflicts(parsed.value, dataControlDao.recordSnapshot())
+                ) {
+                    is ParseResult.Rejected -> checked
+                    is ParseResult.Ok -> pendingMerge(checked.value)
+                }
+            }
+        }
+    }
+
+    private suspend fun pendingRestore(backup: BackupPayload): ParseResult<PendingImport> {
+        val existing = dataControlDao.recordSnapshot()
+        val payload = ImportPayload.Restore(backup)
+        val counts = RecordCounts(
+            entries = existing.entries.size,
+            sleeps = existing.sleeps.size,
+            markers = existing.markers.size,
+            externalScores = dataControlDao.allExternalScores().size
+        )
+        return ParseResult.Ok(
+            PendingImport(ImportKind.BACKUP_RESTORE, payload, previewOf(payload, counts))
+        )
+    }
+
+    private fun pendingMerge(records: RecordsPayload): ParseResult<PendingImport> {
+        val payload = ImportPayload.Merge(records)
+        return ParseResult.Ok(
+            PendingImport(ImportKind.RECORDS_MERGE, payload, previewOf(payload, RecordCounts()))
+        )
+    }
+
+    /**
+     * Cancels a preview that has not been confirmed yet.
+     *
+     * Once [confirmImport] has started the Room transaction the operation is deliberately
+     * no longer cancellable. Clearing the pending state mid-mutation would tell the user
+     * the import was cancelled while the transaction went on to complete, so the reported
+     * state would not match their data. Writes stay cancellable only before the
+     * transaction starts (D-10, D-11).
+     */
+    fun cancelImport() {
+        if (_uiState.value.importing) return
+        importJob?.cancel()
+        clearImportSavedState()
+        _uiState.update {
+            it.copy(importLaunch = null, importing = false, pendingImport = null)
+        }
+    }
+
+    fun confirmImport() {
+        val pending = _uiState.value.pendingImport ?: return
+        _uiState.update { it.copy(importing = true) }
+        viewModelScope.launch {
+            try {
+                when (val payload = pending.payload) {
+                    is ImportPayload.Restore -> applyRestore(payload.backup)
+                    is ImportPayload.Merge -> applyMerge(payload.records)
+                }
+            } catch (error: Throwable) {
+                if (error is CancellationException) throw error
+                clearImportSavedState()
+                _uiState.update {
+                    it.copy(
+                        importing = false,
+                        pendingImport = null,
+                        importError = if (error is ImportConflictException) {
+                            ImportMessages.RECORDS_CHANGED
+                        } else {
+                            ImportMessages.IMPORT_FAILED
+                        }
+                    )
+                }
+            }
+        }
+    }
+
+    private suspend fun applyRestore(backup: BackupPayload) {
+        val counts = dataControlDao.replaceEverything(backup)
+        clearImportSavedState()
+        clearDraftSavedState()
+        // Settings were replaced, so the seeded drafts are stale. Reseed them from the
+        // restored values rather than letting a stale draft overwrite them on next save.
+        val settings = backup.settings
+        _uiState.update {
+            it.copy(
+                importing = false,
+                pendingImport = null,
+                importError = null,
+                anchorDraft = AnchorDraft(settings.anchor2, settings.anchor5, settings.anchor8),
+                chipDraft = settings.onsetChips.joinToString(", "),
+                anchorError = null,
+                chipError = null,
+                pendingDocument = null,
+                retryDocument = null,
+                eraseConfirmation = null,
+                message = ImportMessages.restored(
+                    counts.entries, counts.sleeps, counts.markers, counts.externalScores
+                )
+            )
+        }
+        runCatching(onDataReplaced)
+    }
+
+    private suspend fun applyMerge(records: RecordsPayload) {
+        val counts = dataControlDao.addRecords(records) { snapshot ->
+            checkRecordConflicts(records, snapshot) is ParseResult.Ok
+        }
+        clearImportSavedState()
+        _uiState.update {
+            it.copy(
+                importing = false,
+                pendingImport = null,
+                importError = null,
+                message = ImportMessages.added(counts.entries, counts.sleeps, counts.markers)
+            )
+        }
+    }
+
+    fun dismissImportError() = _uiState.update { it.copy(importError = null) }
+
+    private fun clearImportSavedState() {
+        savedStateHandle.remove<String>(IMPORT_KIND_KEY)
+        savedStateHandle.remove<Boolean>(IMPORT_PREVIEW_PENDING_KEY)
     }
 
     fun dismissMessage() = _uiState.update { it.copy(message = null) }

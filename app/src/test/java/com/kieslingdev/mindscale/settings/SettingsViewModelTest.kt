@@ -125,14 +125,55 @@ class SettingsViewModelTest {
     }
 }
 
-private class FakeDataControlDao : DataControlDao {
-    private val entries = mutableListOf(Entry(id = 1, ts = 1_000, value = 4))
-    private val sleeps = mutableListOf(SleepInterval(id = 2, startTs = 2_000, endTs = 3_000))
-    private val markers = mutableListOf(Marker(id = 3, ts = 4_000, text = "event"))
-    private var settings = TrackSettings()
-    private var profile = UserProfile()
-    private val externalScores = mutableListOf<ExternalScore>()
+/**
+ * In-memory stand-in for the record tables. The `@Transaction` default methods on
+ * [DataControlDao] are inherited unchanged, so the import transaction body and all of its
+ * post-mutation checks are exercised here exactly as production runs them.
+ */
+internal class FakeDataControlDao : DataControlDao {
+    val entries = mutableListOf(Entry(id = 1, ts = 1_000, value = 4))
+    val sleeps = mutableListOf(SleepInterval(id = 2, startTs = 2_000, endTs = 3_000))
+    val markers = mutableListOf(Marker(id = 3, ts = 4_000, text = "event"))
+    var settings = TrackSettings()
+    var profile = UserProfile()
+    val externalScores = mutableListOf<ExternalScore>()
     var eraseCalls = 0
+    var failInsert = false
+    private var nextId = 100L
+
+    /** Mirrors Room: a zero id is generated, a non-zero id is inserted verbatim. */
+    private fun generated(id: Long): Long = if (id == 0L) ++nextId else id
+
+    override suspend fun insertEntries(entries: List<Entry>): List<Long> =
+        insert(entries, this.entries) { it.copy(id = generated(it.id)) }
+
+    override suspend fun insertSleeps(sleeps: List<SleepInterval>): List<Long> =
+        insert(sleeps, this.sleeps) { it.copy(id = generated(it.id)) }
+
+    override suspend fun insertMarkers(markers: List<Marker>): List<Long> =
+        insert(markers, this.markers) { it.copy(id = generated(it.id)) }
+
+    override suspend fun insertExternalScores(scores: List<ExternalScore>): List<Long> =
+        insert(scores, this.externalScores) { it.copy(id = generated(it.id)) }
+
+    private fun <T> insert(incoming: List<T>, into: MutableList<T>, assign: (T) -> T): List<Long> {
+        if (failInsert && incoming.isNotEmpty()) error("insert failed")
+        return incoming.map { row ->
+            val stored = assign(row)
+            into += stored
+            when (stored) {
+                is Entry -> stored.id
+                is SleepInterval -> stored.id
+                is Marker -> stored.id
+                is ExternalScore -> stored.id
+                else -> 0L
+            }
+        }
+    }
+
+    override suspend fun openSleepCount(): Int = sleeps.count { it.endTs == null }
+    override suspend fun settingsRowCount(): Int = 1
+    override suspend fun profileRowCount(): Int = 1
 
     override suspend fun allEntries(): List<Entry> = entries.toList()
     override suspend fun allSleeps(): List<SleepInterval> = sleeps.toList()
