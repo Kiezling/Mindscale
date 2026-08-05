@@ -47,10 +47,16 @@ data class PendingDocument(
     val contents: String,
     val entryCount: Int,
     val sleepCount: Int,
-    val markerCount: Int
+    val markerCount: Int,
+    val safetyPlanItemCount: Int
 )
 
-data class EraseConfirmation(val entryCount: Int, val sleepCount: Int, val markerCount: Int)
+data class EraseConfirmation(
+    val entryCount: Int,
+    val sleepCount: Int,
+    val markerCount: Int,
+    val safetyPlanItemCount: Int
+)
 
 /** A validated, previewed import awaiting explicit confirmation (Phase 12, D-7). */
 data class PendingImport(
@@ -267,7 +273,8 @@ class SettingsViewModel(
                             contents = contents,
                             entryCount = snapshot.entries.size,
                             sleepCount = snapshot.sleeps.size,
-                            markerCount = snapshot.markers.size
+                            markerCount = snapshot.markers.size,
+                            safetyPlanItemCount = snapshot.safetyPlan.size
                         ),
                         retryDocument = null
                     )
@@ -311,7 +318,8 @@ class SettingsViewModel(
                     eraseConfirmation = EraseConfirmation(
                         document.entryCount,
                         document.sleepCount,
-                        document.markerCount
+                        document.markerCount,
+                        document.safetyPlanItemCount
                     ),
                     message = "Backup saved"
                 )
@@ -444,7 +452,8 @@ class SettingsViewModel(
             entries = existing.entries.size,
             sleeps = existing.sleeps.size,
             markers = existing.markers.size,
-            externalScores = dataControlDao.allExternalScores().size
+            externalScores = dataControlDao.allExternalScores().size,
+            safetyPlanItems = dataControlDao.safetyPlanItemCount()
         )
         return ParseResult.Ok(
             PendingImport(ImportKind.BACKUP_RESTORE, payload, previewOf(payload, counts))
@@ -523,7 +532,11 @@ class SettingsViewModel(
                 retryDocument = null,
                 eraseConfirmation = null,
                 message = ImportMessages.restored(
-                    counts.entries, counts.sleeps, counts.markers, counts.externalScores
+                    counts.entries,
+                    counts.sleeps,
+                    counts.markers,
+                    counts.externalScores,
+                    counts.safetyPlanItems
                 )
             )
         }

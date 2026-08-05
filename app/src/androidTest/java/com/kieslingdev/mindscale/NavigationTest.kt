@@ -34,6 +34,52 @@ class NavigationTest {
         composeTestRule.onNodeWithTag("numpad_key_1").assertExists()
     }
 
+    /**
+     * The Safety card is reachable from Track by one tap and returns to Track on Back.
+     * It is an overlay, not a fourth tab: it is a resource, not a place the instrument
+     * expects you to spend time (`docs/specs/SPEC-safety-card.md`, D-6).
+     */
+    @Test
+    fun safetyCardOpensFromTrackAndBackReturnsToTrack() {
+        composeTestRule.onNodeWithTag("track_screen")
+            .performScrollToNode(hasTestTag("safety_link"))
+        composeTestRule.onNodeWithTag("safety_link").performClick()
+        composeTestRule.onNodeWithTag("safety_screen").assertExists()
+        composeTestRule.onNodeWithTag("main_navigation").assertDoesNotExist()
+
+        pressBack()
+
+        composeTestRule.onNodeWithTag("numpad_key_1").assertExists()
+    }
+
+    @Test
+    fun safetyCardOpensFromProfileAndBackReturnsToProfile() {
+        composeTestRule.onNodeWithTag("profile_action").performClick()
+        composeTestRule.onNodeWithTag("profile_screen").assertExists()
+        composeTestRule.onNodeWithTag("profile_screen")
+            .performScrollToNode(hasTestTag("profile_open_safety"))
+        composeTestRule.onNodeWithTag("profile_open_safety").performClick()
+        composeTestRule.onNodeWithTag("safety_screen").assertExists()
+
+        pressBack()
+
+        composeTestRule.onNodeWithTag("profile_screen").assertExists()
+    }
+
+    @Test
+    fun theSafetyDestination_survivesActivityRecreation() {
+        composeTestRule.onNodeWithTag("track_screen")
+            .performScrollToNode(hasTestTag("safety_link"))
+        composeTestRule.onNodeWithTag("safety_link").performClick()
+        composeTestRule.onNodeWithTag("safety_screen").assertExists()
+
+        composeTestRule.activityRule.scenario.recreate()
+
+        composeTestRule.onNodeWithTag("safety_screen").assertExists()
+        pressBack()
+        composeTestRule.onNodeWithTag("numpad_key_1").assertExists()
+    }
+
     @Test
     fun selectedLogDestination_survivesActivityRecreation() {
         composeTestRule.onNodeWithText("Log").performClick()

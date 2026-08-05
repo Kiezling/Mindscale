@@ -29,6 +29,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kieslingdev.mindscale.data.ExternalInstrument
+import com.kieslingdev.mindscale.safety.SafetyCopy
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -40,10 +41,11 @@ fun ProfileRoute(
     viewModel: ReportProfileViewModel,
     onOpenReport: () -> Unit,
     onOpenSettings: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onOpenSafety: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    ProfileScreen(uiState, viewModel, onOpenReport, onOpenSettings, modifier)
+    ProfileScreen(uiState, viewModel, onOpenReport, onOpenSettings, modifier, onOpenSafety)
 }
 
 @Composable
@@ -52,7 +54,8 @@ fun ProfileScreen(
     viewModel: ReportProfileViewModel,
     onOpenReport: () -> Unit,
     onOpenSettings: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onOpenSafety: () -> Unit = {}
 ) {
     val pendingDelete = uiState.pendingDeleteScoreId?.let { id -> uiState.scores.firstOrNull { it.id == id } }
     LazyColumn(
@@ -105,6 +108,15 @@ fun ProfileScreen(
                     onClick = onOpenSettings,
                     modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("profile_open_settings")
                 ) { Text("Settings") }
+            }
+        }
+        item(key = "safety") {
+            ProfileSection("Safety") {
+                TextButton(
+                    onClick = onOpenSafety,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
+                        .testTag("profile_open_safety")
+                ) { Text(SafetyCopy.PROFILE_ROW) }
             }
         }
         item(key = "score_intro") {

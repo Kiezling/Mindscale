@@ -9,10 +9,17 @@ import com.kieslingdev.mindscale.data.ExternalScoreProvenance
 import com.kieslingdev.mindscale.data.HoldDuration
 import com.kieslingdev.mindscale.data.HourFormat
 import com.kieslingdev.mindscale.data.Marker
+import com.kieslingdev.mindscale.data.SafetyPlanItem
+import com.kieslingdev.mindscale.data.SafetyPlanStep
 import com.kieslingdev.mindscale.data.SleepInterval
 import com.kieslingdev.mindscale.data.ThemeMode
 import com.kieslingdev.mindscale.data.TrackSettings
 import com.kieslingdev.mindscale.data.UserProfile
+import com.kieslingdev.mindscale.safety.MAX_PLAN_ITEMS_PER_STEP
+import com.kieslingdev.mindscale.safety.MAX_PLAN_ITEMS_TOTAL
+import com.kieslingdev.mindscale.safety.PlanFieldResult
+import com.kieslingdev.mindscale.safety.validatePlanPhone
+import com.kieslingdev.mindscale.safety.validatePlanText
 import java.time.Instant
 import java.time.ZoneId
 import java.util.Locale
@@ -32,6 +39,9 @@ private const val BACKUP_FORMAT = "mindscale-backup"
 private val BASE_ROOT_KEYS =
     setOf("format", "version", "exportedAt", "entries", "sleeps", "markers", "settings")
 private val V5_ROOT_KEYS = BASE_ROOT_KEYS + setOf("profile", "externalScores")
+private val V6_ROOT_KEYS = V5_ROOT_KEYS + "safetyPlan"
+
+private val PLAN_KEYS = setOf("id", "step", "position", "text", "phone")
 
 private val ENTRY_KEYS = setOf("id", "timestamp", "intensity", "chips", "note", "kind")
 private val SLEEP_KEYS = setOf("id", "start", "end")
@@ -70,7 +80,14 @@ private fun readBackup(text: String, now: Instant, zone: ZoneId): BackupPayload 
     if (version < MIN_BACKUP_VERSION) reject(ImportMessages.UNSUPPORTED_VERSION)
 
     val hasProfileAndScores = version >= 5
-    root.requireExactKeys(if (hasProfileAndScores) V5_ROOT_KEYS else BASE_ROOT_KEYS)
+    val hasSafetyPlan = version >= 6
+    root.requireExactKeys(
+        when {
+            hasSafetyPlan -> V6_ROOT_KEYS
+            hasProfileAndScores -> V5_ROOT_KEYS
+            else -> BASE_ROOT_KEYS
+        }
+    )
 
     // Metadata only, never stored in a column, and written by `Instant.now()` at
     // microsecond precision — so it keeps its exact parsed value (see `requireInstant`).
@@ -82,12 +99,14 @@ private fun readBackup(text: String, now: Instant, zone: ZoneId): BackupPayload 
     val sleepValues = root.arr("sleeps")
     val markerValues = root.arr("markers")
     val scoreValues = if (hasProfileAndScores) root.arr("externalScores") else emptyList()
+    val planValues = if (hasSafetyPlan) root.arr("safetyPlan") else emptyList()
     requireCounts(entryValues.size, sleepValues.size, markerValues.size, scoreValues.size)
 
     val entries = entryValues.map { readEntry(it, now) }
     val sleeps = sleepValues.map { readSleep(it, now) }
     val markers = markerValues.map { readMarker(it, now) }
     val scores = scoreValues.map { readScore(it, now, zone) }
+    val plan = planValues.map(::readPlanItem)
 
     requireUniqueIds(entries.map(Entry::id))
     requireUniqueIds(sleeps.map(SleepInterval::id))
@@ -95,6 +114,8 @@ private fun readBackup(text: String, now: Instant, zone: ZoneId): BackupPayload 
     requireUniqueIds(scores.map(ExternalScore::id))
     requireUniqueAssessments(scores)
     requireSleepStructure(sleeps)
+    requireUniqueIds(plan.map(SafetyPlanItem::id))
+    requirePlanStructure(plan)
 
     return BackupPayload(
         version = version,
@@ -105,8 +126,57 @@ private fun readBackup(text: String, now: Instant, zone: ZoneId): BackupPayload 
         settings = readSettings(root.obj("settings"), version),
         // Absent before version 5. The preview discloses the empty name verbatim (D-2).
         profile = if (hasProfileAndScores) readProfile(root.obj("profile")) else UserProfile(),
-        externalScores = scores
+        externalScores = scores,
+        // Absent before version 6. The preview says so verbatim before anything is
+        // written, because a restore that silently emptied a safety plan would be the
+        // worst possible kind of quiet data loss (Phase 13, D-9).
+        safetyPlan = plan
     )
+}
+
+/**
+ * A safety-plan line from a file is held to exactly the rules the Safety screen enforces
+ * on a line the user types — same functions, no import-only leniency (Phase 13, D-5, D-9).
+ */
+private fun readPlanItem(value: JsonValue): SafetyPlanItem {
+    val obj = value.asObj()
+    obj.requireExactKeys(PLAN_KEYS)
+    val step = SafetyPlanStep.entries
+        .firstOrNull { it.name == obj.str("step", ImportMessages.BACKUP_SHAPE) }
+        ?: reject(ImportMessages.BACKUP_SHAPE)
+    val position = obj.int("position")
+    if (position < 0) reject(ImportMessages.UNSTORABLE_VALUE)
+    val text = when (val result = validatePlanText(obj.str("text", ImportMessages.BACKUP_SHAPE))) {
+        is PlanFieldResult.Valid -> result.value
+        is PlanFieldResult.Invalid -> reject(ImportMessages.UNSTORABLE_VALUE)
+    }
+    val phone = when (val result = validatePlanPhone(obj.nullableStr("phone").orEmpty(), step)) {
+        is PlanFieldResult.Valid -> result.value
+        is PlanFieldResult.Invalid -> reject(ImportMessages.UNSTORABLE_VALUE)
+    }
+    return SafetyPlanItem(
+        id = requireRowId(obj.long("id")),
+        step = step,
+        position = position,
+        text = text,
+        phone = phone
+    )
+}
+
+/**
+ * Positions must already be exactly `0 until size` within each step, and the per-step and
+ * whole-plan limits must already hold. Nothing is renumbered or trimmed: repairing a file
+ * would mean storing an order the user did not write.
+ */
+private fun requirePlanStructure(plan: List<SafetyPlanItem>) {
+    if (plan.size > MAX_PLAN_ITEMS_TOTAL) reject(ImportMessages.TOO_MANY_RECORDS)
+    SafetyPlanStep.entries.forEach { step ->
+        val positions = plan.filter { it.step == step }.map { it.position }
+        if (positions.size > MAX_PLAN_ITEMS_PER_STEP) reject(ImportMessages.TOO_MANY_RECORDS)
+        if (positions.sorted() != positions.indices.toList()) {
+            reject(ImportMessages.UNSTORABLE_VALUE)
+        }
+    }
 }
 
 private fun readEntry(value: JsonValue, now: Instant): Entry {

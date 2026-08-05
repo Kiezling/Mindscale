@@ -15,6 +15,7 @@ import com.kieslingdev.mindscale.log.LogViewModel
 import com.kieslingdev.mindscale.insights.InsightsViewModel
 import com.kieslingdev.mindscale.settings.SettingsViewModel
 import com.kieslingdev.mindscale.report.ReportProfileViewModel
+import com.kieslingdev.mindscale.safety.SafetyViewModel
 import com.kieslingdev.mindscale.track.TrackViewModel
 import com.kieslingdev.mindscale.ui.theme.MindScaleTheme
 
@@ -97,6 +98,20 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private val safetyViewModel: SafetyViewModel by viewModels {
+        object : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
+                // Only the safety plan. No entry, sleep, marker, episode, or settings
+                // source is wired in, so the card cannot become inferential (Phase 13, D-11).
+                return SafetyViewModel(
+                    planDao = database.safetyPlanDao(),
+                    savedStateHandle = extras.createSavedStateHandle()
+                ) as T
+            }
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -109,6 +124,7 @@ class MainActivity : ComponentActivity() {
                     insightsViewModel = insightsViewModel,
                     settingsViewModel = settingsViewModel,
                     reportProfileViewModel = reportProfileViewModel,
+                    safetyViewModel = safetyViewModel,
                     eraseRevision = settingsState.eraseRevision
                 )
             }

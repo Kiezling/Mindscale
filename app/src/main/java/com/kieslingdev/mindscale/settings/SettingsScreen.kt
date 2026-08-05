@@ -402,7 +402,9 @@ fun SettingsScreen(
                 Text(
                     "This permanently deletes ${confirmation.entryCount} ratings, " +
                         "${confirmation.sleepCount} sleep intervals, and ${confirmation.markerCount} markers. " +
-                        "Your Profile name and all externally obtained totals are also deleted. " +
+                        "Your Profile name, all externally obtained totals, and your safety plan " +
+                        "(${confirmation.safetyPlanItemCount} " +
+                        "${if (confirmation.safetyPlanItemCount == 1) "line" else "lines"}) are also deleted. " +
                         "Anchors, custom words, preferences, drafts, and retained export text reset too."
                 )
             },

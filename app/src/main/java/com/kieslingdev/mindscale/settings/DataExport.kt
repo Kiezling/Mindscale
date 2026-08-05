@@ -15,7 +15,7 @@ fun recordsFilename(at: Instant): String = "mindscale-records-${FilenameFormatte
 fun encodeBackup(snapshot: DataSnapshot, exportedAt: Instant): String = buildString {
     append("{\n")
     append("  \"format\": \"mindscale-backup\",\n")
-    append("  \"version\": 5,\n")
+    append("  \"version\": 6,\n")
     append("  \"exportedAt\": ").appendJson(exportedAt.toString()).append(",\n")
     append("  \"entries\": [")
     snapshot.entries.forEachIndexed { index, entry ->
@@ -76,6 +76,20 @@ fun encodeBackup(snapshot: DataSnapshot, exportedAt: Instant): String = buildStr
                 .append('}')
         }
     if (snapshot.externalScores.isNotEmpty()) append('\n').append("  ")
+    // Canonical Stanley-Brown step order, then position, then id, so a re-export of a
+    // restored backup is byte-identical to the file it came from (Phase 13, D-5).
+    append("],\n  \"safetyPlan\": [")
+    snapshot.safetyPlan
+        .sortedWith(compareBy({ it.step.ordinal }, { it.position }, { it.id }))
+        .forEachIndexed { index, item ->
+            if (index > 0) append(',')
+            append("\n    {\"id\": ${item.id}, \"step\": ")
+                .appendJson(item.step.name)
+                .append(", \"position\": ${item.position}, \"text\": ")
+                .appendJson(item.text)
+                .append(", \"phone\": ").appendNullableJson(item.phone).append('}')
+        }
+    if (snapshot.safetyPlan.isNotEmpty()) append('\n').append("  ")
     append("]\n}")
 }
 
