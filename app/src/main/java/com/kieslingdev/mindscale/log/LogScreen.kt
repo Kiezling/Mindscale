@@ -262,15 +262,17 @@ private fun FilterHeader(
                     .testTag("log_to_button")
                     .semantics { contentDescription = "Choose To date" }
             )
-            MsTextAction(
-                text = "All",
-                onClick = onClear,
-                tone = MsActionTone.Muted,
-                // L-4: the trailing gutter the prototype leaves out.
-                modifier = Modifier
-                    .padding(end = MsSpacing.lgPlus)
-                    .testTag("log_all_button")
-            )
+            // L-4: the trailing gutter the prototype leaves out. It sits on a wrapper rather than
+            // on the action's own modifier so the control's reported bounds stay its touch area
+            // and the gutter is measurable from outside (D-11).
+            Box(modifier = Modifier.padding(end = MsSpacing.lgPlus)) {
+                MsTextAction(
+                    text = "All",
+                    onClick = onClear,
+                    tone = MsActionTone.Muted,
+                    modifier = Modifier.testTag("log_all_button")
+                )
+            }
         }
         state.filterError?.let {
             Text(
@@ -313,8 +315,10 @@ private fun UnderlinedFilterField(
             text = label,
             style = MaterialTheme.typography.bodySmall,
             color = if (isSet) palette.inkSecondary else palette.inkQuaternary,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
+            // Deliberately no `maxLines`/ellipsis. `MMM d, yyyy` fits one line at 200% font on the
+            // API 36 emulator — checked by capture — but on a narrower device a single line would
+            // ellipsize a date to "Aug 6, 2…", and losing characters is worse than a second line.
+            // This is Phase 15's clipped-tab lesson applied before it could happen again (D-17).
             modifier = Modifier.padding(bottom = MsSpacing.xxs)
         )
         // Not `MsHairline`: that paints the decorative separator alpha, and this rule is the

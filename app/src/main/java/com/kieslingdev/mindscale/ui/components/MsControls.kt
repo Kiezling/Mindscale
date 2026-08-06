@@ -85,6 +85,13 @@ fun MsPillButton(
  * 1.35:1 against `card` where D-23 requires 3:1 — which is exactly the case D-6 of the foundation
  * carves out when it says an ink border that is the *only* boundary of an interactive control is
  * not decorative (`docs/specs/SPEC-track-and-log-visual.md`, D-4 and D-15).
+ *
+ * The touch target is a transparent box around the painted pill rather than the pill itself, which
+ * is what D-23 actually prescribes — "the painted geometry is the design's; the target is
+ * MindScale's". Growing the pill to 48 dp instead made an eleven-chip value row read as a row of
+ * tall ovals rather than the design's compact pills, and it still left a chip labelled `0` only
+ * 33 dp *wide*, below the same floor it was over-satisfying vertically. Found by installed-app
+ * capture in Phase 16, which is the only place it was visible (D-15).
  */
 @Composable
 fun MsChip(
@@ -97,23 +104,33 @@ fun MsChip(
     val palette = MaterialTheme.ms
     Box(
         modifier = modifier
-            .defaultMinSize(minHeight = MsSpacing.minTouchTarget)
-            .clip(MsShapes.pill)
-            .background(if (selected) palette.ink else androidx.compose.ui.graphics.Color.Transparent)
-            .border(
-                width = MsSpacing.hairline,
-                color = if (selected) palette.ink else palette.outline,
-                shape = MsShapes.pill
+            .defaultMinSize(
+                minWidth = MsSpacing.minTouchTarget,
+                minHeight = MsSpacing.minTouchTarget
             )
-            .selectable(selected = selected, enabled = enabled, onClick = onClick)
-            .padding(horizontal = MsSpacing.lg, vertical = MsSpacing.smPlus),
+            .selectable(selected = selected, enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
-        Text(
-            text = text,
-            style = MindScaleTextStyles.chip,
-            color = if (selected) palette.onInk else palette.inkTertiary
-        )
+        Box(
+            modifier = Modifier
+                .clip(MsShapes.pill)
+                .background(
+                    if (selected) palette.ink else androidx.compose.ui.graphics.Color.Transparent
+                )
+                .border(
+                    width = MsSpacing.hairline,
+                    color = if (selected) palette.ink else palette.outline,
+                    shape = MsShapes.pill
+                )
+                .padding(horizontal = MsSpacing.lg, vertical = MsSpacing.smPlus),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = text,
+                style = MindScaleTextStyles.chip,
+                color = if (selected) palette.onInk else palette.inkTertiary
+            )
+        }
     }
 }
 

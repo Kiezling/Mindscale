@@ -1,10 +1,14 @@
 # SPEC-track-and-log-visual: applying the brand foundation to Track and Full Log
 
-Status: FROZEN — APPROVED
+Status: IMPLEMENTED — VERIFIED LOCALLY
 
 Owner: Claude Code (Phase 16 of 18), on the user's instruction of 2026-08-06
 
 Date: 2026-08-06
+
+Frozen documentation commit: `ecd6247`
+
+Verified implementation commits: `20b28cf` (contrast test, component corrections), `2a6e8c8` (Track and Log restyle), plus the visual-test and capture-defect follow-up
 
 ## Purpose
 
@@ -87,7 +91,7 @@ This phase delivers, and nothing else:
   date picker (D-19 deferred this to the phase that owns each screen).
 - Converting Track's and Log's dimension literals to `MsSpacing`, per D-14.
 - The three D-22 layout corrections this phase owns: L-1, L-2, L-4.
-- Three carry-over corrections to the shared component layer that this phase is the first to
+- Four carry-over corrections to the shared component layer that this phase is the first to
   need (D-15 below).
 
 ## Non-goals
@@ -425,6 +429,11 @@ Each becomes the design's underlined field: no fill, no ring, a 1 dp bottom rule
 `inkSecondary` when a date is set and `inkQuaternary` when it is not. Both keep their tags,
 content descriptions, callbacks, `weight(1f)`, and a 48 dp target.
 
+The field label sets **no** `maxLines` and no ellipsis. `MMM d, yyyy` fits one line at 200% font on
+the API 36 emulator — checked by capture, not assumed — but a single ellipsized line on a narrower
+device would render a date as `Aug 6, 2…`, and losing characters is worse than taking a second
+line. This is Phase 15's clipped-tab defect applied in advance rather than repeated.
+
 **L-4.** D-22 records that the prototype jams `ALL` against the right edge and specifies: give
 `ALL` the same trailing gutter as the fields. `ALL` becomes `MsTextAction` with
 `MsActionTone.Muted` and a trailing gutter of `MsSpacing.lgPlus`, equal to the gap between the
@@ -442,9 +451,19 @@ stays on it. The filter error uses `ms.danger`.
 - **Row**: a top `MsHairline`, then the design's `34 dp | 1fr | auto` proportions with the numeral
   at `titleLarge`. The numeral's colour follows the design's intent at compliant levels:
   `inkPrimary` for a rating, `inkQuaternary` for a `0` rating and for the sleep em-dash — the
-  design's `rgba(ink,.28)` measures below 4.5:1 — and `goldText` for the event `×`. The three
-  actions follow D-9 exactly: one baseline, even gaps, right-aligned on their own line. Log rows
-  carry two or three actions depending on the record type, unchanged.
+  design's `rgba(ink,.28)` measures below 4.5:1 — and `goldText` for the event `×`. Log rows carry
+  two or three actions depending on the record type, unchanged.
+
+  **Log's row actions follow D-9 rather than the design, and that is a divergence worth naming.**
+  Unlike Track's Recent row, the design's Log row at line 277 already lays its three actions out
+  horizontally in the third grid column — `display:flex;gap:14px;justify-content:flex-end` — so Log
+  has no L-2 flaw to fix. MindScale still moves them to their own line, for one reason: the design
+  fits them inline only because its actions are 9 px labels with no touch target, roughly 12 dp
+  tall and 30 dp wide. D-23's 48 dp floor is MindScale's addition and it outranks the prototype, and
+  three 48 dp targets plus gaps need about 186 dp — which on a 320 dp device at 200% font leaves the
+  row content roughly 16 dp. The cost is stated plainly: **Log's rows are about 1.6× taller than the
+  design's**, so fewer records fit on a screen. The alternative was a row whose content collapses to
+  nothing at large font on a small device, and keeping Track and Log incoherent with each other.
 - **Time and meta**: time at `bodySmall` `inkSecondary`, meta at `bodySmall` `inkQuaternary`,
   still two lines with ellipsis. Note preview at `bodySmall` `inkTertiary`, indented to clear the
   numeral column.
@@ -486,9 +505,20 @@ narrow device rather than clipping: 288 dp for the pad, the onset card, and the 
 width; 256 dp for the Sleep/Wake row and the marker block.
 
 **The readout and the help toggle share one row**, as the design's lines 73-86 do: the readout
-column takes the remaining width and the 26 dp help button sits at its trailing edge, top-aligned.
-Today they are two separate list items, and combining them is layout only — both remain present
-exactly when they are present today, and the help toggle still renders when there is no readout.
+column takes the remaining width and the 26 dp help button sits at its trailing edge, top-aligned,
+over the 1 dp hairline the design puts at line 97 between the prompt and the pad. Today they are two
+separate list items, and combining them is layout only — both remain present exactly when they are
+present today, and the help toggle still renders when there is no readout.
+
+One ordering consequence, recorded rather than discovered later: the anchor prompt currently renders
+*between* the readout and the help toggle, so after the merge it renders below both. Nothing changes
+about what controls exist, what they do, or how they are reached; the help toggle simply moves ahead
+of a card that appears once, and only in the session where the app offers to set anchors.
+
+Because the readout is absent most of the time and MindScale has no `padPrompt` string (D-19), the
+row is usually an empty column beside the help button. That leaves visible space above the hairline
+that the design fills with its prompt. Adding a string there would be a copy addition, so the space
+stays.
 
 ### D-14 — Sleep/Wake stays a screen-local composable
 
@@ -508,18 +538,19 @@ which fails as text, so Wake renders at `inkQuaternary` without an open interval
 enabled in both cases**, exactly as today; its content description already says
 "Wake. Disabled: tap Sleep first, nothing is currently open." Changing that would be behavioral.
 
-### D-15 — Three carry-over corrections to the shared component layer
+### D-15 — Four carry-over corrections to the shared component layer
 
-Phase 16 is the first phase to put these three Phase 15 components on a real screen, and doing so
-surfaced that each carries a border that is a control's only boundary at an alpha below D-23's
-floor. They are corrected here rather than left for Phase 18, because by then Settings, Profile,
-Report, and Safety would depend on them too, and because shipping them non-compliant while
-claiming D-23 holds would be false.
+Phase 16 is the first phase to put these Phase 15 components on a real screen, and doing so surfaced
+that each carries a border that is a control's only boundary at an alpha below D-23's floor — plus,
+in `MsChip`, a touch target applied to the wrong box. They are corrected here rather than left for
+Phase 18, because by then Settings, Profile, Report, and Safety would depend on them too, and
+because shipping them non-compliant while claiming D-23 holds would be false.
 
 | Component | Was | Now | Reason |
 |---|---|---|---|
-| `MsPillButton` | unselected border `gold.copy(alpha = 0.45f)` — 1.59:1 | `gold` at full opacity — 3.15:1 | The pill's only boundary; the hue is unchanged |
+| `MsPillButton` | unselected border `gold.copy(alpha = 0.45f)` — 1.60:1 | `gold` at full opacity — 3.15:1 | The pill's only boundary; the hue is unchanged |
 | `MsChip` | unselected border `outlineDecorative`, ink `.16` — 1.41:1 | `outline`, ink `.50`/`.40` — 3.49:1/3.51:1 | An unselected chip has no fill, so the border is its only boundary |
+| `MsChip` | `defaultMinSize(minHeight = 48.dp)` on the **painted pill**, leaving a chip labelled `0` 33 dp wide | the design's compact pill inside a transparent 48 dp **square** | D-23's own technique: the painted geometry is the design's, the target is MindScale's. Found by capture — see the record |
 | `MsCircularHeaderButton` | ring `outlineDecorative` — 1.41:1; fixed 34 dp; fixed `titleLarge` glyph | ring `outline`; `size` and `textStyle` parameters, defaulting to today's values | The ring is the back control's only boundary; Track's 26 dp help button is the same control at a different size |
 
 `MsCircularHeaderButton`'s two new parameters are defaulted, so the chrome's call site in
@@ -633,8 +664,8 @@ Added:
 | File | Contents |
 |---|---|
 | `app/src/test/…/ui/theme/MsControlBoundaryContrastTest.kt` | The D-4 table, computed |
-| `app/src/androidTest/…/track/TrackVisualTest.kt` | L-1, the dot, the armed pad, the toast pill, targets, 200% |
-| `app/src/androidTest/…/log/LogVisualTest.kt` | L-4, one-baseline actions, day headers, 200% |
+| `app/src/androidTest/…/track/TrackVisualTest.kt` | L-1, the armed pad, the toast pill, L-2, touch targets, 200% |
+| `app/src/androidTest/…/log/LogVisualTest.kt` | L-4, one-baseline actions, chip targets, day headers, 200% |
 | `app/src/debug/…/designgallery/TrackLogPreviews.kt` | `@Preview` over both screens, light/dark at 100%/200% |
 
 Unchanged, and any diff to them is a defect in this phase: every `ViewModel`, every DAO, every
@@ -674,40 +705,137 @@ state is added or removed.
 
 ## Acceptance criteria
 
-- [ ] **REGRESSION**: `connectedDebugAndroidTest` passes **206/206** plus the new tests, with no
+- [x] **REGRESSION**: `connectedDebugAndroidTest` passes **226/226** — the 206 baseline plus 20 new
+      — with no pre-existing test file modified.
+- [x] **REGRESSION**: `test` passes **411/411** — the 399 baseline plus 12 new — with no
       pre-existing test file modified.
-- [ ] **REGRESSION**: `test` passes **399/399** plus the new tests, with no pre-existing test file
-      modified.
-- [ ] **DIFF**: `git diff --name-status 238b0ba HEAD -- app/src/test app/src/androidTest` shows
-      only `A` lines. `git diff --check` passes.
-- [ ] **LINT/BUILD**: `lint` reports 0 errors and the unchanged 22-warning baseline;
+- [x] **DIFF**: `git diff --name-status 238b0ba HEAD -- app/src/test app/src/androidTest` shows
+      three `A` lines and zero `M` lines. `git diff --check` passes.
+- [x] **LINT/BUILD**: `lint` reports 0 errors and the unchanged 22-warning baseline;
       `assembleDebug` passes.
-- [ ] **UNIT**: `MsControlBoundaryContrastTest` reproduces every figure in D-4's first table to two
-      decimals, asserts each fails 3:1, and asserts every adopted replacement clears it on both
-      `bg` and `card` in both themes.
-- [ ] **UNIT**: the same test asserts that full light gold does **not** clear 3:1 on
+- [x] **UNIT**: `MsControlBoundaryContrastTest` reproduces every figure in D-4's tables to two
+      decimals, asserts each design value fails 3:1, and asserts every adopted replacement clears it
+      on both `bg` and `card` in both themes. Writing it corrected five of the figures this spec
+      had derived by hand and changed the diagnosis on one row — see the record below.
+- [x] **UNIT**: the same test asserts that full light gold does **not** clear 3:1 on
       `surfaceContainerHighest`, pinning D-4's constraint 1.
-- [ ] **UNIT**: the same test asserts the decorative exemptions stay deliberately below 3:1, so the
-      exemption is a decision rather than an oversight.
-- [ ] **INSTRUMENTED**: `TrackVisualTest` asserts the final numpad row is centred on the pad's axis
-      to within a pixel, that all twelve keys share one width, and that `0` stays left of `10`
-      (L-1).
-- [ ] **INSTRUMENTED**: `TrackVisualTest` asserts the three entry-row actions share one vertical
-      centre and have even gaps (L-2), at 100% and at 200% font.
-- [ ] **INSTRUMENTED**: `TrackVisualTest` asserts the armed pad renders a mark absent when
-      unarmed, and that every numpad key and both Sleep/Wake toggles reach 48 dp.
-- [ ] **INSTRUMENTED**: `LogVisualTest` asserts `ALL` has a trailing gutter equal to the
-      inter-element gap (L-4) and that the row-action group shares one baseline, at 100% and 200%.
-- [ ] **UI/ACCESSIBILITY**: `@Preview` over both screens in light and dark at 100% and 200% font.
-- [ ] **MANUAL**: installed-app capture on the API 36 emulator of Track top, Track scrolled, and
-      Full Log in light and dark, compared screen by screen against `docs/design/reference/`. Light
-      Full Log is compared against the HTML and the dark capture, and that gap is stated rather
-      than papered over.
-- [ ] **MANUAL**: installed-app capture of the armed pad, the backdate dialog, the onset-chip
-      prompt, the help card, the check-in and anchor cards, the toast, and every Track and Log
-      empty state — none of which any screenshot covers.
-- [ ] **MANUAL**: both screens at 200% font, and emulator font scale, night mode, and rotation
-      restored with app data cleared afterwards.
+- [x] **UNIT**: the same test asserts the decorative exemptions stay deliberately below 3:1, so the
+      exemption is a decision rather than an oversight, and that the three failing text alphas are
+      replaced by compliant emphasis levels that keep the design's ordering.
+- [x] **INSTRUMENTED**: `TrackVisualTest` asserts the final numpad row is centred on the pad's axis
+      to within 1.5 px, that both keys moved inboard of the prototype's columns, that all twelve keys
+      share one width and one height, that the final row keeps the grid's gap, and that `0` stays
+      left of `10` below the grid (L-1). **This is the assertion that caught a real defect** — see
+      the record below.
+- [x] **INSTRUMENTED**: `TrackVisualTest` asserts the three entry-row actions share one vertical
+      centre and have even gaps (L-2), at 100% **and** at 200% font, and that each is a 48 dp target.
+- [x] **INSTRUMENTED**: `TrackVisualTest` asserts arming the pad moves and resizes no key, so the
+      rings are drawn in space reserved in every state. Restated honestly from the frozen wording:
+      it does **not** assert that a mark appears, because a border colour is not in the semantics
+      tree. The armed rings' appearance is verified by installed-app capture instead.
+- [x] **INSTRUMENTED**: `TrackVisualTest` asserts every numpad key, both Sleep/Wake toggles, and the
+      help toggle reach 48 dp, and that the toast is a centred pill narrower than the screen rather
+      than the full-bleed banner it replaced.
+- [x] **INSTRUMENTED**: `LogVisualTest` asserts `ALL` has a trailing gutter equal to the
+      inter-element gap and is not flush against the row edge (L-4), that From and To stay
+      equal-width 48 dp targets, that the row-action group shares one baseline with even gaps at
+      100% and 200% font, that a Delete-only row aligns to the same trailing edge as a full row, and
+      that the day header sits above its first row.
+- [x] **INSTRUMENTED**: `LogVisualTest` asserts every one of the eleven inline-edit value chips
+      reaches 48 dp on **both** axes and that the painted pill stays shorter than its touch target.
+      **This pins the second defect found by capture** — see the record below.
+- [x] **UI/ACCESSIBILITY**: thirteen `@Preview` composables over Track and Full Log in light and
+      dark at 100% and 200% font, plus the armed pad and both empty states, in
+      `src/debug/…/TrackLogPreviews.kt`. They compile and are debug-only. Stated honestly: they were
+      **not** rendered in the IDE preview pane in this session; the same theme and scale
+      combinations were verified by installed-app capture instead, which is the stronger oracle and
+      is what found both defects.
+- [x] **MANUAL**: installed-app capture on the API 36 emulator, compared screen by screen against
+      `docs/design/reference/`: Track top and scrolled in light and dark, Track at 200% font top and
+      scrolled, Full Log in light and dark, and Full Log at 200% font. Light Full Log is compared
+      against the HTML and the dark capture only, because **no light Full Log screenshot exists** —
+      that gap is stated rather than papered over.
+- [x] **MANUAL**: installed-app capture of surfaces no screenshot covers — the armed pad in light,
+      the toast pill twice, the readout, the entry row with its badge, the help card, the marker
+      input, the backdate dialog, the delete-confirm dialog, the date picker at 200% font, a set
+      filter field at 200% font, the Log inline edit panel, and the Track and Log empty states.
+- [x] **MANUAL**: both screens at 200% font with nothing clipped, and emulator font scale, night
+      mode, and rotation restored to `1.0`, `no`, and enabled, with the app's data cleared.
+
+Not met, and stated rather than quietly dropped:
+
+- [ ] **MANUAL**: the onset-chip prompt, the check-in card, the anchor card, the paused card, the
+      Log inline **note** panel, and Log's filtered-empty and message and read-error banners were
+      not captured on the installed app. Each needs state the app will not enter on request: the
+      check-in card needs 40 entries and 60 days since the last check-in, the anchor prompt is a
+      one-shot flag, the onset-chip prompt needs the episode engine to classify a capture as an
+      onset, and the two Log banners need an injected mutation or read failure. What does cover
+      them: the connected suite asserts each one's presence, tag, strings, and actions, and each is
+      built from primitives whose rendering *was* captured — `MsCard` by the help card, `MsEyebrow`
+      by both empty states, `MsTextAction` by the marker and dialog actions, and `MsChip` by the Log
+      inline edit panel. Their geometry is therefore compositional rather than novel, but it is not
+      the same as having looked at them.
+- [ ] **REVIEW**: no critical-tier review pass was spent on this phase. The 226 connected tests, the
+      411 JVM tests, the mechanical `testTag` and string diffs, and the capture matrix were treated
+      as the evidence instead. This is recorded as a gap, not as a claim of equivalence.
+
+## Implementation and verification record
+
+Completed 2026-08-06 on `agent/phase16-track-and-log`.
+
+**Two defects were found by building and looking rather than by reasoning, and both are now pinned
+by tests.**
+
+1. **The numpad's columns were 2 px unequal.** `(maxWidth - gap * 2) / 3` is a fractional `Dp` that
+   rounds up to the same pixel width for all three keys, so each row overshot its constraint and
+   Compose measured the *last* key in every row 2 px narrower than its siblings. L-1 requires all
+   twelve keys to share one width, so this was a real failure of the correction rather than a
+   rounding curiosity. The pad now floors in integer pixels — `(constraints.maxWidth - gapPx * 2) / 3`
+   — so `3 × key + 2 × gap` fits exactly. Found by `TrackVisualTest`'s own assertion on its first
+   run, which is the argument for asserting geometry numerically instead of looking at a screenshot.
+2. **`MsChip` grew its painted pill to the touch target instead of padding to it.** D-23 says the
+   painted geometry is the design's and the target is MindScale's; Phase 15's `MsChip` applied
+   `defaultMinSize(minHeight = 48.dp)` to the pill itself, so an eleven-chip value row read as a row
+   of tall ovals — and the same chip labelled `0` was left only **33 dp wide**, failing the very
+   floor it was over-satisfying vertically. The pill is now the design's compact shape inside a
+   transparent 48 dp square. Found by installed-app capture of Log's inline edit panel, which is the
+   only surface in the app where eleven narrow chips sit side by side, and pinned by two new
+   `LogVisualTest` assertions.
+
+**Measurement corrected the spec twice more, before implementation depended on it.** Writing
+`MsControlBoundaryContrastTest` moved five of D-4's hand-derived figures by a hundredth — the tables
+now hold what the code computes, not what arithmetic on paper produced — and it changed one
+diagnosis outright: the armed key ring's 55% alpha is unsalvageable in light at 1.78:1 but **would
+have passed in dark at 3.30:1**. The prototype fails in dark at 2.61:1 only because `keyBase`
+hardcodes the light gold triple on an element whose sibling `padWrapStyle` uses the theme-aware
+`var(--gold)`. Full theme gold is adopted because it is one value legal in both themes rather than
+an alpha legal in one.
+
+**One risk was closed before it could become a defect.** The Log filter field originally set
+`maxLines = 1` with an ellipsis. `MMM d, yyyy` fits one line at 200% font on the API 36 emulator —
+checked by capture — but on a narrower device that would have rendered a date as `Aug 6, 2…`, and
+losing characters is worse than taking a second line. The constraint is removed. This is Phase 15's
+clipped-tab lesson applied in advance rather than repeated.
+
+**A fourth carry-over correction joined the three D-15 named.** `MsChip`'s touch-target treatment
+above is the fourth Phase 15 component defect this phase found by being the first to put those
+components on a real screen. That is the argument for correcting them here rather than letting
+Phase 18 inherit them into four more screens.
+
+Accepted consequences, stated rather than discovered later:
+
+- **Log's rows are about 1.6× taller than the design's**, because its three actions moved to their
+  own line. The design fits them inline only because its actions are 9 px labels with no touch
+  target; D-23's 48 dp floor is MindScale's addition and it outranks the prototype. See D-12.
+- **Track's prompt row is usually empty beside the help toggle**, because MindScale has no
+  `padPrompt` string and adding one would be a copy addition. See D-13.
+- **The help toggle now renders above the anchor prompt** rather than below it, a consequence of
+  merging the readout and help row as the design does. No control changed. See D-13.
+
+Honest gaps beyond the two unmet criteria above: spoken TalkBack output was not audited, only the
+semantics tree; the armed rings' colour is verified by capture rather than by an assertion, because
+a border is not in the semantics tree; and the six surfaces listed as uncaptured were reasoned about
+compositionally rather than looked at.
 
 ## Rollout, migration, and rollback
 

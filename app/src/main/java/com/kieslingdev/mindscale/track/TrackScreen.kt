@@ -43,6 +43,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -900,10 +901,17 @@ private fun Numpad(
                     .padding(MsSpacing.lgPlus)
             ) {
                 BoxWithConstraints {
-                    val columnWidth = (maxWidth - PadKeyGap * 2) / 3
-                    // Never below the touch-target floor, even on an implausibly narrow device.
-                    // All twelve keys take the same value, so the shared width survives the clamp.
-                    val keySize = maxOf(columnWidth, MsSpacing.minTouchTarget)
+                    // Integer pixels, not Dp arithmetic, and the reason is a defect this phase's own
+                    // test caught: `(maxWidth - gap * 2) / 3` is a fractional Dp that rounds up to
+                    // the same pixel width for all three keys, so the row overshot its constraint by
+                    // 2 px and the last key in each row was measured 2 px narrower than its
+                    // siblings. Flooring in pixels makes `3 * key + 2 * gap` fit exactly, which is
+                    // what "all twelve keys share one width" (D-6) actually requires.
+                    val density = LocalDensity.current
+                    val gapPx = with(density) { PadKeyGap.roundToPx() }
+                    val floorPx = with(density) { MsSpacing.minTouchTarget.roundToPx() }
+                    val keyPx = maxOf((constraints.maxWidth - gapPx * 2) / 3, floorPx)
+                    val keySize = with(density) { keyPx.toDp() }
                     Column(verticalArrangement = Arrangement.spacedBy(PadKeyGap)) {
                         NumpadRows.forEach { row ->
                             Row(horizontalArrangement = Arrangement.spacedBy(PadKeyGap)) {
