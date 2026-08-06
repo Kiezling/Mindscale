@@ -63,7 +63,7 @@ Taken from the tree at `238b0ba25a9e5f040e3693ca70d4d91ef8b168e0`, so the accept
 checkable rather than impressionistic:
 
 - `TrackScreen.kt` is 1089 lines; `LogScreen.kt` is 453 lines.
-- 51 distinct `testTag` call sites across the two files.
+- 52 `testTag` call sites across the two files.
 - 60 hardcoded `.dp` literals in `TrackScreen.kt` and 26 in `LogScreen.kt`.
 - Track renders `ToastBanner` as a full-width `Surface` on `inverseSurface`, not the D-20 pill.
 - The numpad renders 1-9 as 12 dp rounded squares on `primaryContainer` and 0/10 as 56 dp-tall
@@ -532,7 +532,7 @@ foundation still hold.
 
 ### D-16 — Every tag, description, and unmerged-tree shape survives
 
-The 51 `testTag` call sites across `TrackScreen.kt` and `LogScreen.kt` keep their exact values, and
+The 52 `testTag` call sites across `TrackScreen.kt` and `LogScreen.kt` keep their exact values, and
 each still resolves to a node with the same role and the same callback. Read the tag list before
 restructuring, not after.
 
@@ -646,7 +646,7 @@ under `src/test/` and `src/androidTest/` that existed before this phase.
 
 ## Invariants
 
-1. Every one of the 51 pre-existing `testTag` values in Track and Log still resolves to a node with
+1. Every one of the 52 pre-existing `testTag` values in Track and Log still resolves to a node with
    the same role and the same callback.
 2. Every content description asserted by the connected suite is unchanged, and each still sits on
    the node that carries the matching click action.
