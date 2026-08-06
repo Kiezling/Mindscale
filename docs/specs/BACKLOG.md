@@ -15,17 +15,21 @@ four phases, 15 through 18:
   `docs/specs/SPEC-visual-foundation.md`.
 - Phase 16 — Track and Full Log. Merged 2026-08-06, governed by
   `docs/specs/SPEC-track-and-log-visual.md`.
-- Phase 17 — Insights and the intensity ramp. Started 2026-08-06, governed by
+- Phase 17 — Insights and the intensity ramp. Merged 2026-08-06, governed by
   `docs/specs/SPEC-insights-visual.md`, which is frozen. Its D-4 resolves the ramp: the
   prototype's warm interpolation and its `(v-1)/9` mapping are adopted, both low anchors are
   raised because the design's own measure 1.26:1 and 1.38:1 against `card`, and the light ramp
   keeps an ascending luminance direction because `IntensityRampTest` is a pre-existing JVM test
   that pins it. D-5 resolves the 0-versus-1 question and D-6 re-checks
-  `SPEC-track-numpad-logging.md` Invariant 14 at all three fill sites. Active work is tracked in
-  `PROJECT_STATE.md`.
-- [ ] Phase 18 — Settings, Profile, Report, Safety, Breathing, and the closing audit — apply the
-      foundation to the remaining surfaces and audit every screen against
-      `docs/design/reference/`. Depends on Phases 15 through 17.
+  `SPEC-track-numpad-logging.md` Invariant 14 at all three fill sites.
+- Phase 18 — Settings, Profile, Report, Safety, Breathing, and the closing audit. Started
+  2026-08-06, governed by `docs/specs/SPEC-remaining-screens-visual.md`, which is frozen. Its D-3
+  corrects `SPEC-visual-foundation.md` D-22's L-5 row, which names Settings but describes a row
+  that lives on Profile in MindScale; D-4 and D-5 verify L-6 at the component layer and correct a
+  fifth Phase-15 component defect; D-14 turns the foundation's dimension-literal promise into a
+  runnable source-scan test; and D-15 closes the type question `SPEC-insights-visual.md` D-19 left
+  open, with the evidence that zero of these five screens need the data-label idiom. Active work
+  is tracked in `PROJECT_STATE.md`.
 
 Every phase inherits the visual-only rule frozen as `SPEC-visual-foundation.md` D-1: the phases
 change how the app looks and nothing about how it works. Each needs its own spec frozen before
