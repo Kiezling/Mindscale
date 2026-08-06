@@ -1,6 +1,6 @@
 # MindScale project state
 
-Last updated: 2026-08-06 (Phase 16 merge)
+Last updated: 2026-08-06 (Phase 17 spec freeze)
 
 ## Goal
 
@@ -8,7 +8,19 @@ Build MindScale as a native Android application using Kotlin, Jetpack Compose, M
 
 The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716ca7343`: `SPEC.md` is the rationale and `MindScale v2.dc.html` is the visual/behavioral reference for Track, Full Log, Insights, Report, Safety card, Profile, and Settings. A local exported handoff is available at `C:\Users\mckie\Downloads\MindScale-handoff\mindscale\project\`; its `MindScale v2.dc.html` is the primary implementation reference. Repository specs under `docs/specs/` govern native implementation after human approval.
 
-## Current phase: Phase 16 Track and Full Log merged and complete; Phase 17 not started
+## Current phase: Phase 17 Insights and the intensity ramp — spec frozen, implementation in progress
+
+- Phase 17 branch: `agent/phase17-insights-visual`, created from synchronized `main` at `18ab15d746abe21a4651547f2e850d7fe7256d09`
+- Starting synchronization: `HEAD`, local `main`, local `origin/main`, and live GitHub `refs/heads/main` all resolved to `18ab15d746abe21a4651547f2e850d7fe7256d09` before branching
+- Governing spec: `docs/specs/SPEC-insights-visual.md` — `FROZEN — IN PROGRESS`; D-1 through D-18 frozen on 2026-08-06 before any application-code edit
+- Selected work: Phase 17 of 18 in the visual overhaul — Insights' body and `IntensityRamp.kt`, and nothing else. Settings, Profile, Report, Safety, Breathing, and the closing audit are Phase 18
+- Inherited rule: **the phase changes how the app looks and nothing about how it works.** 226/226 connected and 411/411 JVM must pass with no pre-existing test file modified; `git diff --name-status 18ab15d HEAD -- app/src/test app/src/androidTest` must show only `A` lines
+- The ramp decision D-24 reserved for this phase is resolved by measurement plus a pre-existing test, not by taste. The prototype's low anchors are invisible in **both** themes, not only in light: `#F0E4CC` measures 1.26:1 against `card` and 1.11:1 against the asleep fill, and `#3A2F1C` measures 1.38:1 and 1.22:1. Separately, the prototype's light ramp *descends* in relative luminance, and `IntensityRampTest` — pre-existing since Phase 1, and uneditable under D-1 — asserts the light ramp is monotonically non-decreasing. The adopted ramp therefore runs `#6E5220` → `#AE8C4F` in light and `#856F46` → `#C9A96A` in dark over the prototype's own `(v-1)/9` mapping: one rule for both themes, from a dim warm brown into the theme's own gold, with every value `1..10` clearing 3:1 against `card` and `bg`. The app's shipped dark low anchor `#3A4652` was also found to fail, at 1.87:1
+- The 0-versus-1 question is settled structurally: `EpisodeEngine.kt:384` drops zero-valued entries before any `IntensitySegment` is built, so `RasterState.INTENSITY` carries only `1..10` and a 0 rating is `WELL`. `intensityColor(0)` maps to the low anchor and cannot render
+- One conflict is flagged rather than smuggled, in the spec's open questions and due in the completion report: obeying `IntensityRampTest` costs the light ramp its *direction*, so on a light page a rating of 1 carries more visual weight than a rating of 10. The alternative needs an authorized edit to a pre-existing test file, which is exactly what the acceptance criteria forbid, so it was not taken unilaterally
+- Exact next action: implement task 2 of the spec's decomposition — the two new contrast tests and `IntensityRamp.kt` — then the raster, the chart, L-3, and the remaining sections
+
+### Phase 16 merged checkpoint
 
 - Phase 16 branch: `agent/phase16-track-and-log`, created from synchronized `main` at `238b0ba25a9e5f040e3693ca70d4d91ef8b168e0`
 - Starting synchronization: `HEAD`, local `main`, local `origin/main`, and live GitHub `refs/heads/main` all resolved to `238b0ba25a9e5f040e3693ca70d4d91ef8b168e0` before branching
@@ -302,8 +314,9 @@ The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716c
 
 ## Active blocker
 
-No active blocker. Phase 16 is merged and complete. Phases 17 and 18 are scoped in
-`docs/specs/BACKLOG.md` and each needs its own spec frozen before any application-code edit.
+No active blocker. Phase 16 is merged and complete. Phase 17's spec is frozen and implementation
+is under way on `agent/phase17-insights-visual`. Phase 18 is scoped in `docs/specs/BACKLOG.md` and
+needs its own spec frozen before any application-code edit.
 
 One environment constraint, not a repository problem: the harness permission classifier declined
 `gh pr merge` and `gh pr view` during Phase 15, so it was not attempted for Phase 16 either. `gh
@@ -323,7 +336,7 @@ user, or to have the permission granted, at each future phase boundary.
 
 ## Next tasks
 
-1. Freeze a Phase 17 spec for Insights and the intensity ramp before any application-code edit, then implement it. It inherits the visual-only rule and must hold 226/226 connected and 411/411 JVM with no pre-existing test file modified. It must resolve the 0-versus-1 low-anchor question explicitly and re-check `SPEC-track-numpad-logging.md` Invariant 14.
+1. Implement `docs/specs/SPEC-insights-visual.md`, which is frozen. It inherits the visual-only rule and must hold 226/226 connected and 411/411 JVM with no pre-existing test file modified. Then freeze a Phase 18 spec before any application-code edit on the remaining screens.
 2. Re-verify the crisis resources in `SafetyCopy` against their operator sources before any future release, and update `SafetyCopy.VERIFIED_ON` in the same edit. Hotline numbers and coverage change; a stale number in a safety feature is a real harm, not a cosmetic bug.
 3. Continue excluding `.agents/` and `.codex/` from product/documentation commits.
 
