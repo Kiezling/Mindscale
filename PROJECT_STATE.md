@@ -95,8 +95,10 @@ The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716c
   timeout at `NavigationTest.kt:188`. `NavigationTest` passes 17/17 alone, and line 188 is the exact
   soft-keyboard-eats-Back race `FAILED_PATHS.md` recorded on 2026-08-04. The clean 268/268 run is the
   one reported
-- Exact next action: push the branch, open a PR, mark it ready, verify CLEAN/MERGEABLE, and hand the
-  merge to the user. After the merge, the visual overhaul is complete and the highest-value remaining
+- Phase 18 PR #15 was opened as draft, marked ready, and verified `MERGEABLE`/`clean` at exact head
+  `0a4c9db30087205b1447584ded25f3f4abe3f326`; no remote status checks are configured. `gh pr merge`
+  was not attempted, per the user's standing instruction carried since Phase 15
+- Exact next action: the user merges PR #15. After the merge, the visual overhaul is complete and the highest-value remaining
   task in the repository is re-verifying `SafetyCopy`'s crisis numbers against operator sources
 
 ### Phase 17 merged checkpoint
