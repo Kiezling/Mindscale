@@ -46,4 +46,11 @@ object MsSpacing {
 
     /** The design's 34 dp circular header buttons (D-16). */
     val headerButton: Dp = 34.dp
+
+    /**
+     * The design's 26 dp circular help toggle, at line 84 of the design authority
+     * (`docs/specs/SPEC-track-and-log-visual.md`, D-18). Painted at 26 dp and raised to
+     * [minTouchTarget] with transparent padding, like every other undersized control in the design.
+     */
+    val helpButton: Dp = 26.dp
 }

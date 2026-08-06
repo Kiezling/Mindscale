@@ -172,28 +172,30 @@ dark and therefore carry no boundary at all.
 Ratios are sRGB WCAG 2.x relative-luminance ratios of the alpha-composited border against the
 stated backdrop, composited in floating point as the compositor does, rounded to two decimals.
 `bg` and `card` are both tabulated because a ring sits on the boundary between two surfaces and
-must clear the floor against both.
+must clear the floor against both. **Every figure below was produced by
+`MsControlBoundaryContrastTest` rather than by hand**, so the tables and the assertions agree to
+the decimal and cannot drift apart.
 
 | Element | Design value | Light bg / card | Dark bg / card | Verdict |
 |---|---|---|---|---|
-| Numpad key border, at rest | `rgba(ink,.10)` | 1.23 / 1.23 | 1.25 / 1.29 | **fails** |
-| Numpad key border, armed | `rgba(174,140,79,.55)` | 1.76 / 1.78 | 2.63 / 2.60 | **fails** |
+| Numpad key border, at rest | `rgba(ink,.10)` | 1.24 / 1.24 | 1.26 / 1.30 | **fails** |
+| Numpad key border, armed | `rgba(174,140,79,.55)` | 1.76 / 1.78 | 2.62 / 2.61 | **fails** |
 | Pad wrapper border, armed | `var(--gold)` | 3.05 / 3.15 | 8.60 / 8.04 | passes |
-| Sleep/Wake border, at rest | `rgba(ink,.13)` | 1.31 / 1.32 | 1.37 / 1.42 | **fails** |
-| Onset chip border, unselected | `rgba(ink,.14)` | 1.34 / 1.35 | — | **fails** |
-| Breathing pill border | `rgba(174,140,79,.45)` | 1.57 / 1.59 | 2.61 / 2.62 | **fails** |
+| Sleep/Wake border, at rest | `rgba(ink,.13)` | 1.31 / 1.32 | 1.37 / 1.41 | **fails** |
+| Onset chip border, unselected | `rgba(ink,.14)` | 1.35 / 1.35 | 1.42 / 1.48 | **fails** |
+| Breathing pill border | `rgba(174,140,79,.45)` | 1.57 / 1.60 | 2.62 / 2.61 | **fails** |
 | Log From/To underline | `rgba(ink,.16)` | 1.41 / 1.41 | 1.51 / 1.57 | **fails** |
-| Marker input border | `rgba(ink,.14)` | 1.34 / 1.35 | — | **fails** |
+| Marker input border | `rgba(ink,.14)` | 1.35 / 1.35 | 1.42 / 1.48 | **fails** |
 | Help button ring | `rgba(ink,.16)` | 1.41 / 1.41 | 1.51 / 1.57 | **fails** |
 
 The compliant replacements, and nothing else changes about these controls:
 
 | Element | Adopted | Light bg / card | Dark bg / card |
 |---|---|---|---|
-| Every ink control boundary above | `MaterialTheme.ms.outline` — ink `.50` light, `.40` dark | 3.46 / 3.49 | 3.49 / 3.51 |
+| Every ink control boundary above | `MaterialTheme.ms.outline` — ink `.50` light, `.40` dark | 3.47 / 3.49 | 3.47 / 3.51 |
 | Numpad key border, armed | `MaterialTheme.ms.gold` at full opacity | 3.05 / 3.15 | 8.60 / 8.04 |
 | Breathing pill border | `MaterialTheme.ms.gold` at full opacity | 3.05 / 3.15 | 8.60 / 8.04 |
-| Marker input border | Material's `outline` role, which D-9 of the foundation already sets to the same ink alpha | 3.46 / 3.49 | 3.49 / 3.51 |
+| Marker input border | Material's `outline` role, which D-9 of the foundation already sets to the same ink alpha | 3.47 / 3.49 | 3.47 / 3.51 |
 
 Two constraints come out of the arithmetic and are recorded so a later phase does not trip on
 them:
@@ -205,10 +207,20 @@ them:
    it rather than inventing a second ink alpha, so `MindScaleContrastTest`'s existing
    `theControlBoundaryOutlineClearsThreeToOne` keeps covering it.
 
+One row in the failing table deserves a correction to the framing rather than to the value, because
+measurement changed the diagnosis. **The armed ring's 55% alpha is unsalvageable in light and
+salvageable in dark.** At 55% of the *theme's* gold the dark ring measures 3.30:1 and passes; the
+prototype nonetheless fails in dark at 2.61:1, because `keyBase` hardcodes the light triple
+`rgba(174,140,79,.55)` on an element whose sibling `padWrapStyle` uses the theme-aware
+`var(--gold)`. A per-theme alpha would therefore have been legal in dark and illegal in light. Full
+theme gold is chosen instead because it is one value for both themes rather than two, and because
+the pad wrapper's armed border — the mark a user actually reads as "armed" — is already full gold
+in the design and already passes.
+
 The cost is recorded honestly: at ink `.50` the numpad keys' rings are visibly firmer than the
 design's near-invisible `.10`, and the pad reads as twelve outlined circles rather than as twelve
 suggestions of circles. The hue, the radius, the size, the spacing, and the near-flat surface are
-all the design's. Only the alpha moves, and it moves because 1.23:1 is not a boundary a sighted
+all the design's. Only the alpha moves, and it moves because 1.24:1 is not a boundary a sighted
 user with low contrast sensitivity can find.
 
 Deliberately **not** raised, because they are decorative and WCAG imposes no minimum on them
@@ -216,9 +228,14 @@ Deliberately **not** raised, because they are decorative and WCAG imposes no min
 
 | Element | Design value | Light bg / card | Dark bg / card | Why exempt |
 |---|---|---|---|---|
-| Entry-row dot ring | `rgba(174,140,79,.5)` | 1.66 / 1.68 | 2.95 / 2.94 | The row is not clickable; the dot is a mark, not a control |
-| Kind-badge pill border | `rgba(174,140,79,.4)` | 1.49 / 1.51 | 2.31 / 2.33 | A non-interactive badge around text that is itself ≥4.5:1 |
-| Row and day separators | `rgba(ink,.08–.09)` | <3 | <3 | Separators; `MsHairline` and `ms.hairline` |
+| Entry-row dot ring | `rgba(174,140,79,.5)` | 1.67 / 1.69 | 2.98 / 2.96 | The row is not clickable; the dot is a mark, not a control |
+| Kind-badge pill border | `rgba(174,140,79,.4)` | 1.49 / 1.50 | 2.31 / 2.33 | A non-interactive badge around text that is itself ≥4.5:1 |
+| Row and day separators | `rgba(ink,.08–.09)` | 1.20 | 1.26 | Separators; `MsHairline` and `ms.hairline` |
+
+The dark dot ring at 2.96:1 comes within four hundredths of the control floor, and it is exempt
+because it is decorative rather than because it is faint. That distinction is asserted rather than
+assumed: the exemption tests check these values stay *below* 3:1, so a later phase that "fixes"
+them into heavy borders loses the design's most characteristic mark and breaks a test on the way.
 
 ### D-5 — The armed pad, and why its state is not carried by colour alone
 
@@ -239,13 +256,16 @@ untouched: the armed Sleep or Wake toggle changes from an ink outline to a gold 
 content description already reads "Sleep armed. Tap a number to log falling asleep."
 
 Only mark (3) needed a value change, and it is in D-4: the key's armed ring is full `gold`
-(3.15:1) rather than the design's 55% gold (1.78:1). The pad wrapper's armed border is the
-design's `var(--gold)` unchanged, because it already passes.
+(3.15:1 light, 8.04:1 dark) rather than the design's 55% gold (1.78:1 light, 2.61:1 dark as the
+prototype paints it). The pad wrapper's armed border is the design's `var(--gold)` unchanged,
+because it already passes.
 
-A recorded prototype omission, adopted as a correction rather than copied: `keyBase`'s armed
-border is the hardcoded literal `rgba(174,140,79,.55)`, which is the **light** gold, so the
-prototype paints a light-theme gold ring in dark mode. `padWrapStyle` on the same element uses the
-theme-aware `var(--gold)`. MindScale uses the theme's gold in both places.
+A recorded prototype omission, adopted as a correction rather than copied: `keyBase`'s armed border
+is the hardcoded literal `rgba(174,140,79,.55)`, which is the **light** gold, while
+`padWrapStyle` on the same element uses the theme-aware `var(--gold)`. So the prototype paints a
+light-theme ring in dark mode, and it costs it the floor: the theme's own dark gold at the same
+alpha measures 3.30:1 and would have passed. MindScale uses the theme's gold in both places, at
+full opacity, which is legal in both themes.
 
 ### D-6 — L-1: the numpad's last row is centred on the pad's axis
 
