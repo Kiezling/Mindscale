@@ -1,6 +1,6 @@
 # MindScale project state
 
-Last updated: 2026-08-06
+Last updated: 2026-08-06 (Phase 16 merge)
 
 ## Goal
 
@@ -8,11 +8,14 @@ Build MindScale as a native Android application using Kotlin, Jetpack Compose, M
 
 The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716ca7343`: `SPEC.md` is the rationale and `MindScale v2.dc.html` is the visual/behavioral reference for Track, Full Log, Insights, Report, Safety card, Profile, and Settings. A local exported handoff is available at `C:\Users\mckie\Downloads\MindScale-handoff\mindscale\project\`; its `MindScale v2.dc.html` is the primary implementation reference. Repository specs under `docs/specs/` govern native implementation after human approval.
 
-## Current phase: Phase 16 Track and Full Log — implemented and verified locally; not yet published
+## Current phase: Phase 16 Track and Full Log merged and complete; Phase 17 not started
 
 - Phase 16 branch: `agent/phase16-track-and-log`, created from synchronized `main` at `238b0ba25a9e5f040e3693ca70d4d91ef8b168e0`
 - Starting synchronization: `HEAD`, local `main`, local `origin/main`, and live GitHub `refs/heads/main` all resolved to `238b0ba25a9e5f040e3693ca70d4d91ef8b168e0` before branching
 - Governing spec: `docs/specs/SPEC-track-and-log-visual.md` — `IMPLEMENTED — VERIFIED LOCALLY`; D-1 through D-19 frozen on 2026-08-06 before any application-code edit; frozen documentation commit `ecd6247`, verified implementation commits `23fb1fe`, `2a6e8c8`, and `45b2810`
+- Verification-state commit: `2eff8d592286f341022c36b471fdb9c52885e0bd`
+- Phase 16 PR #13 was opened as draft, marked ready, and verified `CLEAN`/`MERGEABLE` at exact head `2eff8d592286f341022c36b471fdb9c52885e0bd`; no remote status checks are configured
+- PR #13 merged into `main` as `2e9f1ea65f3d91d7ae266bf327e303dc7bb247c3` on 2026-08-06 by the user. Local `HEAD`, local `main`, `origin/main`, and live GitHub `refs/heads/main` all matched that merge before this phase-boundary documentation commit, and `git merge-base --is-ancestor` confirmed the verified head is an ancestor of it. `git diff --name-status 238b0ba 2e9f1ea -- app/src/test app/src/androidTest` was re-checked at the exact merge head and still shows three `A` lines and zero `M` lines
 - Selected work: Phase 16 of 18 in the visual overhaul — apply the P15 foundation to Track's and Full Log's bodies, and to nothing else. Insights is Phase 17; Settings, Profile, Report, Safety, Breathing, and the closing audit are Phase 18
 - Inherited rule held: **the phase changes how the app looks and nothing about how it works.** 226/226 connected (206 baseline plus 20 new) and 411/411 JVM (399 plus 12), with no pre-existing test file modified. Proved mechanically: `git diff --name-status 238b0ba HEAD -- app/src/test app/src/androidTest` shows three `A` lines and zero `M` lines, all 52 testTags are byte-identical, and a diff of every literal string in both screens shows no removal and no addition outside KDoc
 - Delivered: Track as the design's screen — a centred 288 dp pad of twelve `card`-filled circles at one measured column width, the armed gold wrapper border with its 4 dp spread, a 26 sp readout sharing one row with a 26 dp help toggle over the design's hairline, hairline-separated cards, an ink toast pill, and entry rows built on an unfilled 42 dp gold-ringed dot — and Full Log as underlined From/To fields over gold day headers and hairline-separated rows on a 34 dp numeral column. Plus L-1, L-2, L-4, uppercased dialog labels at all five sites, and both screens' dimension literals on `MsSpacing`
@@ -24,8 +27,12 @@ The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716c
 - Accepted consequences, recorded rather than discovered later: Log's rows are about 1.6× taller than the design's, because the design fits three actions inline only where they are 9 px labels with no touch target; Track's prompt row is usually empty beside the help toggle, because MindScale has no `padPrompt` string; and the help toggle now renders above the anchor prompt rather than below it
 - Honest gaps: six state-gated surfaces were not captured on the installed app — the onset-chip prompt, the check-in card, the anchor card, the paused card, the Log inline note panel, and Log's message and read-error banners — because each needs state the app will not enter on request. The connected suite asserts each one's presence, tag, strings, and actions, and each is built from primitives whose rendering was captured, but that is not the same as having looked at them. The armed rings' colour is verified by capture rather than by an assertion, because a border is not in the semantics tree. Spoken TalkBack output was not audited. No critical-tier review pass was spent on this phase
 - Expected untracked paths remain `.agents/` and `.codex/`; they are excluded from product/documentation scope
-- Exact next action: push `agent/phase16-track-and-log`, open the PR, and hand the merge to the user — the harness permission classifier declined `gh pr merge` in Phase 15 and is expected to again
+- Exact next action: freeze a Phase 17 spec (e.g. `docs/specs/SPEC-insights-visual.md`) for Insights and the intensity ramp before any application-code edit, per `docs/specs/BACKLOG.md`'s Phase 17 entry and `SPEC-visual-foundation.md` D-24 — it must resolve the 0-versus-1 low-anchor difference explicitly and re-check `SPEC-track-numpad-logging.md` Invariant 14, because the light theme's warm low anchor `#F0E4CC` sits very close to the `card` surface
 - Explicitly not started: Phases 17 and 18
+
+### Phase 16 publication note
+
+`gh pr merge` was not attempted by the agent for PR #13, per the user's explicit instruction carried over from Phase 15 ("don't burn attempts working around it"). `gh pr create` and `gh pr ready` worked from the Bash tool once the WinGet shim directory was prepended to `PATH` for the invocation (see `FAILED_PATHS.md`, 2026-08-05). The user merged PR #13 directly on GitHub.
 
 ### Phase 15 merged checkpoint
 
@@ -295,13 +302,14 @@ The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716c
 
 ## Active blocker
 
-No active blocker. Phase 16 is implemented and verified locally, and is not yet published. Phases 17 and 18
-are scoped in `docs/specs/BACKLOG.md` and each needs its own spec frozen before any
-application-code edit.
+No active blocker. Phase 16 is merged and complete. Phases 17 and 18 are scoped in
+`docs/specs/BACKLOG.md` and each needs its own spec frozen before any application-code edit.
 
 One environment constraint, not a repository problem: the harness permission classifier declined
-`gh pr merge` and `gh pr view` during Phase 15. Branch, push, and PR creation all worked. Expect
-to hand the merge to the user, or to have the permission granted, at each future phase boundary.
+`gh pr merge` and `gh pr view` during Phase 15, so it was not attempted for Phase 16 either. `gh
+pr create` and `gh pr ready` work from the Bash tool once the WinGet shim directory is prepended
+to `PATH` for the invocation (`FAILED_PATHS.md`, 2026-08-05). Expect to hand the merge to the
+user, or to have the permission granted, at each future phase boundary.
 
 ## Known decisions
 
@@ -315,11 +323,22 @@ to hand the merge to the user, or to have the permission granted, at each future
 
 ## Next tasks
 
-1. Publish Phase 16: push `agent/phase16-track-and-log`, open the PR, and hand the merge to the user. Then freeze a Phase 17 spec for Insights and the intensity ramp before any application-code edit, resolving the 0-versus-1 low-anchor question and re-checking `SPEC-track-numpad-logging.md` Invariant 14.
+1. Freeze a Phase 17 spec for Insights and the intensity ramp before any application-code edit, then implement it. It inherits the visual-only rule and must hold 226/226 connected and 411/411 JVM with no pre-existing test file modified. It must resolve the 0-versus-1 low-anchor question explicitly and re-check `SPEC-track-numpad-logging.md` Invariant 14.
 2. Re-verify the crisis resources in `SafetyCopy` against their operator sources before any future release, and update `SafetyCopy.VERIFIED_ON` in the same edit. Hotline numbers and coverage change; a stale number in a safety feature is a real harm, not a cosmetic bug.
 3. Continue excluding `.agents/` and `.codex/` from product/documentation commits.
 
 ## Last verification
+
+Phase 16 publication checkpoint completed 2026-08-06:
+
+- Pushed `agent/phase16-track-and-log` through verification-state commit `2eff8d592286f341022c36b471fdb9c52885e0bd`.
+- GitHub PR #13 was opened as draft, marked ready, and confirmed `CLEAN`/`MERGEABLE` at that exact head with no status checks configured.
+- The agent did not attempt `gh pr merge`, per the user's carried-over instruction from Phase 15. `gh pr create` and `gh pr ready` worked from the Bash tool once the WinGet shim directory was prepended to `PATH` for the invocation.
+- PR #13 merged into `main` as `2e9f1ea65f3d91d7ae266bf327e303dc7bb247c3` by the user.
+- Local `main` fast-forwarded from `238b0ba25a9e5f040e3693ca70d4d91ef8b168e0` to `2e9f1ea65f3d91d7ae266bf327e303dc7bb247c3`; `HEAD`, local `main`, `origin/main`, and live `git ls-remote`-equivalent `git fetch` all matched before this phase-boundary documentation commit, and `git merge-base --is-ancestor` confirmed the verified head is an ancestor of the merge.
+- The visual-only rule was re-checked at the exact merge head, not just the verified branch head: `git diff --name-status 238b0ba 2e9f1ea -- app/src/test app/src/androidTest` returned three `A` lines and zero `M` lines.
+- No Android oracle was rerun for the GitHub merge or this documentation-only checkpoint because the application/test tree is the exact verified PR head plus GitHub's merge commit.
+- Expected untracked `.agents/` and `.codex/` remain excluded; no other local change was present before this documentation update.
 
 Phase 16 final local verification completed 2026-08-06 for `agent/phase16-track-and-log`:
 

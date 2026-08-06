@@ -13,13 +13,16 @@ four phases, 15 through 18:
 
 - Phase 15 — tokens and chrome. Merged 2026-08-06, governed by
   `docs/specs/SPEC-visual-foundation.md`.
-- Phase 16 — Track and Full Log. Active on 2026-08-06, governed by
-  `docs/specs/SPEC-track-and-log-visual.md`; `PROJECT_STATE.md` owns it while it is in progress.
+- Phase 16 — Track and Full Log. Merged 2026-08-06, governed by
+  `docs/specs/SPEC-track-and-log-visual.md`.
 - [ ] Phase 17 — Insights and the intensity ramp — apply the foundation to the Insights
       surfaces and move `intensityColor` onto the prototype's single warm interpolation.
-      Depends on Phase 15. Needs its own spec, which must decide the 0-versus-1 low-anchor
-      question explicitly and re-check `SPEC-track-numpad-logging.md` Invariant 14, because the
-      warm low end sits very close to the card surface.
+      Depends on Phases 15 and 16. Needs its own spec, which must decide the 0-versus-1
+      low-anchor question explicitly and re-check `SPEC-track-numpad-logging.md` Invariant 14,
+      because the warm low end sits very close to the card surface. Reconcile against
+      `SPEC-track-and-log-visual.md` D-4/D-5's measured control-boundary contrast findings and
+      D-8's decision to stop routing Track's entry dot through `intensityColor` before deciding
+      this phase's colour mapping.
 - [ ] Phase 18 — Settings, Profile, Report, Safety, Breathing, and the closing audit — apply the
       foundation to the remaining surfaces and audit every screen against
       `docs/design/reference/`. Depends on Phases 15 through 17.
