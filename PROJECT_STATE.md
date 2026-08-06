@@ -1,6 +1,6 @@
 # MindScale project state
 
-Last updated: 2026-08-06 (Phase 17 spec freeze)
+Last updated: 2026-08-06 (Phase 18 spec freeze)
 
 ## Goal
 
@@ -8,7 +8,100 @@ Build MindScale as a native Android application using Kotlin, Jetpack Compose, M
 
 The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716ca7343`: `SPEC.md` is the rationale and `MindScale v2.dc.html` is the visual/behavioral reference for Track, Full Log, Insights, Report, Safety card, Profile, and Settings. A local exported handoff is available at `C:\Users\mckie\Downloads\MindScale-handoff\mindscale\project\`; its `MindScale v2.dc.html` is the primary implementation reference. Repository specs under `docs/specs/` govern native implementation after human approval.
 
-## Current phase: Phase 17 Insights and the intensity ramp — implemented and verified locally; not yet merged
+## Current phase: Phase 18 Settings, Profile, Report, Safety, Breathing, and the closing audit — implemented and verified locally; not yet merged
+
+- Phase 18 branch: `agent/phase18-remaining-screens`, created from synchronized `main` at
+  `af273f915cb83be6506b0aa5e5859c6743be0676`
+- Starting synchronization: `HEAD`, local `main`, and local `origin/main` all resolved to
+  `af273f915cb83be6506b0aa5e5859c6743be0676` before branching
+- Governing spec: `docs/specs/SPEC-remaining-screens-visual.md` — `FROZEN`; D-1 through D-17 frozen
+  on 2026-08-06 before any application-code edit. `SPEC-visual-foundation.md`,
+  `SPEC-track-and-log-visual.md`, and `SPEC-insights-visual.md` all bind this phase; its measured
+  contrast figures are **reused** from the Phase 16 D-4 and Phase 17 D-7 tables, not re-derived
+- Selected work: Phase 18 of 18 — the bodies of `SettingsScreen.kt`, `ProfileScreen.kt`,
+  `ReportScreen.kt`, `SafetyScreen.kt`, and `BreathingScreen.kt`, layout fixes L-5 and L-6, and the
+  closing audit. This is the last phase of the visual overhaul
+- Inherited rule: **the phase changes how the app looks and nothing about how it works.** 239/239
+  connected and 428/428 JVM must pass with no pre-existing test file modified;
+  `git diff --name-status af273f9 HEAD -- app/src/test app/src/androidTest` must show only `A` lines
+- Measured starting state: 1,642 lines, 79 testTags, and 73 undocumented dimension literals across
+  the five screens. The whole tree holds 138 `.dp`/`.sp` literals, of which 26 are the `ui/theme`
+  scale definitions and 39 are already documented named constants (Insights 31, Track 6, Log 2), so
+  D-14's audit distinguishes documented from undocumented rather than counting
+- Four findings the spec froze before any code edit:
+  1. **L-5 names the wrong screen.** `SPEC-visual-foundation.md` D-22 records the DATE / PHQ-8 /
+     GAD-7 / ADD row as Settings'. The prototype puts it there; MindScale puts external totals on
+     **Profile**, and `SettingsScreen.kt` has no date field, no PHQ-8 control, and no ADD. L-5 is
+     implemented on `ProfileScreen.kt`'s `score_form` and D-22's table is amended, because moving
+     the row to match the screenshot would be a navigation change
+  2. **L-6 is already satisfied by `MsSegmentedControl` and has never been proved.** The component
+     has carried `weight(1f)` since Phase 15, but its only call sites are in the debug gallery;
+     Settings' choice rows are `FilterChip`s in a `horizontalScroll`. This phase is the first to put
+     it on a real screen, and pins equal widths at 100% and 200% font
+  3. **A fifth Phase-15 component defect.** `MsSegmentedControl` passes `maxLines = 1` with no
+     overflow, which is `TextOverflow.Clip` — the same arithmetic that clipped the `INSIGHTS` tab in
+     Phase 15 and that made Phase 16 remove `maxLines` from Log's filter field. `SYSTEM` in a
+     three-segment row at 200% font is the case. It is corrected, and the component gains one
+     defaulted `optionModifier` parameter so a caller can attach the per-segment content description
+     `NavigationTest` asserts, without the component owning it
+  4. **The open type question is closed by evidence, not taste.** `SPEC-insights-visual.md` D-19
+     left the 0.067 em data-label idiom local and deferred the decision here. Zero of these five
+     screens need it, so `chartLabelStyle` stays private to `InsightsScreen.kt` and `Type.kt` keeps
+     fifteen Material slots
+- Screenshot coverage, stated before the work rather than after: Settings has three dark and two
+  light captures; Breathing has one light capture and **no dark one**; **Profile, Report, and Safety
+  have no reference screenshot in either theme.** Those three are derived from the HTML and from the
+  idioms the captured screens establish, and no claim of a match against a picture that does not
+  exist will be made
+- Safety constraints that outrank fidelity: `SafetyIntents.kt` is untouched, `ACTION_CALL` stays
+  forbidden, no permission is added, the resource card's name → actions → detail order is preserved
+  so reaching help never requires reading a paragraph first, and the crisis actions stay filled
+  rather than becoming the design's bare text actions. `BreathingViewModel`'s constructor is
+  byte-identical, so the structural non-inference guarantee cannot be weakened by a restyle
+- Explicitly out of scope and flagged rather than done: re-verifying `SafetyCopy`'s crisis numbers
+  and `VERIFIED_ON` against operator sources. It is overdue and it is a content change to a safety
+  feature, which does not belong in a visual phase. It remains "Next tasks" item 2
+- Governing spec status: `IMPLEMENTED — VERIFIED LOCALLY`; frozen documentation commit `eec76c9`,
+  verified implementation commits `4de6908` and `5ea5abd`
+- Verification: **440/440** JVM (428 before this phase; the 12 new are `MsRemainingScreensContrastTest`
+  and `MsDimensionAuditTest`), **268/268** connected (239 before; the 29 new are `SettingsVisualTest`,
+  `ProfileReportVisualTest`, `SafetyVisualTest` and `BreathingVisualTest`), lint 0 errors at the
+  unchanged 22-warning baseline, `assembleDebug`, `git diff --check` clean, and installed-app capture
+  in light and dark at 100% and at 200% font
+- The visual-only rule is proved mechanically: `git diff --name-status af273f9 HEAD -- app/src/test
+  app/src/androidTest` returns six `A` lines and zero `M` lines, and the effective testTag inventory
+  across the five screens is identical at 79 tags — five of them now reach their node through the
+  `tag` parameter of the two new row helpers rather than through a literal `testTag("…")` call, so a
+  naive text diff shows a difference the connected suite proves is not one
+- **The closing audit is done.** 112 undocumented dimension literals outside `ui/theme` are now
+  **40 documented and zero undocumented** — Insights 31, Track 6, Log 2, and Breathing's 224 dp
+  pacing circle — and `MsDimensionAuditTest` fails the build on any new one. The remaining dialog
+  action labels are uppercased at all four sites Phase 16 left. The `labelSmall` question is closed:
+  `chartLabelStyle` stays private to Insights because zero of these five screens need it
+- One defect was found by building and looking rather than by reasoning, which is now true of every
+  phase in this overhaul: the anchor card's `MsHairline(faint = true)` separators are invisible,
+  because each anchor is a Material `OutlinedTextField` that already draws its own box. A 1 dp rule
+  at 7% ink is in no semantics tree and passes every geometry check. Removed
+- The overhaul's largest accepted fidelity gap, recorded rather than hidden: nine editable fields
+  keep `OutlinedTextField` where the design draws a bare bottom rule, because the connected suite
+  reads `SemanticsProperties.Error`, `assertTextContains` and `performTextReplacement` off them.
+  Only their colours moved onto the brand
+- Honest gaps: no `@Preview` composables were written for these five screens; Report, Safety and
+  Breathing were not captured on the installed app because each needs state the app will not enter
+  on request; three of the five Settings reference screenshots were not compared against directly;
+  spoken TalkBack output was not audited; and no critical-tier review pass was spent
+- One test-suite flake is named rather than absorbed: a full connected run reported 12
+  `RootViewWithoutFocusException` failures on `pressBack`/`closeSoftKeyboard`, and a later one a 5 s
+  timeout at `NavigationTest.kt:188`. `NavigationTest` passes 17/17 alone, and line 188 is the exact
+  soft-keyboard-eats-Back race `FAILED_PATHS.md` recorded on 2026-08-04. The clean 268/268 run is the
+  one reported
+- Phase 18 PR #15 was opened as draft, marked ready, and verified `MERGEABLE`/`clean` at exact head
+  `0a4c9db30087205b1447584ded25f3f4abe3f326`; no remote status checks are configured. `gh pr merge`
+  was not attempted, per the user's standing instruction carried since Phase 15
+- Exact next action: the user merges PR #15. After the merge, the visual overhaul is complete and the highest-value remaining
+  task in the repository is re-verifying `SafetyCopy`'s crisis numbers against operator sources
+
+### Phase 17 merged checkpoint
 
 - Phase 17 branch: `agent/phase17-insights-visual`, created from synchronized `main` at `18ab15d746abe21a4651547f2e850d7fe7256d09`
 - Starting synchronization: `HEAD`, local `main`, local `origin/main`, and live GitHub `refs/heads/main` all resolved to `18ab15d746abe21a4651547f2e850d7fe7256d09` before branching
@@ -321,9 +414,10 @@ The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716c
 
 ## Active blocker
 
-No active blocker. Phase 16 is merged and complete. Phase 17 is implemented and verified locally on
-`agent/phase17-insights-visual` and is waiting on publication and merge. Phase 18 is scoped in
-`docs/specs/BACKLOG.md` and needs its own spec frozen before any application-code edit.
+No active blocker. Phases 15, 16, and 17 are merged and complete; `main` is at `af273f9`. Phase 18
+is the last phase of the visual overhaul: its spec is frozen at
+`docs/specs/SPEC-remaining-screens-visual.md` and implementation is in progress on
+`agent/phase18-remaining-screens`.
 
 One environment constraint, not a repository problem: the harness permission classifier declined
 `gh pr merge` and `gh pr view` during Phase 15, so it was not attempted for Phase 16 either. `gh
@@ -343,7 +437,7 @@ user, or to have the permission granted, at each future phase boundary.
 
 ## Next tasks
 
-1. Implement `docs/specs/SPEC-insights-visual.md`, which is frozen. It inherits the visual-only rule and must hold 226/226 connected and 411/411 JVM with no pre-existing test file modified. Then freeze a Phase 18 spec before any application-code edit on the remaining screens.
+1. Implement `docs/specs/SPEC-remaining-screens-visual.md`, which is frozen. It inherits the visual-only rule and must hold 239/239 connected and 428/428 JVM with no pre-existing test file modified. It is the last phase of the visual overhaul; after it, the closing audit's two new JVM tests are the standing guard against literal and contrast drift.
 2. Re-verify the crisis resources in `SafetyCopy` against their operator sources before any future release, and update `SafetyCopy.VERIFIED_ON` in the same edit. Hotline numbers and coverage change; a stale number in a safety feature is a real harm, not a cosmetic bug.
 3. Continue excluding `.agents/` and `.codex/` from product/documentation commits.
 

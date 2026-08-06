@@ -2,20 +2,16 @@ package com.kieslingdev.mindscale.safety
 
 import android.content.ActivityNotFoundException
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Button
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -31,13 +27,23 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
+import com.kieslingdev.mindscale.ui.components.MsActionTone
+import com.kieslingdev.mindscale.ui.components.MsCard
 import com.kieslingdev.mindscale.ui.components.MsDialog
+import com.kieslingdev.mindscale.ui.components.MsFieldSelectionColors
+import com.kieslingdev.mindscale.ui.components.MsHairline
+import com.kieslingdev.mindscale.ui.components.MsPillButton
+import com.kieslingdev.mindscale.ui.components.MsTextAction
+import com.kieslingdev.mindscale.ui.components.MsUppercaseText
+import com.kieslingdev.mindscale.ui.components.msFieldColors
+import com.kieslingdev.mindscale.ui.theme.MsSpacing
+import com.kieslingdev.mindscale.ui.theme.ms
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kieslingdev.mindscale.data.SafetyPlanItem
 import com.kieslingdev.mindscale.data.allowsPhone
 
 /** Every actionable element on this screen, per D-10. */
-private val MinTarget = Modifier.heightIn(min = 48.dp)
+private val MinTarget = Modifier.heightIn(min = MsSpacing.minTouchTarget)
 
 @Composable
 fun SafetyRoute(viewModel: SafetyViewModel, modifier: Modifier = Modifier) {
@@ -76,16 +82,20 @@ fun SafetyScreen(
 
     LazyColumn(
         modifier = modifier.testTag("safety_screen"),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        contentPadding = PaddingValues(MsSpacing.lgPlus),
+        verticalArrangement = Arrangement.spacedBy(MsSpacing.lgPlus)
     ) {
         item(key = "intro") {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(SafetyCopy.SCREEN_INTRO, style = MaterialTheme.typography.bodyLarge)
+            Column(verticalArrangement = Arrangement.spacedBy(MsSpacing.md)) {
+                Text(
+                    SafetyCopy.SCREEN_INTRO,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.ms.inkPrimary
+                )
                 Text(
                     SafetyCopy.HONESTY,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = MaterialTheme.ms.inkTertiary,
                     modifier = Modifier.testTag("safety_honesty")
                 )
             }
@@ -96,31 +106,38 @@ fun SafetyScreen(
         }
 
         items(SAFETY_RESOURCES, key = { "resource:${it.key}" }) { resource ->
-            Surface(
-                tonalElevation = 2.dp,
-                shape = MaterialTheme.shapes.medium,
-                modifier = Modifier.fillMaxWidth().testTag("resource_${resource.key}")
+            MsCard(
+                modifier = Modifier.fillMaxWidth().testTag("resource_${resource.key}"),
+                contentPadding = MsSpacing.lgPlus
             ) {
-                Column(
-                    Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
+                Column(verticalArrangement = Arrangement.spacedBy(MsSpacing.mdPlus)) {
                     // Name, then actions, then detail. Reaching help must not require
                     // reading a paragraph first — visually or in TalkBack order (D-3).
-                    Text(resource.name, style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        resource.name,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.ms.inkPrimary
+                    )
+                    // The one place this overhaul refuses the design's bare text action. These
+                    // are the controls a person in crisis has to find, and a 9 sp gold label is a
+                    // weaker affordance than a filled pill. `selected = true` is the design's own
+                    // ink-fill-with-`onInk` treatment used as emphasis rather than as state, and
+                    // the pair measures 11.98:1 light and 13.93:1 dark (D-11).
                     resource.actions.forEach { action ->
-                        Button(
+                        MsPillButton(
+                            text = action.label,
                             onClick = { run(action.action) },
+                            selected = true,
                             modifier = MinTarget
                                 .fillMaxWidth()
                                 .testTag("resource_action_${action.label}")
                                 .semantics { contentDescription = action.contentDescription }
-                        ) { Text(action.label) }
+                        )
                     }
                     Text(
                         resource.detail,
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.ms.inkTertiary
                     )
                 }
             }
@@ -130,6 +147,7 @@ fun SafetyScreen(
             Text(
                 SafetyCopy.EMERGENCY,
                 style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.ms.inkSecondary,
                 modifier = Modifier.testTag("safety_emergency")
             )
         }
@@ -138,21 +156,25 @@ fun SafetyScreen(
             Text(
                 SafetyCopy.VERIFIED_ON,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = MaterialTheme.ms.inkQuaternary,
                 modifier = Modifier.testTag("safety_verified")
             )
         }
 
         item(key = "plan_heading") {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                HorizontalDivider()
+            Column(verticalArrangement = Arrangement.spacedBy(MsSpacing.md)) {
+                MsHairline()
                 SectionHeading(SafetyCopy.PLAN_HEADING, tag = "plan_heading")
-                Text(SafetyCopy.PLAN_INTRO, style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    SafetyCopy.PLAN_INTRO,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.ms.inkSecondary
+                )
                 if (uiState.isEmpty) {
                     Text(
                         SafetyCopy.PLAN_EMPTY,
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = MaterialTheme.ms.inkTertiary,
                         modifier = Modifier.testTag("plan_empty")
                     )
                 }
@@ -164,35 +186,37 @@ fun SafetyScreen(
         SAFETY_STEPS.forEach { stepContent ->
             val items = uiState.plan[stepContent.step].orEmpty()
             item(key = "step:${stepContent.step.name}") {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(MsSpacing.sm)) {
                     SectionHeading(
                         stepContent.heading,
                         tag = "step_heading_${stepContent.step.name}",
-                        style = MaterialTheme.typography.titleSmall
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.ms.inkQuaternary
                     )
                     Text(
                         stepContent.hint,
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.ms.inkQuaternary
                     )
                     if (items.isEmpty()) {
                         Text(
                             SafetyCopy.STEP_EMPTY,
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = MaterialTheme.ms.inkQuaternary,
                             modifier = Modifier.testTag("step_empty_${stepContent.step.name}")
                         )
                     }
                     items.forEach { item ->
                         PlanRow(item, viewModel, onDial = ::run)
                     }
-                    TextButton(
+                    MsTextAction(
+                        text = SafetyCopy.ADD_ITEM,
                         onClick = { viewModel.startAdd(stepContent.step) },
                         modifier = MinTarget.testTag("step_add_${stepContent.step.name}")
                             .semantics {
                                 contentDescription = "Add to ${stepContent.heading}"
                             }
-                    ) { Text(SafetyCopy.ADD_ITEM) }
+                    )
                 }
             }
         }
@@ -202,7 +226,7 @@ fun SafetyScreen(
                 Text(
                     message,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.primary,
+                    color = MaterialTheme.ms.goldText,
                     modifier = Modifier
                         .testTag("safety_message")
                         .semantics { liveRegion = LiveRegionMode.Polite }
@@ -212,18 +236,20 @@ fun SafetyScreen(
 
         uiState.readError?.let { error ->
             item(key = "read_error") {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(MsSpacing.sm)) {
                     Text(
                         error,
-                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.ms.danger,
                         modifier = Modifier
                             .testTag("safety_error")
                             .semantics { liveRegion = LiveRegionMode.Polite }
                     )
-                    TextButton(
+                    MsTextAction(
+                        text = SafetyCopy.RETRY,
                         onClick = viewModel::retry,
                         modifier = MinTarget.testTag("safety_retry")
-                    ) { Text(SafetyCopy.RETRY) }
+                    )
                 }
             }
         }
@@ -242,29 +268,41 @@ fun SafetyScreen(
                 TextButton(
                     onClick = viewModel::confirmDelete,
                     modifier = MinTarget.testTag("plan_delete_confirm")
-                ) { Text(SafetyCopy.DELETE_CONFIRM) }
+                ) { DialogActionLabel(SafetyCopy.DELETE_CONFIRM) }
             },
             dismissButton = {
                 TextButton(
                     onClick = viewModel::cancelDelete,
                     modifier = MinTarget.testTag("plan_delete_cancel")
-                ) { Text(SafetyCopy.CANCEL) }
+                ) { DialogActionLabel(SafetyCopy.CANCEL) }
             }
         )
     }
 }
 
+/**
+ * A section heading, uppercased and tracked as the design draws it.
+ *
+ * The tag and the `heading()` role sit on a **merging wrapper** rather than on the text node,
+ * because [MsUppercaseText] uses `clearAndSetSemantics` and would otherwise wipe both off the leaf
+ * it is applied to. `mergeDescendants = true` puts the restored original-case string back on the
+ * same node that carries the tag and the role, so `onNodeWithTag`, `keyIsDefined(Heading)` and
+ * `onNodeWithText` all still resolve exactly as `SafetyScreenTest` asserts.
+ */
 @Composable
 private fun SectionHeading(
     text: String,
     tag: String,
-    style: androidx.compose.ui.text.TextStyle = MaterialTheme.typography.titleMedium
+    style: androidx.compose.ui.text.TextStyle = MaterialTheme.typography.labelLarge,
+    color: androidx.compose.ui.graphics.Color = MaterialTheme.ms.inkSecondary
 ) {
-    Text(
-        text,
-        style = style,
-        modifier = Modifier.testTag(tag).semantics { heading() }
-    )
+    Box(
+        modifier = Modifier
+            .testTag(tag)
+            .semantics(mergeDescendants = true) { heading() }
+    ) {
+        MsUppercaseText(text = text, style = style, color = color)
+    }
 }
 
 @Composable
@@ -274,41 +312,49 @@ private fun PlanRow(
     onDial: (SafetyAction) -> Unit
 ) {
     val dial = viewModel.dialActionFor(item)
-    Surface(
-        tonalElevation = 1.dp,
-        shape = MaterialTheme.shapes.small,
-        modifier = Modifier.fillMaxWidth().testTag("plan_row_${item.id}")
+    MsCard(
+        modifier = Modifier.fillMaxWidth().testTag("plan_row_${item.id}"),
+        contentPadding = MsSpacing.mdPlus
     ) {
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(item.text, style = MaterialTheme.typography.bodyLarge)
+        Column(verticalArrangement = Arrangement.spacedBy(MsSpacing.xs)) {
+            Text(
+                item.text,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.ms.inkPrimary
+            )
             item.phone?.let { phone ->
                 Text(
                     phone,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.ms.inkTertiary
                 )
             }
             // A number with nothing dialable left in it gets no button at all, rather
             // than one that cannot work (D-7).
             if (dial != null) {
-                OutlinedButton(
+                MsPillButton(
+                    text = SafetyCopy.callContact(item.text),
                     onClick = { onDial(dial) },
                     modifier = MinTarget
                         .testTag("plan_call_${item.id}")
                         .semantics { contentDescription = SafetyCopy.callContact(item.text) }
-                ) { Text(SafetyCopy.callContact(item.text)) }
+                )
             }
             androidx.compose.foundation.layout.Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(MsSpacing.sm),
+                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
             ) {
-                TextButton(
+                MsTextAction(
+                    text = SafetyCopy.EDIT_ITEM,
                     onClick = { viewModel.startEdit(item.id) },
                     modifier = MinTarget.testTag("plan_edit_${item.id}")
-                ) { Text(SafetyCopy.EDIT_ITEM) }
-                TextButton(
+                )
+                MsTextAction(
+                    text = SafetyCopy.DELETE_ITEM,
                     onClick = { viewModel.requestDelete(item.id) },
+                    tone = MsActionTone.Danger,
                     modifier = MinTarget.testTag("plan_delete_${item.id}")
-                ) { Text(SafetyCopy.DELETE_ITEM) }
+                )
             }
         }
     }
@@ -321,42 +367,60 @@ private fun PlanEditorDialog(editor: PlanEditor, viewModel: SafetyViewModel) {
         onDismissRequest = viewModel::cancelEdit,
         title = { Text(heading) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(
-                    value = editor.textDraft,
-                    onValueChange = viewModel::updateTextDraft,
-                    label = { Text(SafetyCopy.TEXT_FIELD_LABEL) },
-                    isError = editor.textError != null,
-                    supportingText = { editor.textError?.let { Text(it) } },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth().testTag("plan_text_field")
-                )
-                if (editor.step.allowsPhone) {
+            MsFieldSelectionColors {
+                Column(verticalArrangement = Arrangement.spacedBy(MsSpacing.mdPlus)) {
                     OutlinedTextField(
-                        value = editor.phoneDraft,
-                        onValueChange = viewModel::updatePhoneDraft,
-                        label = { Text(SafetyCopy.PHONE_FIELD_LABEL) },
-                        isError = editor.phoneError != null,
-                        supportingText = { editor.phoneError?.let { Text(it) } },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                        value = editor.textDraft,
+                        onValueChange = viewModel::updateTextDraft,
+                        label = { Text(SafetyCopy.TEXT_FIELD_LABEL) },
+                        isError = editor.textError != null,
+                        supportingText = { editor.textError?.let { Text(it) } },
                         singleLine = true,
-                        modifier = Modifier.fillMaxWidth().testTag("plan_phone_field")
+                        colors = msFieldColors(),
+                        modifier = Modifier.fillMaxWidth().testTag("plan_text_field")
                     )
+                    if (editor.step.allowsPhone) {
+                        OutlinedTextField(
+                            value = editor.phoneDraft,
+                            onValueChange = viewModel::updatePhoneDraft,
+                            label = { Text(SafetyCopy.PHONE_FIELD_LABEL) },
+                            isError = editor.phoneError != null,
+                            supportingText = { editor.phoneError?.let { Text(it) } },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                            singleLine = true,
+                            colors = msFieldColors(),
+                            modifier = Modifier.fillMaxWidth().testTag("plan_phone_field")
+                        )
+                    }
                 }
             }
         },
+        // The button stays a Material `TextButton` so its enabled/disabled semantics are
+        // untouched — `plan_save` is disabled while the editor saves. Only the label is
+        // wrapped (D-13).
         confirmButton = {
             TextButton(
                 onClick = viewModel::saveEditor,
                 enabled = !editor.saving,
-                modifier = MinTarget.widthIn(min = 48.dp).testTag("plan_save")
-            ) { Text(SafetyCopy.SAVE_ITEM) }
+                modifier = MinTarget.widthIn(min = MsSpacing.minTouchTarget).testTag("plan_save")
+            ) { DialogActionLabel(SafetyCopy.SAVE_ITEM) }
         },
         dismissButton = {
             TextButton(
                 onClick = viewModel::cancelEdit,
-                modifier = MinTarget.widthIn(min = 48.dp).testTag("plan_cancel")
-            ) { Text(SafetyCopy.CANCEL) }
+                modifier = MinTarget.widthIn(min = MsSpacing.minTouchTarget).testTag("plan_cancel")
+            ) { DialogActionLabel(SafetyCopy.CANCEL) }
         }
     )
+}
+
+/**
+ * A dialog action label, uppercased in place (D-13). The button stays a Material [TextButton] so
+ * its enabled and disabled semantics are untouched; only the label is wrapped, and the colour is
+ * left unspecified so it inherits `TextButton`'s content colour, which D-9 of the foundation
+ * resolves to `goldText`.
+ */
+@Composable
+private fun DialogActionLabel(text: String) {
+    MsUppercaseText(text = text, style = MaterialTheme.typography.labelMedium)
 }

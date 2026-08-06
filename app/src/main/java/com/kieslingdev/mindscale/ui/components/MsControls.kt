@@ -145,6 +145,20 @@ fun MsChip(
  *
  * This component renders the segments a caller already had. It does not decide what segments
  * exist (D-15).
+ *
+ * Two corrections were made in Phase 18, which is the first phase to put this component on a real
+ * screen — the same reason Phase 16 corrected four others
+ * (`docs/specs/SPEC-remaining-screens-visual.md`, D-5):
+ *
+ * 1. **`maxLines = 1` is gone.** It carried no `overflow`, which resolves to [TextOverflow.Clip].
+ *    At 200% font a three-segment row gives `SYSTEM` about a third of the screen, and six tracked
+ *    characters at 21 sp is the arithmetic that clipped the `INSIGHTS` navigation tab in Phase 15
+ *    and that made Phase 16 remove `maxLines` from Log's filter field. A long label now wraps;
+ *    losing characters is worse than taking a second line.
+ * 2. **[optionModifier] lets the caller attach per-segment semantics** without the component
+ *    inventing any. `NavigationTest` asserts `onNodeWithContentDescription("24h, selected")`, and
+ *    under D-15 a description belongs to the caller exactly as a `testTag` does. It is defaulted,
+ *    so existing call sites are unchanged.
  */
 @Composable
 fun MsSegmentedControl(
@@ -152,7 +166,8 @@ fun MsSegmentedControl(
     selectedIndex: Int,
     onSelect: (Int) -> Unit,
     modifier: Modifier = Modifier,
-    enabled: Boolean = true
+    enabled: Boolean = true,
+    optionModifier: (Int) -> Modifier = { Modifier }
 ) {
     val palette = MaterialTheme.ms
     Row(
@@ -180,6 +195,7 @@ fun MsSegmentedControl(
                         enabled = enabled,
                         onClick = { onSelect(index) }
                     )
+                    .then(optionModifier(index))
                     .padding(horizontal = MsSpacing.xxs, vertical = MsSpacing.smPlus),
                 contentAlignment = Alignment.Center
             ) {
@@ -187,8 +203,7 @@ fun MsSegmentedControl(
                     text = label,
                     style = MaterialTheme.typography.labelLarge,
                     color = if (isSelected) palette.onInk else palette.inkQuaternary,
-                    textAlign = TextAlign.Center,
-                    maxLines = 1
+                    textAlign = TextAlign.Center
                 )
             }
         }

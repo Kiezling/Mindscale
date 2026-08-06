@@ -11,12 +11,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -36,10 +36,23 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.kieslingdev.mindscale.ui.components.MsEyebrow
+import com.kieslingdev.mindscale.ui.components.MsPillButton
+import com.kieslingdev.mindscale.ui.components.MsUppercaseText
+import com.kieslingdev.mindscale.ui.theme.MsSpacing
+import com.kieslingdev.mindscale.ui.theme.ms
 
 /** Every actionable element on this screen, per D-13. */
-private val MinTarget = Modifier.heightIn(min = 48.dp).widthIn(min = 48.dp)
+private val MinTarget = Modifier
+    .heightIn(min = MsSpacing.minTouchTarget)
+    .widthIn(min = MsSpacing.minTouchTarget)
 
+/**
+ * The design's pacing circle, at line 1602 of the design authority. Figure geometry rather than
+ * spacing: no other surface in the app is 224 dp across, and a spacing scale should not absorb a
+ * value that exists because a circle has to be big enough to follow with your eyes
+ * (`docs/specs/SPEC-remaining-screens-visual.md`, D-14).
+ */
 private val CircleSize = 224.dp
 
 @Composable
@@ -118,77 +131,84 @@ fun BreathingScreen(
 
     LazyColumn(
         modifier = modifier.testTag("breathing_screen"),
-        contentPadding = PaddingValues(24.dp),
-        verticalArrangement = Arrangement.spacedBy(24.dp),
+        contentPadding = PaddingValues(MsSpacing.xxlPlus),
+        verticalArrangement = Arrangement.spacedBy(MsSpacing.xxlPlus),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         item(key = "circle") {
+            // The design draws one circle with the cue inside it, at line 1602. The ring, the
+            // fill and the cue are one composition here for that reason — but the cue is still
+            // its own `Text` node with its own tag, description and live region, so this is a
+            // stacking change and not a structural one (D-12).
             Box(
                 modifier = Modifier.size(CircleSize),
                 contentAlignment = Alignment.Center
             ) {
-                // Decorative. Everything a TalkBack user needs is on the cue text below,
-                // so the animation carries no information of its own (D-13).
+                // Decorative. Everything a TalkBack user needs is on the cue text, so the
+                // animation carries no information of its own (D-13 of the breathing spec).
+                //
+                // The ring is full `ms.gold` rather than the design's `rgba(gold,.45)`. On a
+                // full-bleed screen there is no card edge to help, so the ring is the only thing
+                // separating the pacer from the page, and 45% gold measures 1.60:1 against a 3:1
+                // floor (D-7).
                 Box(
                     modifier = Modifier
                         .size(CircleSize)
                         .clearAndSetSemantics { }
-                        .border(1.dp, MaterialTheme.colorScheme.outline, CircleShape)
+                        .border(MsSpacing.hairline, MaterialTheme.ms.gold, CircleShape)
                 )
                 Box(
                     modifier = Modifier
                         .size(CircleSize)
                         .scale(scale)
                         .clearAndSetSemantics { }
-                        .background(MaterialTheme.colorScheme.secondaryContainer, CircleShape)
+                        .background(MaterialTheme.ms.sleepBand, CircleShape)
                         .testTag("breathing_circle")
                 )
+                // The pacing signal for anyone not watching the circle. About eleven polite
+                // announcements a minute is not chatter here - it is the pace.
+                MsUppercaseText(
+                    text = cue,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.ms.inkSecondary,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        // The idle cue is a fifteen-character sentence, not the design's `IN`,
+                        // so it needs room to wrap inside the ring rather than up against it.
+                        .padding(horizontal = MsSpacing.xxl)
+                        .testTag("breathing_cue")
+                        .semantics {
+                            contentDescription = cueDescription
+                            liveRegion = LiveRegionMode.Polite
+                        }
+                )
             }
-        }
-
-        item(key = "cue") {
-            // The pacing signal for anyone not watching the circle. About eleven polite
-            // announcements a minute is not chatter here - it is the pace.
-            Text(
-                text = cue,
-                style = MaterialTheme.typography.titleMedium,
-                textAlign = TextAlign.Center,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("breathing_cue")
-                    .semantics {
-                        contentDescription = cueDescription
-                        liveRegion = LiveRegionMode.Polite
-                    }
-            )
         }
 
         if (running != null) {
             item(key = "length") {
                 // Static, never a countdown: a running clock would make this a compliance
-                // monitor rather than a pace.
-                Text(
+                // monitor rather than a pace. The design tracks it as an eyebrow.
+                MsEyebrow(
                     text = BreathingCopy.runningLength(running.minutes),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth().testTag("breathing_running_length")
+                    modifier = Modifier.testTag("breathing_running_length")
                 )
             }
         } else {
             item(key = "lengths") {
                 // Four choices, ascending, none selected. There is no default dose.
                 Column(
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(MsSpacing.mdPlus),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     BREATHING_LENGTHS_MINUTES.chunked(2).forEach { row ->
                         androidx.compose.foundation.layout.Row(
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            horizontalArrangement = Arrangement.spacedBy(MsSpacing.mdPlus)
                         ) {
                             row.forEach { minutes ->
-                                OutlinedButton(
+                                MsPillButton(
+                                    text = BreathingCopy.lengthLabel(minutes),
                                     onClick = { onStart(minutes) },
                                     modifier = MinTarget
                                         .testTag("breathing_length_$minutes")
@@ -196,7 +216,7 @@ fun BreathingScreen(
                                             contentDescription =
                                                 BreathingCopy.lengthDescription(minutes)
                                         }
-                                ) { Text(BreathingCopy.lengthLabel(minutes)) }
+                                )
                             }
                         }
                     }
@@ -205,18 +225,18 @@ fun BreathingScreen(
         }
 
         item(key = "close") {
-            OutlinedButton(
+            MsPillButton(
+                text = if (running != null) BreathingCopy.STOP else BreathingCopy.CLOSE,
                 onClick = onStop,
                 modifier = MinTarget.testTag("breathing_close")
-            ) {
-                Text(if (running != null) BreathingCopy.STOP else BreathingCopy.CLOSE)
-            }
+            )
         }
 
         item(key = "instructions") {
             Text(
                 text = BreathingCopy.INSTRUCTIONS,
                 style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.ms.inkTertiary,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth().testTag("breathing_instructions")
             )
@@ -226,7 +246,7 @@ fun BreathingScreen(
             Text(
                 text = BreathingCopy.NO_CLAIM,
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = MaterialTheme.ms.inkQuaternary,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth().testTag("breathing_no_claim")
             )
@@ -236,7 +256,7 @@ fun BreathingScreen(
             Text(
                 text = BreathingCopy.RECORDING,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = MaterialTheme.ms.inkQuaternary,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth().testTag("breathing_recording")
             )
@@ -247,7 +267,7 @@ fun BreathingScreen(
                 Text(
                     text = message,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.error,
+                    color = MaterialTheme.ms.danger,
                     textAlign = TextAlign.Center,
                     modifier = Modifier
                         .fillMaxWidth()
