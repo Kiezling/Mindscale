@@ -8,7 +8,7 @@ Date: 2026-08-06
 
 Frozen documentation commit: `ecd6247`
 
-Verified implementation commits: `20b28cf` (contrast test, component corrections), `2a6e8c8` (Track and Log restyle), plus the visual-test and capture-defect follow-up
+Verified implementation commits: `23fb1fe` (contrast test, component corrections), `2a6e8c8` (Track and Log restyle), `45b2810` (visual tests and the two defects capture found)
 
 ## Purpose
 
