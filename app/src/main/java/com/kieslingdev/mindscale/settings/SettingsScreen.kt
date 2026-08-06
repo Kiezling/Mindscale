@@ -14,7 +14,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -35,6 +34,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.kieslingdev.mindscale.ui.components.MsDialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kieslingdev.mindscale.breathing.BreathingCopy
 import com.kieslingdev.mindscale.data.HourFormat
@@ -363,7 +363,7 @@ fun SettingsScreen(
     }
 
     uiState.pendingImport?.let { pending ->
-        AlertDialog(
+        MsDialog(
             onDismissRequest = viewModel::cancelImport,
             title = { Text(pending.preview.title) },
             text = {
@@ -405,7 +405,7 @@ fun SettingsScreen(
     }
 
     uiState.eraseConfirmation?.let { confirmation ->
-        AlertDialog(
+        MsDialog(
             onDismissRequest = viewModel::cancelErase,
             title = { Text("Erase everything on this device?") },
             text = {

@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -32,6 +31,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
+import com.kieslingdev.mindscale.ui.components.MsDialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kieslingdev.mindscale.data.SafetyPlanItem
 import com.kieslingdev.mindscale.data.allowsPhone
@@ -234,7 +234,7 @@ fun SafetyScreen(
     val pendingDelete = uiState.pendingDeleteId
         ?.let { id -> uiState.plan.values.flatten().firstOrNull { it.id == id } }
     if (pendingDelete != null) {
-        AlertDialog(
+        MsDialog(
             onDismissRequest = viewModel::cancelDelete,
             title = { Text(SafetyCopy.DELETE_TITLE) },
             text = { Text(SafetyCopy.deleteMessage(pendingDelete.text)) },
@@ -317,7 +317,7 @@ private fun PlanRow(
 @Composable
 private fun PlanEditorDialog(editor: PlanEditor, viewModel: SafetyViewModel) {
     val heading = SAFETY_STEPS.first { it.step == editor.step }.heading
-    AlertDialog(
+    MsDialog(
         onDismissRequest = viewModel::cancelEdit,
         title = { Text(heading) },
         text = {

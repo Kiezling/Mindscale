@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -37,6 +36,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.kieslingdev.mindscale.ui.components.MsDialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kieslingdev.mindscale.data.Entry
 import com.kieslingdev.mindscale.data.EntryKind
@@ -157,7 +157,7 @@ fun LogScreen(
     }
 
     uiState.deleteTarget?.let { target ->
-        AlertDialog(
+        MsDialog(
             onDismissRequest = { onEvent(LogEvent.DeleteCancelled) },
             title = { Text("Delete ${target.description}?") },
             text = { Text("This permanently deletes this record. This cannot be undone.") },

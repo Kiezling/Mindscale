@@ -1,20 +1,21 @@
 package com.kieslingdev.mindscale
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -26,8 +27,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import com.kieslingdev.mindscale.ui.components.MsCircularHeaderButton
+import com.kieslingdev.mindscale.ui.components.MsEyebrow
+import com.kieslingdev.mindscale.ui.components.MsHairline
+import com.kieslingdev.mindscale.ui.components.MsHeaderRule
+import com.kieslingdev.mindscale.ui.components.MsTextAction
+import com.kieslingdev.mindscale.ui.components.MsUppercaseText
+import com.kieslingdev.mindscale.ui.components.MsWordmark
+import com.kieslingdev.mindscale.ui.theme.MsSpacing
+import com.kieslingdev.mindscale.ui.theme.ms
 import com.kieslingdev.mindscale.log.LogRoute
 import com.kieslingdev.mindscale.log.LogViewModel
 import com.kieslingdev.mindscale.insights.InsightsRoute
@@ -110,83 +122,43 @@ fun MindScaleApp(
 
     BackHandler(enabled = destination != AppDestination.TRACK) { navigateBack() }
 
+    val isRoot = destination in setOf(
+        AppDestination.TRACK,
+        AppDestination.LOG,
+        AppDestination.INSIGHTS
+    )
+
     Scaffold(
+        containerColor = MaterialTheme.ms.bg,
         topBar = {
-            Surface(tonalElevation = 1.dp) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .windowInsetsPadding(WindowInsets.statusBars)
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    if (destination in setOf(
-                            AppDestination.PROFILE,
-                            AppDestination.REPORT,
-                            AppDestination.SETTINGS,
-                            AppDestination.SAFETY,
-                            AppDestination.BREATHING
-                        )
-                    ) {
-                        TextButton(onClick = ::navigateBack, modifier = Modifier.testTag("overlay_back")) {
-                            Text("Back")
-                        }
-                    } else {
-                        Text("MindScale", style = MaterialTheme.typography.titleLarge)
-                    }
-                    Text(
-                        when (destination) {
-                            AppDestination.TRACK -> "Track"
-                            AppDestination.LOG -> "Full Log"
-                            AppDestination.INSIGHTS -> "Insights"
-                            AppDestination.PROFILE -> "Profile"
-                            AppDestination.REPORT -> "Clinician summary"
-                            AppDestination.SETTINGS -> "Settings"
-                            AppDestination.SAFETY -> SafetyCopy.TOP_BAR_TITLE
-                            AppDestination.BREATHING -> BreathingCopy.TOP_BAR_TITLE
-                        },
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                    if (destination in setOf(AppDestination.TRACK, AppDestination.LOG, AppDestination.INSIGHTS)) {
-                        TextButton(
-                            onClick = { openOverlay(AppDestination.PROFILE) },
-                            modifier = Modifier.testTag("profile_action")
-                                .semantics { contentDescription = "Open Profile" }
-                        ) { Text("Profile") }
-                    } else {
-                        Text("")
-                    }
-                }
+            // The pacer renders full-bleed: no top bar and no bottom navigation
+            // (`docs/specs/SPEC-visual-foundation.md`, D-18). This is safe only because the exit
+            // affordance does not live in the chrome — the screen has its own `breathing_close`
+            // pill, and system Back still works through the BackHandler above.
+            if (destination != AppDestination.BREATHING) {
+                MindScaleHeader(
+                    isRoot = isRoot,
+                    title = when (destination) {
+                        AppDestination.TRACK -> "Track"
+                        AppDestination.LOG -> "Full Log"
+                        AppDestination.INSIGHTS -> "Insights"
+                        AppDestination.PROFILE -> "Profile"
+                        AppDestination.REPORT -> "Clinician summary"
+                        AppDestination.SETTINGS -> "Settings"
+                        AppDestination.SAFETY -> SafetyCopy.TOP_BAR_TITLE
+                        AppDestination.BREATHING -> BreathingCopy.TOP_BAR_TITLE
+                    },
+                    onBack = ::navigateBack,
+                    onOpenProfile = { openOverlay(AppDestination.PROFILE) }
+                )
             }
         },
         bottomBar = {
-            if (destination in setOf(AppDestination.TRACK, AppDestination.LOG, AppDestination.INSIGHTS)) {
-                NavigationBar(modifier = Modifier.testTag("main_navigation")) {
-                    NavigationBarItem(
-                        selected = destination == AppDestination.TRACK,
-                        onClick = { setRoot(AppDestination.TRACK) },
-                        icon = { Text("●") },
-                        label = { Text("Track") },
-                        modifier = Modifier.semantics { contentDescription = "Track tab" }
-                    )
-                    NavigationBarItem(
-                        selected = destination == AppDestination.LOG,
-                        onClick = { setRoot(AppDestination.LOG) },
-                        icon = { Text("≡") },
-                        label = { Text("Log") },
-                        modifier = Modifier.semantics { contentDescription = "Log tab" }
-                    )
-                    NavigationBarItem(
-                        selected = destination == AppDestination.INSIGHTS,
-                        onClick = { setRoot(AppDestination.INSIGHTS) },
-                        icon = { Text("▦") },
-                        label = { Text("Insights") },
-                        modifier = Modifier
-                            .testTag("insights_tab")
-                            .semantics { contentDescription = "Insights tab" }
-                    )
-                }
+            if (isRoot) {
+                MindScaleBottomNavigation(
+                    destination = destination,
+                    onSelect = ::setRoot
+                )
             }
         }
     ) { innerPadding ->
@@ -227,8 +199,171 @@ fun MindScaleApp(
             )
             AppDestination.BREATHING -> BreathingRoute(
                 breathingViewModel,
-                modifier = Modifier.padding(innerPadding)
+                modifier = Modifier
+                    .padding(innerPadding)
+                    // The pacer has no top bar, so `BreathingCopy.TOP_BAR_TITLE` would otherwise
+                    // stop being rendered anywhere. Rather than leave a frozen string dead, it
+                    // becomes the accessibility pane title and is still announced on entry
+                    // (`docs/specs/SPEC-visual-foundation.md`, D-18).
+                    .semantics { paneTitle = BreathingCopy.TOP_BAR_TITLE }
             )
         }
+    }
+}
+
+/**
+ * The design's header (`docs/specs/SPEC-visual-foundation.md`, D-16): flat on the page with no
+ * divider and no tonal elevation, a centred title in the wordmark treatment — uppercase, weight
+ * 500, tracked to 0.542 em — with the 22 x 1 dp gold rule beneath it.
+ *
+ * All three of the app's existing header slots survive, because removing any of them would be a
+ * removal of on-screen content and D-1 forbids that. The prototype's header carries a single
+ * centred wordmark because that app has an initials avatar and no destination title; MindScale
+ * has a destination title and a Profile text action, so it keeps a three-cell bar. The cells are
+ * weighted 1/2/1 rather than absolutely positioned so the title stays optically centred and the
+ * bar reflows instead of overlapping at 200% font.
+ *
+ * The prototype's initials avatar is not adopted: it is a different Profile entry point, and
+ * changing entry points is a navigation change (D-1).
+ */
+@Composable
+private fun MindScaleHeader(
+    isRoot: Boolean,
+    title: String,
+    onBack: () -> Unit,
+    onOpenProfile: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.ms.bg)
+            .windowInsetsPadding(WindowInsets.statusBars)
+            .padding(horizontal = MsSpacing.mdPlus, vertical = MsSpacing.sm),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+            if (isRoot) {
+                MsEyebrow("MindScale")
+            } else {
+                MsCircularHeaderButton(
+                    label = "‹",
+                    onClick = onBack,
+                    modifier = Modifier
+                        .testTag("overlay_back")
+                        .semantics { contentDescription = "Back" }
+                )
+            }
+        }
+        Column(
+            modifier = Modifier.weight(2f),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(MsSpacing.sm)
+        ) {
+            MsWordmark(title)
+            MsHeaderRule()
+        }
+        Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
+            if (isRoot) {
+                MsTextAction(
+                    text = "Profile",
+                    onClick = onOpenProfile,
+                    modifier = Modifier
+                        .testTag("profile_action")
+                        .semantics { contentDescription = "Open Profile" }
+                )
+            }
+        }
+    }
+}
+
+/**
+ * The design's navigation (D-17): three flush text tabs on the page above a hairline top border,
+ * the selected one in gold at weight 600 and the rest at the faintest compliant emphasis level.
+ * There are no icons.
+ *
+ * `NavigationBar` cannot render an item without an icon slot, so this is a plain [Row] of
+ * selectable cells. What had to survive the swap, and is asserted by `MindScaleChromeTest`: the
+ * `main_navigation` and `insights_tab` tags, the three `… tab` content descriptions, clickable
+ * nodes findable by the original-case strings `Track`, `Log`, and `Insights` — `NavigationTest`
+ * does `onNodeWithText("Log").performClick()` — the selected state, the `setRoot` callbacks, and
+ * a 48 dp target.
+ *
+ * The three glyphs the old bar carried (`●`, `≡`, `▦`) are dropped. That is a removal of
+ * on-screen marks, so it is stated rather than smuggled: they are unlabelled decorations that no
+ * test asserts and no content description names, and every tab keeps both its text label and its
+ * content description, so nothing that was announced stops being announced.
+ *
+ * Selection is never colour alone: gold *and* weight 600 (D-23).
+ */
+@Composable
+private fun MindScaleBottomNavigation(
+    destination: AppDestination,
+    onSelect: (AppDestination) -> Unit
+) {
+    val palette = MaterialTheme.ms
+    Column(modifier = Modifier.testTag("main_navigation")) {
+        MsHairline()
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(palette.bg)
+                .navigationBarsPadding()
+        ) {
+            NavigationTab(
+                label = "Track",
+                contentDescription = "Track tab",
+                selected = destination == AppDestination.TRACK,
+                onClick = { onSelect(AppDestination.TRACK) },
+                modifier = Modifier.weight(1f)
+            )
+            NavigationTab(
+                label = "Log",
+                contentDescription = "Log tab",
+                selected = destination == AppDestination.LOG,
+                onClick = { onSelect(AppDestination.LOG) },
+                modifier = Modifier.weight(1f)
+            )
+            NavigationTab(
+                label = "Insights",
+                contentDescription = "Insights tab",
+                selected = destination == AppDestination.INSIGHTS,
+                onClick = { onSelect(AppDestination.INSIGHTS) },
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag("insights_tab")
+            )
+        }
+    }
+}
+
+@Composable
+private fun NavigationTab(
+    label: String,
+    contentDescription: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val palette = MaterialTheme.ms
+    Box(
+        modifier = modifier
+            .defaultMinSize(minHeight = MsSpacing.minTouchTarget)
+            .selectable(selected = selected, onClick = onClick)
+            .semantics { this.contentDescription = contentDescription }
+            .padding(horizontal = MsSpacing.xxs, vertical = MsSpacing.lgPlus),
+        contentAlignment = Alignment.Center
+    ) {
+        // Deliberately unbounded lines. At 200% font `INSIGHTS` is wider than a third of the
+        // screen, and a single-line label clipped its last glyph at the edge. Wrapping is not
+        // pretty at that scale, but D-23 requires reflow without clipping and a label that has
+        // lost a letter is worse than one that has taken two lines.
+        MsUppercaseText(
+            text = label,
+            style = MaterialTheme.typography.labelLarge.copy(
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium
+            ),
+            color = if (selected) palette.goldText else palette.inkQuaternary,
+            textAlign = TextAlign.Center
+        )
     }
 }

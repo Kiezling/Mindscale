@@ -22,7 +22,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -53,6 +52,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.kieslingdev.mindscale.ui.components.MsDialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kieslingdev.mindscale.data.Entry
 import com.kieslingdev.mindscale.data.EntryKind
@@ -823,7 +823,7 @@ private fun TimestampEditDialog(
 ) {
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
-    AlertDialog(
+    MsDialog(
         onDismissRequest = { if (!isSaving) onCancel() },
         title = { Text(title) },
         text = {
@@ -996,7 +996,7 @@ private fun NoteDialog(modal: TrackModalState.Note, onEvent: (TrackEvent) -> Uni
     val status = listOfNotNull(conflictMessage, modal.mutationError).joinToString("\n").ifEmpty { null }
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
-    AlertDialog(
+    MsDialog(
         onDismissRequest = { if (!modal.isSaving) onEvent(TrackEvent.NoteCancelled) },
         title = { Text("Edit note") },
         text = {
@@ -1049,7 +1049,7 @@ private fun NoteDialog(modal: TrackModalState.Note, onEvent: (TrackEvent) -> Uni
 
 @Composable
 private fun DeleteConfirmDialog(modal: TrackModalState.Delete, onEvent: (TrackEvent) -> Unit) {
-    AlertDialog(
+    MsDialog(
         onDismissRequest = { if (!modal.isSaving) onEvent(TrackEvent.DeleteCancelled) },
         title = { Text("Delete entry?") },
         text = {
