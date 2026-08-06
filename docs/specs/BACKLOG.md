@@ -11,11 +11,10 @@ deferred "the shared gold/ink light/dark token foundation until the later global
 and it now has an agreed outcome, an agreed dependency order, and frozen decisions. It runs as
 four phases, 15 through 18:
 
-- Phase 15 — tokens and chrome. Active on 2026-08-05, governed by
-  `docs/specs/SPEC-visual-foundation.md`; `PROJECT_STATE.md` owns it while it is in progress.
-- [ ] Phase 16 — Track and Full Log — apply the P15 foundation to the two recording surfaces,
-      including the numpad, the entry rows, and the Log filter fields. Depends on Phase 15.
-      Needs its own frozen spec before any application-code edit.
+- Phase 15 — tokens and chrome. Merged 2026-08-06, governed by
+  `docs/specs/SPEC-visual-foundation.md`.
+- Phase 16 — Track and Full Log. Active on 2026-08-06, governed by
+  `docs/specs/SPEC-track-and-log-visual.md`; `PROJECT_STATE.md` owns it while it is in progress.
 - [ ] Phase 17 — Insights and the intensity ramp — apply the foundation to the Insights
       surfaces and move `intensityColor` onto the prototype's single warm interpolation.
       Depends on Phase 15. Needs its own spec, which must decide the 0-versus-1 low-anchor

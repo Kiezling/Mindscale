@@ -16,20 +16,27 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import com.kieslingdev.mindscale.ui.theme.MindScaleTextStyles
 import com.kieslingdev.mindscale.ui.theme.MsShapes
 import com.kieslingdev.mindscale.ui.theme.MsSpacing
 import com.kieslingdev.mindscale.ui.theme.ms
 
 /**
- * The design's outlined pill: 999 dp radius, hairline gold or ink border, uppercase tracked
- * label, no fill until it is selected (`docs/specs/SPEC-visual-foundation.md`, D-12 and D-15).
+ * The design's outlined pill: 999 dp radius, hairline gold border, uppercase tracked label, no
+ * fill until it is selected (`docs/specs/SPEC-visual-foundation.md`, D-12 and D-15).
  *
  * Selection uses the D-9 inverse pair — an ink fill with warm `onInk` text — which is the same
  * treatment in both themes but not the same colours: `onInk` is `#E3CE9F` in light and `#2A2114`
  * in dark. It is never colour alone: the fill itself is the second signal (D-23).
+ *
+ * The unselected border is **full** gold rather than the design's `rgba(174,140,79,.45)`. An
+ * unselected pill has no fill, so its border is the control's only boundary, and 45% gold measures
+ * 1.59:1 against `card` where D-23 requires 3:1. Full gold measures 3.15:1 and keeps the hue
+ * exactly (`docs/specs/SPEC-track-and-log-visual.md`, D-4 and D-15).
  */
 @Composable
 fun MsPillButton(
@@ -47,7 +54,7 @@ fun MsPillButton(
             .background(if (selected) palette.ink else androidx.compose.ui.graphics.Color.Transparent)
             .border(
                 width = MsSpacing.hairline,
-                color = if (selected) palette.ink else palette.gold.copy(alpha = 0.45f),
+                color = if (selected) palette.ink else palette.gold,
                 shape = MsShapes.pill
             )
             .clickable(enabled = enabled, onClick = onClick)
@@ -72,6 +79,19 @@ fun MsPillButton(
  * Unlike almost every other label in the design, a chip is **not** uppercased: `chipBtn` at line
  * 1223 of the design authority sets no `text-transform`, because a chip carries the user's own
  * words and shouting them back is both a change of voice and a TalkBack problem.
+ *
+ * The unselected border is `outline` rather than the design's `rgba(var(--ink-rgb),.14)`. An
+ * unselected chip has no fill, so its border is the control's only boundary, and 14% ink measures
+ * 1.35:1 against `card` where D-23 requires 3:1 — which is exactly the case D-6 of the foundation
+ * carves out when it says an ink border that is the *only* boundary of an interactive control is
+ * not decorative (`docs/specs/SPEC-track-and-log-visual.md`, D-4 and D-15).
+ *
+ * The touch target is a transparent box around the painted pill rather than the pill itself, which
+ * is what D-23 actually prescribes — "the painted geometry is the design's; the target is
+ * MindScale's". Growing the pill to 48 dp instead made an eleven-chip value row read as a row of
+ * tall ovals rather than the design's compact pills, and it still left a chip labelled `0` only
+ * 33 dp *wide*, below the same floor it was over-satisfying vertically. Found by installed-app
+ * capture in Phase 16, which is the only place it was visible (D-15).
  */
 @Composable
 fun MsChip(
@@ -84,23 +104,33 @@ fun MsChip(
     val palette = MaterialTheme.ms
     Box(
         modifier = modifier
-            .defaultMinSize(minHeight = MsSpacing.minTouchTarget)
-            .clip(MsShapes.pill)
-            .background(if (selected) palette.ink else androidx.compose.ui.graphics.Color.Transparent)
-            .border(
-                width = MsSpacing.hairline,
-                color = if (selected) palette.ink else palette.outlineDecorative,
-                shape = MsShapes.pill
+            .defaultMinSize(
+                minWidth = MsSpacing.minTouchTarget,
+                minHeight = MsSpacing.minTouchTarget
             )
-            .selectable(selected = selected, enabled = enabled, onClick = onClick)
-            .padding(horizontal = MsSpacing.lg, vertical = MsSpacing.smPlus),
+            .selectable(selected = selected, enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
-        Text(
-            text = text,
-            style = MindScaleTextStyles.chip,
-            color = if (selected) palette.onInk else palette.inkTertiary
-        )
+        Box(
+            modifier = Modifier
+                .clip(MsShapes.pill)
+                .background(
+                    if (selected) palette.ink else androidx.compose.ui.graphics.Color.Transparent
+                )
+                .border(
+                    width = MsSpacing.hairline,
+                    color = if (selected) palette.ink else palette.outline,
+                    shape = MsShapes.pill
+                )
+                .padding(horizontal = MsSpacing.lg, vertical = MsSpacing.smPlus),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = text,
+                style = MindScaleTextStyles.chip,
+                color = if (selected) palette.onInk else palette.inkTertiary
+            )
+        }
     }
 }
 
@@ -190,16 +220,26 @@ fun MsToastPill(text: String, modifier: Modifier = Modifier) {
 }
 
 /**
- * The design's 34 dp circular header button: a hairline ring around a single glyph, with the
- * touch target raised to 48 dp by transparent padding rather than by growing the ring (D-16,
- * D-23).
+ * The design's circular hairline button: a ring around a single glyph, with the touch target
+ * raised to 48 dp by transparent padding rather than by growing the ring (D-16, D-23).
+ *
+ * Two sizes exist in the design and both are this control: the 34 dp header back button at line 85
+ * of the design authority and Track's 26 dp help toggle at line 84. [size] and [textStyle] are
+ * defaulted to the header's values so the chrome's call site is unchanged
+ * (`docs/specs/SPEC-track-and-log-visual.md`, D-15).
+ *
+ * The ring is `outline` rather than the design's `rgba(var(--ink-rgb),.16)`. The ring is the only
+ * boundary either control has, and 16% ink measures 1.41:1 against `card` where D-23 requires
+ * 3:1 (D-4).
  */
 @Composable
 fun MsCircularHeaderButton(
     label: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    enabled: Boolean = true
+    enabled: Boolean = true,
+    size: Dp = MsSpacing.headerButton,
+    textStyle: TextStyle = MaterialTheme.typography.titleLarge
 ) {
     val palette = MaterialTheme.ms
     Box(
@@ -213,17 +253,14 @@ fun MsCircularHeaderButton(
     ) {
         Box(
             modifier = Modifier
-                .defaultMinSize(
-                    minWidth = MsSpacing.headerButton,
-                    minHeight = MsSpacing.headerButton
-                )
+                .defaultMinSize(minWidth = size, minHeight = size)
                 .clip(MsShapes.circle)
-                .border(MsSpacing.hairline, palette.outlineDecorative, MsShapes.circle),
+                .border(MsSpacing.hairline, palette.outline, MsShapes.circle),
             contentAlignment = Alignment.Center
         ) {
             Text(
                 text = label,
-                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Normal),
+                style = textStyle.copy(fontWeight = FontWeight.Normal),
                 color = palette.inkSecondary
             )
         }
