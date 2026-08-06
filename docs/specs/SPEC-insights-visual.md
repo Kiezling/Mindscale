@@ -214,17 +214,22 @@ pre-existing test file modified… a single `M` is a defect in this phase."* The
 authority 5 in this spec's own ordering; D-1 is authority 2. **The light ramp therefore keeps a
 non-decreasing luminance direction.**
 
-**Finding 3 — the constraint costs nothing measurable.** The two candidate light ramps are the
-*same two design hexes in the opposite order*, and they separate their endpoints almost identically:
+**Finding 3 — the endpoint separation is paid for by compliance, not by the constraint.** This
+table was corrected by `MsIntensityRampContrastTest` after the spec was first drafted, and the
+correction changes the argument rather than a decimal:
 
 | Light ramp | intensity 1 | intensity 10 | endpoint separation | min vs `card` |
 |---|---|---|---|---|
-| the design's direction (rejected) | `#F0E4CC` 1.26 | `#6E5220` 7.26 | 2.24 | **1.26** |
+| the design as drawn (rejected) | `#F0E4CC` 1.26 | `#6E5220` 7.26 | **5.77** | **1.26** |
 | the design's direction, low anchor raised to clear 3:1 | `#A28C65` 3.24 | `#6E5220` 7.26 | 2.24 | 3.24 |
-| **adopted — the same pair, ascending** | `#6E5220` 7.26 | `#AE8C4F` 3.15 | **2.31** | 3.15 |
+| **adopted — the design's own pair, ascending** | `#6E5220` 7.26 | `#AE8C4F` 3.15 | **2.31** | 3.15 |
 
-The adopted ramp is *marginally more* separated end to end than the design's own, and it needs no
-test amendment. What it costs is stated plainly in "the accepted consequence" below.
+The design's raw pair really is far wider end to end — and it buys that width by putting one end
+where it cannot be seen. Raise that end to the palest point on the design's own line that clears
+3:1, and its separation collapses to 2.24, *below* the adopted ramp's 2.31. So most of the width
+is lost to the accessibility floor whichever direction is chosen, and the direction the
+pre-existing test allows costs nothing further. What it does cost is stated plainly in "the
+accepted consequence" below.
 
 **Finding 4 — the app's own dark ramp also fails, and always has.** Today's dark low anchor
 `#3A4652` measures 1.87:1 against `card` and its intensity 1 measures 2.19:1. That is a real
@@ -272,6 +277,10 @@ and the dark theme — where the raster is most often read, and the only theme w
 reference capture — runs dim-to-bright with prominence and intensity increasing together. **This
 is the one place in the phase where a frozen constraint and the design point in opposite
 directions, and it is flagged in the completion report rather than left in a diff.**
+
+Finding 3 also removes the tempting counter-argument. The design's direction is not more legible
+once it is made compliant; it is very slightly less. The whole of its extra width lives in the part
+of the ramp the 3:1 floor deletes.
 
 ### D-5 — The 0-versus-1 low anchor, resolved by the engine rather than by preference
 
