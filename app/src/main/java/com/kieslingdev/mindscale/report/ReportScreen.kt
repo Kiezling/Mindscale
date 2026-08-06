@@ -14,16 +14,11 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -37,9 +32,14 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kieslingdev.mindscale.insights.InsightRange
+import com.kieslingdev.mindscale.ui.components.MsCard
+import com.kieslingdev.mindscale.ui.components.MsChip
+import com.kieslingdev.mindscale.ui.components.MsEyebrow
+import com.kieslingdev.mindscale.ui.components.MsTextAction
+import com.kieslingdev.mindscale.ui.theme.MsSpacing
+import com.kieslingdev.mindscale.ui.theme.ms
 import java.io.OutputStreamWriter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -126,23 +126,26 @@ fun ReportScreen(
 ) {
     LazyColumn(
         modifier = modifier.testTag("report_screen"),
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(MsSpacing.lgPlus),
+        verticalArrangement = Arrangement.spacedBy(MsSpacing.lg)
     ) {
         item(key = "report_ranges") {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("Summary window", style = MaterialTheme.typography.titleMedium)
+            Column(verticalArrangement = Arrangement.spacedBy(MsSpacing.xs)) {
+                MsEyebrow("Summary window")
+                // Six ranges stay a scrolling chip row rather than becoming a segmented control:
+                // six equal segments at 200% font would leave about 55 dp for `90 days`. The
+                // design's own range control on Insights is a chip row, and this is that control
+                // on a different screen (D-6).
                 Row(
                     modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(MsSpacing.sm)
                 ) {
                     InsightRange.entries.forEach { range ->
-                        FilterChip(
+                        MsChip(
+                            text = range.shortLabel,
                             selected = uiState.report?.range == range,
                             onClick = { onRangeSelected(range) },
-                            label = { Text(range.shortLabel) },
                             modifier = Modifier
-                                .heightIn(min = 48.dp)
                                 .testTag("report_range_${range.name}")
                                 .semantics { selected = uiState.report?.range == range }
                         )
@@ -151,11 +154,14 @@ fun ReportScreen(
             }
         }
         item(key = "privacy") {
-            Surface(color = MaterialTheme.colorScheme.secondaryContainer, shape = MaterialTheme.shapes.medium) {
+            // `emphasized` is the design's gold-bordered card, which is exactly "this one
+            // matters". The sentence is about sensitive health information leaving the app.
+            MsCard(emphasized = true, contentPadding = MsSpacing.mdPlus) {
                 Text(
                     "This summary can contain sensitive health information. Nothing leaves MindScale until you choose Copy, Share, or Save.",
-                    modifier = Modifier.fillMaxWidth().padding(12.dp),
-                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.ms.inkSecondary,
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
         }
@@ -168,68 +174,84 @@ fun ReportScreen(
         }
         uiState.error?.let { error ->
             item(key = "report_error") {
-                Surface(color = MaterialTheme.colorScheme.errorContainer, shape = MaterialTheme.shapes.medium) {
-                    Column(Modifier.fillMaxWidth().padding(12.dp)) {
-                        Text(error, color = MaterialTheme.colorScheme.onErrorContainer)
-                        TextButton(onClick = onRetry) { Text("Retry") }
-                    }
+                MsCard(contentPadding = MsSpacing.mdPlus) {
+                    Text(
+                        error,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.ms.danger
+                    )
+                    MsTextAction(text = "Retry", onClick = onRetry)
                 }
             }
         }
         uiState.report?.let { report ->
             item(key = "report_text:${report.generatedAt}:${report.range}") {
-                SelectionContainer {
-                    Text(
-                        report.text,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontFamily = FontFamily.Monospace,
-                        modifier = Modifier.fillMaxWidth().testTag("report_text")
-                    )
+                MsCard(contentPadding = MsSpacing.lg) {
+                    SelectionContainer {
+                        Text(
+                            report.text,
+                            style = MaterialTheme.typography.bodyMedium,
+                            // The one deliberate refusal of Instrument Sans in the app. This is a
+                            // fixed-width document whose alignment carries meaning, it is
+                            // selectable, and it is the exact byte sequence Copy, Share and Save
+                            // hand out. A proportional face would misrepresent what the user is
+                            // about to send (D-10).
+                            fontFamily = FontFamily.Monospace,
+                            color = MaterialTheme.ms.inkPrimary,
+                            modifier = Modifier.fillMaxWidth().testTag("report_text")
+                        )
+                    }
                 }
             }
             uiState.pendingDocument?.takeIf { it.launchToken == null }?.let { pendingDocument ->
                 item(key = "retained_report_document") {
-                    Surface(
-                        color = MaterialTheme.colorScheme.tertiaryContainer,
-                        shape = MaterialTheme.shapes.medium
-                    ) {
-                        Column(
-                            Modifier.fillMaxWidth().padding(12.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
+                    MsCard(contentPadding = MsSpacing.mdPlus) {
+                        Column(verticalArrangement = Arrangement.spacedBy(MsSpacing.xs)) {
                             Text(
                                 if (pendingDocument.text == report.text) {
                                     "A captured summary is retained. Save as text retries those exact captured bytes."
                                 } else {
                                     "A previously captured summary is retained and differs from the summary now shown. " +
                                         "Save as text retries the previous text."
-                                }
+                                },
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.ms.inkSecondary
                             )
-                            TextButton(
+                            MsTextAction(
+                                text = "Discard retained save",
                                 onClick = onDiscardPendingSave,
-                                modifier = Modifier.heightIn(min = 48.dp).testTag("report_discard_pending")
-                            ) { Text("Discard retained save") }
+                                modifier = Modifier.testTag("report_discard_pending")
+                            )
                         }
                     }
                 }
             }
             item(key = "report_actions") {
+                // The three actions on one baseline with even gaps — the L-2 treatment Phase 16
+                // froze for Track's entry rows, applied to the same shape of problem (D-10).
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .horizontalScroll(rememberScrollState())
                         .testTag("report_actions"),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(MsSpacing.lgPlus),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    TextButton(onClick = onCopy, modifier = Modifier.heightIn(min = 48.dp).testTag("report_copy")) {
-                        Text("Copy")
-                    }
-                    TextButton(onClick = onShare, modifier = Modifier.heightIn(min = 48.dp).testTag("report_share")) {
-                        Text("Share")
-                    }
-                    TextButton(onClick = onSave, modifier = Modifier.heightIn(min = 48.dp).testTag("report_save")) {
-                        Text("Save as text")
-                    }
+                    MsTextAction(
+                        text = "Copy",
+                        onClick = onCopy,
+                        modifier = Modifier.testTag("report_copy")
+                    )
+                    MsTextAction(
+                        text = "Share",
+                        onClick = onShare,
+                        modifier = Modifier.testTag("report_share")
+                    )
+                    MsTextAction(
+                        text = "Save as text",
+                        onClick = onSave,
+                        modifier = Modifier.testTag("report_save")
+                    )
                 }
             }
         }
@@ -238,7 +260,7 @@ fun ReportScreen(
                 Text(
                     message,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary,
+                    color = MaterialTheme.ms.goldText,
                     modifier = Modifier.testTag("report_message").semantics { liveRegion = LiveRegionMode.Polite }
                 )
             }

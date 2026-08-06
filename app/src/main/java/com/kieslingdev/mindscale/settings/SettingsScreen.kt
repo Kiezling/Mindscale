@@ -2,11 +2,11 @@ package com.kieslingdev.mindscale.settings
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -14,8 +14,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
@@ -33,8 +31,18 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.unit.dp
+import com.kieslingdev.mindscale.ui.components.MsActionTone
+import com.kieslingdev.mindscale.ui.components.MsCard
 import com.kieslingdev.mindscale.ui.components.MsDialog
+import com.kieslingdev.mindscale.ui.components.MsEyebrow
+import com.kieslingdev.mindscale.ui.components.MsFieldSelectionColors
+import com.kieslingdev.mindscale.ui.components.MsHairline
+import com.kieslingdev.mindscale.ui.components.MsSegmentedControl
+import com.kieslingdev.mindscale.ui.components.MsTextAction
+import com.kieslingdev.mindscale.ui.components.MsUppercaseText
+import com.kieslingdev.mindscale.ui.components.msFieldColors
+import com.kieslingdev.mindscale.ui.theme.MsSpacing
+import com.kieslingdev.mindscale.ui.theme.ms
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kieslingdev.mindscale.breathing.BreathingCopy
 import com.kieslingdev.mindscale.data.HourFormat
@@ -152,6 +160,10 @@ fun SettingsScreen(
     modifier: Modifier = Modifier
 ) {
     val listState = rememberLazyListState()
+    // The deep link's contract is "focus the anchors section" and "focus the data section", not
+    // "scroll to item 4". The item list is unchanged in count and order by this phase, so the two
+    // indices are unchanged too — but `SettingsVisualTest` now asserts the *behaviour* rather than
+    // the number, so a later restructure moves the index and keeps the contract (D-8).
     LaunchedEffect(focus) {
         listState.animateScrollToItem(when (focus) {
             SettingsFocus.TOP -> 0
@@ -163,8 +175,8 @@ fun SettingsScreen(
     LazyColumn(
         state = listState,
         modifier = modifier.testTag("settings_screen"),
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(MsSpacing.lgPlus),
+        verticalArrangement = Arrangement.spacedBy(MsSpacing.lg)
     ) {
         item(key = "appearance") {
             SettingsSection("Appearance") {
@@ -194,46 +206,69 @@ fun SettingsScreen(
                     label = { "${it.hours}h" },
                     onSelected = viewModel::setHoldDuration
                 )
-                Text(
+                BodyText(
                     "Waking hours. Sleep pauses this clock. This changes how Insights treats " +
                         "gaps across your history; your records do not change.",
                     style = MaterialTheme.typography.bodySmall
                 )
             }
         }
-        item(key = "divider_before_anchors") { HorizontalDivider() }
+        item(key = "divider_before_anchors") { MsHairline() }
         item(key = "anchors") {
             SettingsSection("What the numbers mean to you") {
-                Text("Personal anchors help the same number mean the same thing months later.")
-                AnchorField("2 — noticeable", uiState.anchorDraft.anchor2, viewModel::updateAnchor2, "anchor_2")
-                AnchorField("5 — changing what I do", uiState.anchorDraft.anchor5, viewModel::updateAnchor5, "anchor_5")
-                AnchorField("8 — most of what is happening", uiState.anchorDraft.anchor8, viewModel::updateAnchor8, "anchor_8")
-                uiState.anchorError?.let { ErrorText(it) }
-                TextButton(onClick = viewModel::saveAnchors, modifier = Modifier.testTag("save_anchors")) {
-                    Text("Save anchors")
+                BodyText("Personal anchors help the same number mean the same thing months later.")
+                // The design draws the three anchors as one card of hairline-separated rows,
+                // each headed by its gold numeral. The numeral is already inside the label, so
+                // the card is the only thing added (D-8).
+                MsCard(modifier = Modifier.fillMaxWidth(), contentPadding = MsSpacing.lgPlus) {
+                    MsFieldSelectionColors {
+                        AnchorField("2 — noticeable", uiState.anchorDraft.anchor2, viewModel::updateAnchor2, "anchor_2")
+                        MsHairline(faint = true)
+                        AnchorField("5 — changing what I do", uiState.anchorDraft.anchor5, viewModel::updateAnchor5, "anchor_5")
+                        MsHairline(faint = true)
+                        AnchorField("8 — most of what is happening", uiState.anchorDraft.anchor8, viewModel::updateAnchor8, "anchor_8")
+                    }
                 }
+                uiState.anchorError?.let { ErrorText(it) }
+                MsTextAction(
+                    text = "Save anchors",
+                    onClick = viewModel::saveAnchors,
+                    modifier = Modifier.testTag("save_anchors")
+                )
             }
         }
         item(key = "onset_words") {
             SettingsSection("What was happening") {
-                Text("Separate onset words with commas or new lines.")
-                OutlinedTextField(
-                    value = uiState.chipDraft,
-                    onValueChange = viewModel::updateChipDraft,
-                    label = { Text("Onset words") },
-                    minLines = 3,
-                    modifier = Modifier.fillMaxWidth().testTag("onset_words")
-                )
+                BodyText("Separate onset words with commas or new lines.")
+                MsFieldSelectionColors {
+                    OutlinedTextField(
+                        value = uiState.chipDraft,
+                        onValueChange = viewModel::updateChipDraft,
+                        label = { Text("Onset words") },
+                        minLines = 3,
+                        colors = msFieldColors(),
+                        modifier = Modifier.fillMaxWidth().testTag("onset_words")
+                    )
+                }
                 uiState.chipError?.let { ErrorText(it) }
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    TextButton(onClick = viewModel::saveOnsetWords, modifier = Modifier.testTag("save_onset_words")) {
-                        Text("Save words")
-                    }
-                    TextButton(onClick = viewModel::restoreDefaultWords) { Text("Restore defaults") }
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(MsSpacing.mdPlus),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    MsTextAction(
+                        text = "Save words",
+                        onClick = viewModel::saveOnsetWords,
+                        modifier = Modifier.testTag("save_onset_words")
+                    )
+                    MsTextAction(
+                        text = "Restore defaults",
+                        onClick = viewModel::restoreDefaultWords,
+                        tone = MsActionTone.Muted
+                    )
                 }
             }
         }
-        item(key = "divider_before_preferences") { HorizontalDivider() }
+        item(key = "divider_before_preferences") { MsHairline() }
         item(key = "sleep") {
             SettingSwitch(
                 "Sleep and Wake",
@@ -274,52 +309,63 @@ fun SettingsScreen(
                 viewModel::setPaused
             )
         }
-        item(key = "divider_before_data") { HorizontalDivider() }
+        item(key = "divider_before_data") { MsHairline() }
         item(key = "data") {
             SettingsSection("Your data") {
-                Text("Exports stay local and go only to the document location you choose.")
-                Text(
+                BodyText("Exports stay local and go only to the document location you choose.")
+                BodyText(
                     "Records CSV contains ratings, sleep, marked events, and breathing sessions only. It " +
                         "excludes your Profile name and external PHQ-8/GAD-7 totals. JSON backup includes " +
                         "them; Clinician summary exports the bounded factual summary."
                 )
-                TextButton(onClick = viewModel::requestBackup, modifier = Modifier.testTag("export_backup")) {
-                    Text("Export backup")
+                // The design's `Export everything` card: one row per action, hairline-separated,
+                // the destructive one in `danger`. MindScale invents no trailing `JSON`/`CSV`
+                // label, because those are strings it does not have (D-16).
+                MsCard(modifier = Modifier.fillMaxWidth(), contentPadding = MsSpacing.xxxs) {
+                    ActionRow("Export backup", viewModel::requestBackup, "export_backup")
+                    MsHairline(faint = true)
+                    ActionRow("Export records", viewModel::requestRecordsCsv, "export_records")
+                    MsHairline(faint = true)
+                    ActionRow(
+                        "Export, then erase everything",
+                        viewModel::requestExportThenErase,
+                        "export_then_erase",
+                        danger = true
+                    )
                 }
-                TextButton(onClick = viewModel::requestRecordsCsv, modifier = Modifier.testTag("export_records")) {
-                    Text("Export records")
+                if (uiState.preparingExport) {
+                    BodyText("Preparing export…", style = MaterialTheme.typography.bodySmall)
                 }
-                TextButton(onClick = viewModel::requestExportThenErase, modifier = Modifier.testTag("export_then_erase")) {
-                    Text("Export, then erase everything")
-                }
-                if (uiState.preparingExport) Text("Preparing export…")
             }
         }
         item(key = "import") {
             SettingsSection("Bring data back") {
-                Text(
+                BodyText(
                     "Restoring a backup replaces everything on this device. Importing a " +
                         "records CSV only adds ratings, sleep, marked events, and breathing " +
                         "sessions. MindScale shows exactly what will change and waits for you " +
                         "to confirm."
                 )
-                TextButton(
-                    onClick = viewModel::requestBackupRestore,
-                    modifier = Modifier
-                        .heightIn(min = 48.dp)
-                        .testTag("import_backup")
-                        .semantics { contentDescription = "Restore from a MindScale JSON backup" }
-                ) { Text("Restore from backup") }
-                TextButton(
-                    onClick = viewModel::requestRecordsImport,
-                    modifier = Modifier
-                        .heightIn(min = 48.dp)
-                        .testTag("import_records")
-                        .semantics { contentDescription = "Import a MindScale records CSV" }
-                ) { Text("Import records") }
+                MsCard(modifier = Modifier.fillMaxWidth(), contentPadding = MsSpacing.xxxs) {
+                    ActionRow(
+                        "Restore from backup",
+                        viewModel::requestBackupRestore,
+                        "import_backup",
+                        contentDescription = "Restore from a MindScale JSON backup"
+                    )
+                    MsHairline(faint = true)
+                    ActionRow(
+                        "Import records",
+                        viewModel::requestRecordsImport,
+                        "import_records",
+                        contentDescription = "Import a MindScale records CSV"
+                    )
+                }
                 if (uiState.importing) {
                     Text(
                         "Checking that file…",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.ms.goldText,
                         modifier = Modifier
                             .testTag("import_progress")
                             .semantics { liveRegion = LiveRegionMode.Polite }
@@ -329,14 +375,18 @@ fun SettingsScreen(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
                             error,
-                            color = MaterialTheme.colorScheme.error,
+                            color = MaterialTheme.ms.danger,
                             style = MaterialTheme.typography.bodySmall,
                             modifier = Modifier
                                 .weight(1f)
                                 .testTag("import_error")
                                 .semantics { liveRegion = LiveRegionMode.Polite }
                         )
-                        TextButton(onClick = viewModel::dismissImportError) { Text("Dismiss") }
+                        MsTextAction(
+                            text = "Dismiss",
+                            onClick = viewModel::dismissImportError,
+                            tone = MsActionTone.Muted
+                        )
                     }
                 }
             }
@@ -345,18 +395,27 @@ fun SettingsScreen(
             item(key = "read_error") {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     ErrorText(error)
-                    TextButton(onClick = viewModel::retrySettingsRead) { Text("Retry") }
+                    MsTextAction(text = "Retry", onClick = viewModel::retrySettingsRead)
                 }
             }
         }
         uiState.message?.let { message ->
             item(key = "message") {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(message, modifier = Modifier.weight(1f))
+                    Text(
+                        message,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.ms.inkSecondary,
+                        modifier = Modifier.weight(1f)
+                    )
                     if (uiState.retryDocument != null) {
-                        TextButton(onClick = viewModel::retryDocumentWrite) { Text("Retry export") }
+                        MsTextAction(text = "Retry export", onClick = viewModel::retryDocumentWrite)
                     }
-                    TextButton(onClick = viewModel::dismissMessage) { Text("Dismiss") }
+                    MsTextAction(
+                        text = "Dismiss",
+                        onClick = viewModel::dismissMessage,
+                        tone = MsActionTone.Muted
+                    )
                 }
             }
         }
@@ -376,19 +435,22 @@ fun SettingsScreen(
                     modifier = Modifier
                         .verticalScroll(rememberScrollState())
                         .testTag("import_preview"),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                    verticalArrangement = Arrangement.spacedBy(MsSpacing.md)
                 ) {
                     pending.preview.lines.forEach { Text(it) }
                 }
             },
+            // Both buttons stay Material `TextButton`s: `assertIsNotEnabled` and every other
+            // assertion target lives on that node, and both are disabled while the transaction
+            // runs. Only the labels are wrapped (D-13).
             confirmButton = {
                 TextButton(
                     onClick = viewModel::confirmImport,
                     enabled = !uiState.importing,
                     modifier = Modifier
-                        .heightIn(min = 48.dp)
+                        .heightIn(min = MsSpacing.minTouchTarget)
                         .testTag("confirm_import")
-                ) { Text(pending.preview.confirmLabel) }
+                ) { DialogActionLabel(pending.preview.confirmLabel) }
             },
             dismissButton = {
                 // Disabled once the mutation is running: the transaction can no longer be
@@ -397,9 +459,9 @@ fun SettingsScreen(
                     onClick = viewModel::cancelImport,
                     enabled = !uiState.importing,
                     modifier = Modifier
-                        .heightIn(min = 48.dp)
+                        .heightIn(min = MsSpacing.minTouchTarget)
                         .testTag("cancel_import")
-                ) { Text("Cancel") }
+                ) { DialogActionLabel("Cancel") }
             }
         )
     }
@@ -423,39 +485,58 @@ fun SettingsScreen(
             },
             confirmButton = {
                 TextButton(onClick = viewModel::confirmErase, modifier = Modifier.testTag("confirm_erase")) {
-                    Text("Erase everything")
+                    DialogActionLabel("Erase everything")
                 }
             },
-            dismissButton = { TextButton(onClick = viewModel::cancelErase) { Text("Cancel") } }
+            dismissButton = { TextButton(onClick = viewModel::cancelErase) { DialogActionLabel("Cancel") } }
         )
     }
 }
 
 @Composable
 private fun SettingsSection(title: String, content: @Composable ColumnScope.() -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text(title, style = MaterialTheme.typography.titleMedium)
+    Column(verticalArrangement = Arrangement.spacedBy(MsSpacing.md)) {
+        MsEyebrow(title)
         content()
     }
 }
 
+/** Prose on the page, at the compliant emphasis levels rather than the prototype's alphas. */
+@Composable
+private fun BodyText(
+    text: String,
+    style: androidx.compose.ui.text.TextStyle = MaterialTheme.typography.bodyMedium
+) {
+    Text(text, style = style, color = MaterialTheme.ms.inkTertiary)
+}
+
+/**
+ * The design's segmented control, and layout fix L-6.
+ *
+ * The prototype's segments size to their content, so `12-HOUR`/`24-HOUR` and `8H`/`12H`/`16H`/`24H`
+ * render at visibly different widths. `MsSegmentedControl` equal-weights them, which has been its
+ * contract since Phase 15 — this is simply the first screen to call it (D-4).
+ *
+ * The `horizontalScroll` this replaces is gone: equal-weight segments are all visible at once, so
+ * every choice stays reachable without a scroll. What must survive the conversion is listed in
+ * D-6, and every item of it is asserted — the visible label in original case, the
+ * `"<label>, selected"` description on the node that carries the click, the `selected` state, the
+ * callback, the enum's order, and a 48 dp target.
+ */
 @Composable
 private fun <T> ChoiceRow(values: List<T>, selected: T, label: (T) -> String, onSelected: (T) -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        values.forEach { value ->
-            FilterChip(
-                selected = value == selected,
-                onClick = { onSelected(value) },
-                label = { Text(label(value)) },
-                modifier = Modifier
-                    .heightIn(min = 48.dp)
-                    .semantics { contentDescription = "${label(value)}, ${if (value == selected) "selected" else "not selected"}" }
-            )
+    MsSegmentedControl(
+        options = values.map(label),
+        selectedIndex = values.indexOf(selected),
+        onSelect = { onSelected(values[it]) },
+        optionModifier = { index ->
+            val value = values[index]
+            Modifier.semantics {
+                contentDescription =
+                    "${label(value)}, ${if (value == selected) "selected" else "not selected"}"
+            }
         }
-    }
+    )
 }
 
 @Composable
@@ -465,25 +546,82 @@ private fun AnchorField(label: String, value: String, onValueChange: (String) ->
         onValueChange = onValueChange,
         label = { Text(label) },
         singleLine = true,
+        colors = msFieldColors(),
         modifier = Modifier.fillMaxWidth().testTag(tag)
     )
 }
 
+/**
+ * The design's action row, at line 1720 of the design authority: a label at the leading edge with
+ * the whole row as the target. The destructive one is painted in `danger`, as the design paints
+ * `Export, then erase everything` (D-8).
+ */
 @Composable
-private fun SettingSwitch(title: String, description: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+private fun ActionRow(
+    label: String,
+    onClick: () -> Unit,
+    tag: String,
+    danger: Boolean = false,
+    contentDescription: String? = null
+) {
     Row(
-        modifier = Modifier.fillMaxWidth().semantics { contentDescription = "$title. $description" },
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = MsSpacing.minTouchTarget)
+            .clickable(onClick = onClick)
+            .padding(horizontal = MsSpacing.lg, vertical = MsSpacing.mdPlus)
+            .testTag(tag)
+            .then(
+                if (contentDescription == null) Modifier
+                else Modifier.semantics { this.contentDescription = contentDescription }
+            ),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
-            Text(title, style = MaterialTheme.typography.titleSmall)
-            Text(description, style = MaterialTheme.typography.bodySmall)
+        Text(
+            label,
+            style = MaterialTheme.typography.titleSmall,
+            color = if (danger) MaterialTheme.ms.danger else MaterialTheme.ms.inkPrimary
+        )
+    }
+}
+
+/**
+ * The design's preference row: title, description beneath, switch trailing, on a card of
+ * hairline-separated siblings. The rows stay one `LazyColumn` item each, so the section reads as a
+ * run of cards rather than one continuous card — the cost of keeping the item list's identity, and
+ * the reason is that `SettingsFocus` scrolls by item index (D-8).
+ */
+@Composable
+private fun SettingSwitch(title: String, description: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    MsCard(modifier = Modifier.fillMaxWidth(), contentPadding = MsSpacing.lg) {
+        Row(
+            modifier = Modifier.fillMaxWidth().semantics { contentDescription = "$title. $description" },
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f).padding(end = MsSpacing.mdPlus)) {
+                Text(
+                    title,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.ms.inkPrimary
+                )
+                Text(
+                    description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.ms.inkQuaternary
+                )
+            }
+            Switch(checked = checked, onCheckedChange = onCheckedChange)
         }
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
 
 @Composable
 private fun ErrorText(message: String) {
-    Text(message, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+    Text(message, color = MaterialTheme.ms.danger, style = MaterialTheme.typography.bodySmall)
+}
+
+/** A dialog action label, uppercased in place (D-13). */
+@Composable
+private fun DialogActionLabel(text: String) {
+    MsUppercaseText(text = text, style = MaterialTheme.typography.labelMedium)
 }

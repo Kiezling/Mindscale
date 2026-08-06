@@ -239,7 +239,7 @@ Already measured and settled, applied here unchanged:
 |---|---|---|---|---|
 | Segmented-control container | `rgba(ink,.09)` | 1.21 / 1.20 | 1.22 / 1.26 | **kept** — it is a decorative container around segments that are themselves marked by fill and weight; see below |
 | Underlined field rule (`DATE`, anchors, name, totals) | `rgba(ink,.16)` | 1.41 / 1.41 | 1.51 / 1.57 | `ms.outline` — 3.47 / 3.49 light, 3.47 / 3.51 dark |
-| Settings row separators | `rgba(ink,.07)` | ~1.16 | ~1.18 | **kept** — a separator, exempt by D-6 of the foundation |
+| Settings row separators | `rgba(ink,.07)` | — / 1.16 | — / 1.18 | **kept** — a separator, exempt by D-6 of the foundation |
 | Chip / instrument border, unselected | `rgba(ink,.14–.16)` | 1.35 / 1.41 | 1.42 / 1.57 | `ms.outline`, already `MsChip`'s border since Phase 16 |
 | Breathing outer ring | `rgba(gold,.45)` | 1.57 / 1.60 | 2.62 / 2.61 | `ms.gold` at full opacity — 3.05 / 3.15 light, 8.60 / 8.04 dark |
 | Breathing close pill border | `rgba(gold,.45)` | 1.57 / 1.60 | 2.62 / 2.61 | `ms.gold`, already `MsPillButton`'s border since Phase 16 |
