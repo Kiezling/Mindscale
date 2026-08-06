@@ -8,8 +8,8 @@ Date: 2026-08-06
 
 Frozen documentation commit: `c1420c7`
 
-Verified implementation commits: `4dd99eb` (the ramp and its two contrast tests), and the screen
-restyle plus the visual test and previews recorded in the implementation section below
+Verified implementation commits: `4dd99eb` (the ramp and its two contrast tests), `3fe5ca4` (the
+screen restyle, the visual test, and the previews)
 
 ## Purpose
 
