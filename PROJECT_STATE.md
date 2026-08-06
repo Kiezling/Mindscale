@@ -8,7 +8,21 @@ Build MindScale as a native Android application using Kotlin, Jetpack Compose, M
 
 The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716ca7343`: `SPEC.md` is the rationale and `MindScale v2.dc.html` is the visual/behavioral reference for Track, Full Log, Insights, Report, Safety card, Profile, and Settings. A local exported handoff is available at `C:\Users\mckie\Downloads\MindScale-handoff\mindscale\project\`; its `MindScale v2.dc.html` is the primary implementation reference. Repository specs under `docs/specs/` govern native implementation after human approval.
 
-## Current phase: Phase 15 visual foundation merged and complete; Phase 16 not started
+## Current phase: Phase 16 Track and Full Log — spec frozen, implementation in progress
+
+- Phase 16 branch: `agent/phase16-track-and-log`, created from synchronized `main` at `238b0ba25a9e5f040e3693ca70d4d91ef8b168e0`
+- Starting synchronization: `HEAD`, local `main`, local `origin/main`, and live GitHub `refs/heads/main` all resolved to `238b0ba25a9e5f040e3693ca70d4d91ef8b168e0` before branching
+- Governing spec: `docs/specs/SPEC-track-and-log-visual.md` — `FROZEN — APPROVED`; D-1 through D-19 frozen on 2026-08-06 before any application-code edit
+- Selected work: Phase 16 of 18 in the visual overhaul — apply the P15 foundation to Track's and Full Log's bodies, and to nothing else. Insights is Phase 17; Settings, Profile, Report, Safety, Breathing, and the closing audit are Phase 18
+- Inherited rule: **the phase changes how the app looks and nothing about how it works.** Baselines to hold are 206/206 connected and 399/399 JVM, with no pre-existing test file modified. Checked mechanically with `git diff --name-status 238b0ba HEAD -- app/src/test app/src/androidTest`, where every line must be an `A`
+- The phase's largest finding is arithmetic, not taste: nine of the design's own border values fail D-23's 3:1 non-text floor because almost every control here is drawn as transparent-with-a-hairline, so the hairline *is* the control's only boundary. The numpad key at rest measures 1.23:1 and the armed key ring 1.78:1 on `card`. Every ink boundary moves to the existing `outline` token (3.49:1 / 3.51:1) and every gold boundary to full `gold` (3.15:1). The pad wrapper's armed border already passed at 3.15:1 and is unchanged
+- One earlier invariant is reinterpreted and flagged rather than smuggled: `SPEC-track-numpad-logging.md` Invariant 12's "visually distinct group" is satisfied by position rather than by shape and tone, because the mockup it appeals to draws all twelve keys from one `border-radius:50%` rule. Order and grouping are untouched
+- Room stays at schema 7, the records CSV header stays byte-identical, and `IntensityRamp.kt` is byte-identical — Track simply stops calling `intensityColor`, which keeps three `InsightsScreen` callers, so Phase 17 still owns the ramp decision D-24 reserved for it
+- Expected untracked paths remain `.agents/` and `.codex/`; they are excluded from product/documentation scope
+- Exact next action: implement task 2 of the spec's decomposition — `MsControlBoundaryContrastTest` and the three D-15 component corrections — then proceed through tasks 3 to 8
+- Explicitly not started: Phases 17 and 18
+
+### Phase 15 merged checkpoint
 
 - Phase 15 branch: `agent/phase15-visual-foundation`, created from synchronized `main` at `009f33455a8f79263f5a17de16d00f57ebec45d7`
 - Starting synchronization: `HEAD`, local `main`, local `origin/main`, and live GitHub `refs/heads/main` all resolved to `009f33455a8f79263f5a17de16d00f57ebec45d7` before branching
@@ -29,8 +43,8 @@ The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716c
 - Verification-state commit: `4a43a56e9a9c47ad74cd1a863480aa7fbd7d370d`
 - Phase 15 PR #12 was opened as draft, marked ready, and verified `CLEAN`/`MERGEABLE` at exact head `4a43a56e9a9c47ad74cd1a863480aa7fbd7d370d`; no remote status checks are configured
 - PR #12 merged into `main` as `e22ee6b843445614f2aef5f62c727269469ce232` on 2026-08-06 by the user, after the agent's `gh pr merge` was declined by the harness permission classifier. Local `HEAD`, local `main`, `origin/main`, and live GitHub `refs/heads/main` all matched that merge before this phase-boundary documentation commit, and the verified head is an ancestor of it
-- Exact next action: freeze `docs/specs/SPEC-track-and-log-visual.md` for Phase 16 before any application-code edit. Phase 16 applies the P15 foundation to Track and Full Log, including layout corrections L-1, L-2, and L-4 recorded in `SPEC-visual-foundation.md` D-22
-- Explicitly not started: Phases 16, 17, and 18
+- Exact next action after the phase boundary: freeze `docs/specs/SPEC-track-and-log-visual.md` for Phase 16 before any application-code edit. Done on 2026-08-06; see the Phase 16 section above
+- Explicitly not started at the Phase 15 boundary: Phases 16, 17, and 18
 
 ### Phase 14 merged checkpoint
 
@@ -276,8 +290,9 @@ The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716c
 
 ## Active blocker
 
-No active blocker. Phase 15 is merged and complete. Phases 16 through 18 are scoped in
-`docs/specs/BACKLOG.md` and each needs its own spec frozen before any application-code edit.
+No active blocker. Phase 16's spec is frozen and implementation is in progress. Phases 17 and 18
+are scoped in `docs/specs/BACKLOG.md` and each needs its own spec frozen before any
+application-code edit.
 
 One environment constraint, not a repository problem: the harness permission classifier declined
 `gh pr merge` and `gh pr view` during Phase 15. Branch, push, and PR creation all worked. Expect
@@ -295,11 +310,23 @@ to hand the merge to the user, or to have the permission granted, at each future
 
 ## Next tasks
 
-1. Freeze a Phase 16 spec for Track and Full Log before any application-code edit, then implement it. It inherits the visual-only rule and must hold 206/206 connected and 399/399 JVM with no pre-existing test file modified.
+1. Implement `docs/specs/SPEC-track-and-log-visual.md` through its task decomposition, then verify with all four Gradle oracles and installed-app capture. It inherits the visual-only rule and must hold 206/206 connected and 399/399 JVM with no pre-existing test file modified.
 2. Re-verify the crisis resources in `SafetyCopy` against their operator sources before any future release, and update `SafetyCopy.VERIFIED_ON` in the same edit. Hotline numbers and coverage change; a stale number in a safety feature is a real harm, not a cosmetic bug.
 3. Continue excluding `.agents/` and `.codex/` from product/documentation commits.
 
 ## Last verification
+
+Phase 16 starting-state verification completed 2026-08-06 before application-code edits:
+
+- `git status --short --branch` showed synchronized `main` with only the expected untracked `.agents/` and `.codex/` directories.
+- `HEAD`, local `main`, local `origin/main`, and live `git ls-remote origin refs/heads/main` all resolved to `238b0ba25a9e5f040e3693ca70d4d91ef8b168e0`.
+- Branch `agent/phase16-track-and-log` was created from that exact head.
+- `AGENTS.md`, `PROJECT_STATE.md`, all `FAILED_PATHS.md` headings, `docs/DECISIONS.md` D-001 through D-015, `docs/specs/BACKLOG.md`, and `docs/specs/SPEC-visual-foundation.md` in full were reconciled before drafting, along with `SPEC-track-numpad-logging.md`'s invariant list — which is where the Invariant 12 reconciliation recorded in D-016 came from.
+- The design authority was read at its exact anchors rather than impressionistically: `keyBase` (1204), `order` (1205), `padWrapStyle` (1218), `toggleBase` (1222), `chipBtn` (1223), `dotStyle` (1240), `numS` (1276), `sleepStyle`/`wakeStyle` (1719-1720), the Track markup (60-250), and the Log markup (255-292).
+- The current screens were measured so the acceptance criteria are checkable: `TrackScreen.kt` 1089 lines, `LogScreen.kt` 453 lines, 51 `testTag` call sites across the two, 60 `.dp` literals in Track and 26 in Log, the toast still a full-width `inverseSurface` `Surface`, the numpad still rounded squares and pills with no armed state rendered, and the entry-row dot still filled with `intensityColor`.
+- Every connected test that touches either screen was read in full before any restructuring: `TrackScreenTest` (24 tests), `LogScreenTest` (7), `TrackDialogSavedStateTest`, `NavigationTest`, `MindScaleChromeTest`, and `MsUppercaseTextTest`. Four fragile shapes were identified and are frozen as D-16 of the new spec.
+- The nine failing control-boundary contrast values in D-4 were computed rather than estimated, and the two the user flagged were reproduced exactly — `rgba(ink,.10)` at 1.23:1 and `rgba(gold,.55)` at 1.78:1 on `card`.
+- No Gradle oracle was rerun for this documentation-only freeze; the merged Phase 15 application tree and its verification evidence below remain unchanged.
 
 Phase 15 publication checkpoint completed 2026-08-06:
 
