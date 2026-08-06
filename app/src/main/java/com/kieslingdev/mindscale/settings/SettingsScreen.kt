@@ -217,16 +217,22 @@ fun SettingsScreen(
         item(key = "anchors") {
             SettingsSection("What the numbers mean to you") {
                 BodyText("Personal anchors help the same number mean the same thing months later.")
-                // The design draws the three anchors as one card of hairline-separated rows,
-                // each headed by its gold numeral. The numeral is already inside the label, so
-                // the card is the only thing added (D-8).
+                // The design draws the three anchors as one card of rows, each headed by its gold
+                // numeral. The numeral is already inside each frozen label, so the card is the
+                // only thing added (D-8).
+                //
+                // No hairline between the rows: each field is a Material `OutlinedTextField` and
+                // already draws its own box, so a `.07` rule between two boxes is noise rather
+                // than the design's separator. The field stays outlined for the reason D-9 gives
+                // — its label, error and IME behaviour are what the connected suite asserts — and
+                // that is the phase's largest accepted fidelity gap, recorded rather than hidden.
                 MsCard(modifier = Modifier.fillMaxWidth(), contentPadding = MsSpacing.lgPlus) {
                     MsFieldSelectionColors {
-                        AnchorField("2 — noticeable", uiState.anchorDraft.anchor2, viewModel::updateAnchor2, "anchor_2")
-                        MsHairline(faint = true)
-                        AnchorField("5 — changing what I do", uiState.anchorDraft.anchor5, viewModel::updateAnchor5, "anchor_5")
-                        MsHairline(faint = true)
-                        AnchorField("8 — most of what is happening", uiState.anchorDraft.anchor8, viewModel::updateAnchor8, "anchor_8")
+                        Column(verticalArrangement = Arrangement.spacedBy(MsSpacing.mdPlus)) {
+                            AnchorField("2 — noticeable", uiState.anchorDraft.anchor2, viewModel::updateAnchor2, "anchor_2")
+                            AnchorField("5 — changing what I do", uiState.anchorDraft.anchor5, viewModel::updateAnchor5, "anchor_5")
+                            AnchorField("8 — most of what is happening", uiState.anchorDraft.anchor8, viewModel::updateAnchor8, "anchor_8")
+                        }
                     }
                 }
                 uiState.anchorError?.let { ErrorText(it) }

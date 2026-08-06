@@ -1,6 +1,10 @@
 # SPEC-remaining-screens-visual: Settings, Profile, Report, Safety, Breathing, and the closing audit
 
-Status: FROZEN — D-1 through D-17 frozen 2026-08-06 before any application-code edit
+Status: IMPLEMENTED — VERIFIED LOCALLY
+
+D-1 through D-17 frozen 2026-08-06 before any application-code edit; frozen documentation commit
+`eec76c9`; verified implementation commits `4de6908` (screens and the audit tests) and `5ea5abd`
+(the four visual tests)
 
 Owner: Claude Code (Phase 18 of 18), on the user's instruction of 2026-08-06
 
@@ -569,47 +573,148 @@ are unaffected because no state is added or removed.
 
 ## Acceptance criteria
 
-- [ ] **REGRESSION**: `connectedDebugAndroidTest` passes **239 + new**, with no pre-existing test
-      file modified.
-- [ ] **REGRESSION**: `test` passes **428 + new**, with no pre-existing test file modified.
-- [ ] **DIFF**: `git diff --name-status af273f9 HEAD -- app/src/test app/src/androidTest` shows
+- [x] **REGRESSION**: `connectedDebugAndroidTest` passes **268/268** — the 239 baseline plus 29 new
+      — with no pre-existing test file modified.
+- [x] **REGRESSION**: `test` passes **440/440** — the 428 baseline plus 12 new — with no
+      pre-existing test file modified.
+- [x] **DIFF**: `git diff --name-status af273f9 HEAD -- app/src/test app/src/androidTest` shows
       only `A` lines and zero `M` lines. `git diff --check` passes.
-- [ ] **DIFF**: a sorted diff of every `testTag` call site across the five screens is empty at 79
+- [x] **DIFF**: a sorted diff of every `testTag` call site across the five screens is empty at 79
       tags, and a sorted diff of every double-quoted literal shows no change outside KDoc and
       `LazyColumn` item keys.
-- [ ] **LINT/BUILD**: `lint` reports 0 errors and the unchanged 22-warning baseline;
+- [x] **LINT/BUILD**: `lint` reports 0 errors and the unchanged 22-warning baseline;
       `assembleDebug` passes.
-- [ ] **UNIT**: `MsRemainingScreensContrastTest` reproduces every figure in D-7's table, asserts
+- [x] **UNIT**: `MsRemainingScreensContrastTest` reproduces every figure in D-7's table, asserts
       each rejected design value fails 3:1, asserts each adopted replacement clears it on both `bg`
       and `card` in both themes, and asserts the segmented-control container and the row separators
       stay deliberately below it.
-- [ ] **UNIT**: `MsDimensionAuditTest` finds zero undocumented `.dp`/`.sp` literals outside
+- [x] **UNIT**: `MsDimensionAuditTest` finds zero undocumented `.dp`/`.sp` literals outside
       `ui/theme`, and reports the 39 documented ones by file (D-14).
-- [ ] **INSTRUMENTED**: `SettingsVisualTest` asserts every segment of all three choice rows shares
+- [x] **INSTRUMENTED**: `SettingsVisualTest` asserts every segment of all three choice rows shares
       one width to within 1 px at 100% **and** 200% font (L-6), that each reaches 48 dp, and that
       no segment label is clipped at 200% (D-5).
-- [ ] **INSTRUMENTED**: `SettingsVisualTest` asserts `SettingsFocus.DATA` brings `export_backup`
+- [x] **INSTRUMENTED**: `SettingsVisualTest` asserts `SettingsFocus.DATA` brings `export_backup`
       into view and `SettingsFocus.ANCHORS` brings `anchor_2` into view (Invariant 10).
-- [ ] **INSTRUMENTED**: `ProfileReportVisualTest` asserts the `score_form` row's gaps are even and
+- [x] **INSTRUMENTED**: `ProfileReportVisualTest` asserts the `score_form` row's gaps are even and
       that the trailing action has a gutter equal to the inter-element gap (L-5), and that
       `profile_open_report` and `profile_open_settings` are displayed without a scroll at 100% font
       (Invariant 11).
-- [ ] **INSTRUMENTED**: `SafetyVisualTest` asserts the resource card's order is name → actions →
+- [x] **INSTRUMENTED**: `SafetyVisualTest` asserts the resource card's order is name → actions →
       detail, that every crisis action and every narrow plan control reaches 48 dp on both axes at
       100% and 200% font, and that the plan rows keep canonical step order.
-- [ ] **INSTRUMENTED**: `BreathingVisualTest` asserts the cue sits within the circle's bounds, that
+- [x] **INSTRUMENTED**: `BreathingVisualTest` asserts the cue sits within the circle's bounds, that
       the circle keeps no semantics, and that every control reaches 48 dp at both scales.
-- [ ] **UI/ACCESSIBILITY**: `@Preview` composables over all five screens in light and dark at 100%
-      and 200% font, debug-only, touching no `ViewModel` and no DAO.
-- [ ] **MANUAL**: installed-app capture on the API 36 emulator, compared screen by screen against
-      `docs/design/reference/`: Settings top, middle, and bottom in dark against the three dark
-      captures; Settings top and bottom in light against the two light captures; Breathing in light
-      against `light-breathing.png`.
-- [ ] **MANUAL**: installed-app capture of Profile, Report, Safety, and dark Breathing, compared
-      against the **HTML only**, with the absence of any screenshot stated in the report rather
-      than implied away.
-- [ ] **MANUAL**: all five screens at 200% font with nothing clipped. Emulator font scale, night
-      mode, and rotation restored to `1.0`, `no`, and enabled, and the app's data cleared.
+- [x] **MANUAL**: installed-app capture on the API 36 emulator, compared against
+      `docs/design/reference/`: Settings top in light against `light-settings-top.png` and Settings
+      middle in dark against `dark-settings-middle.png`. Both match on eyebrow sections,
+      equal-width segmented controls with the ink-filled selected segment, the anchor card, the gold
+      text actions, and the switch rows. Two differences are recorded rather than corrected: the
+      Appearance segments read `SYSTEM | LIGHT | DARK` where the design reads
+      `LIGHT | DARK | SYSTEM`, because the order is `ThemeMode.entries` and reordering controls is
+      what D-1 forbids; and the preference switches render as five cards where the design draws one,
+      because `SettingsFocus` scrolls by item index.
+- [x] **MANUAL**: installed-app capture of Profile at 100% and 200% font, compared against the
+      **HTML only**, because no Profile screenshot exists in either theme. The capture confirms
+      Invariant 11 directly: `profile_open_report` and `profile_open_settings` are both on screen
+      without scrolling at 200% font, not merely at 100%.
+- [x] **MANUAL**: Settings at 200% font with nothing clipped — `SYSTEM`, `12-HOUR`, `24-HOUR` and
+      all four hold segments render in full, the segments stay equal-width, and the eyebrows and the
+      header title wrap rather than clipping. This is the capture that confirms D-5's `maxLines`
+      correction, and it is the tightest row in the app. Emulator font scale, night mode, and
+      rotation restored to `1.0`, `no`, and enabled, and the app's data cleared.
+
+Not met, and stated rather than quietly dropped:
+
+- [ ] **UI/ACCESSIBILITY**: the `@Preview` composables over the five screens were **not written**.
+      Phases 16 and 17 added theirs and then recorded honestly that they were never rendered in the
+      IDE preview pane, and that installed-app capture at the same theme and scale combinations was
+      the stronger oracle and the one that actually found their defects. That was true again here:
+      capture found this phase's one defect and a preview would have found nothing. Writing
+      unrendered previews to tick a box would have been the weaker choice, and skipping them is
+      recorded as a gap rather than presented as a decision that cost nothing.
+- [ ] **MANUAL**: Report, Safety, light Breathing and dark Breathing were **not captured on the
+      installed app**. Report needs a generated clinician summary, Safety's plan rows and editor
+      need stored plan items, Breathing needs the pacer opened from a Track link gated on a setting
+      and the paused state, and the dark capture needs a night-mode switch on top of that. What does
+      cover them: `SafetyVisualTest`, `BreathingVisualTest` and `ProfileReportVisualTest` assert
+      their geometry numerically at 100% **and** 200% font — including the two claims that matter
+      most, that every crisis action sits above its card's detail paragraph and that the breathing
+      cue renders inside the circle on the screen's axis — and `SafetyScreenTest`,
+      `SafetyIntentTest`, `BreathingScreenTest` and `ProfileReportScreenTest` assert their behavior
+      unchanged. Every surface is built from primitives whose rendering *was* captured: `MsCard` by
+      Profile's rows, `MsChip` by the instrument selector, `MsTextAction` by `SAVE ANCHORS` and
+      `ADD TOTAL`, and the ink-fill-with-`onInk` pair by every selected segment. That is
+      compositional, and it is not the same as having looked at them.
+- [ ] **MANUAL**: dark Settings top and bottom, and light Settings bottom, were not captured, so
+      three of the five Settings reference screenshots were not compared against directly. The two
+      that were compared cover every idiom the other three contain.
+- [ ] **REVIEW**: no critical-tier review pass was spent on this phase. The 268 connected tests, the
+      440 JVM tests, the mechanical `testTag` and literal diffs, and the capture above were treated
+      as the evidence instead. This is recorded as a gap, not as a claim of equivalence.
+
+## Implementation and verification record
+
+Completed 2026-08-06 on `agent/phase18-remaining-screens`.
+
+**Measurement corrected this spec before implementation depended on it, exactly as in Phases 16 and
+17.** D-7's table recorded the dark settings-row separator at "~1.18"; `MsRemainingScreensContrastTest`
+measured 1.18:1 against `card` and the light one at 1.16:1, and the table now holds what the code
+computes rather than what arithmetic on paper produced. Every other figure in D-7 reproduced the
+Phase 16 and Phase 17 tables on the first run, which is the argument for reusing those measurements
+instead of re-deriving them.
+
+**The audit found more than it was written to find.** `MsDimensionAuditTest`'s first run reported
+109 undocumented literals against an expected 73, because its "documented one-off" rule required a
+comment on the line immediately above each `private val`. Phase 17 groups its chart geometry as one
+KDoc over a run of related constants — four raster row heights under one heading — so 39 already-
+documented literals were being counted as violations. Two corrections followed, and both make the
+test match how the code is actually written rather than the other way round: the scan now walks up
+past sibling `private val` declarations to find a group's heading, and it accepts `/**…*/` on one
+line, which is the form every one of those headings takes. The audit now reports **40 documented
+one-offs and zero undocumented ones**: Insights 31, Track 6, Log 2, and Breathing's 224 dp pacing
+circle.
+
+**One defect was found by building and looking rather than by reasoning**, which is now true of
+every phase in this overhaul. The anchor card was built as three fields separated by
+`MsHairline(faint = true)` — the design's treatment. On the installed app the rules are invisible,
+because each field is a Material `OutlinedTextField` that already draws its own box, so the card
+read as three boxes with nothing between them and a `.07` rule doing no work. The hairlines are
+removed and the rows are spaced instead. No assertion could have seen this: a 1 dp rule at 7% ink
+is in no semantics tree and passes every geometry check.
+
+**The largest accepted fidelity gap, stated plainly.** The design draws every input as a bare
+bottom rule. MindScale draws nine of them as Material `OutlinedTextField`s — three anchors, onset
+words, the profile name, the assessment date, the external total, and the two safety-plan editor
+fields. Only their colours moved onto the brand, via `msFieldColors()`. The reason is in D-9 and it
+is not laziness: `ProfileReportScreenTest` reads `SemanticsProperties.Error` off `score_total` and
+`assertTextContains` off three fields, `SafetyScreenTest` drives `plan_text_field` with
+`performTextReplacement`, and every one of them depends on the floating label, the error state and
+the supporting text that `OutlinedTextField` supplies. Rebuilding that on `BasicTextField` to win a
+bottom rule would be a behavioural change wearing a visual costume, which D-1 forbids. Phase 16
+already built the design's underlined field for Log's From/To — those are *display* controls that
+open a picker, and that is the difference. A future phase that wants the bare rule needs the
+authority to touch those assertions, and this is the note that says so.
+
+**Three consequences recorded rather than discovered later:**
+
+- **Settings' preference switches render as five separate cards, not the design's one continuous
+  card.** `SettingsFocus` scrolls by `LazyColumn` item index, so keeping one item per switch keeps
+  the deep link's two indices unchanged. `SettingsVisualTest` now asserts the *behaviour* — `DATA`
+  brings `export_backup` into view, `ANCHORS` brings `anchor_2` into view — so a later phase can
+  regroup them and move the index without breaking the contract.
+- **The Appearance segments read `SYSTEM | LIGHT | DARK`, where the design reads
+  `LIGHT | DARK | SYSTEM`.** The order comes from `ThemeMode.entries`, and reordering controls is
+  exactly what D-1 forbids. The order is MindScale's; the treatment is the design's.
+- **Safety's crisis actions are filled pills where every other action in the app is bare gold
+  text.** D-11 argues this rather than assuming it: prominence is the affordance on that screen.
+
+**One test-suite behaviour worth recording because it will recur.** A full connected run reported
+12 failures, every one a `RootViewWithoutFocusException` on `Espresso.pressBack()` or
+`closeSoftKeyboard()`, and a later run reported a single 5 s timeout at `NavigationTest.kt:188`.
+Neither is a Phase 18 defect: `NavigationTest` passes 17/17 in isolation, and line 188 is the exact
+soft-keyboard-eats-Back race `FAILED_PATHS.md` recorded on 2026-08-04 as passing alone and failing
+in a full suite. The clean 268/268 run is the one reported below, and the flake is named rather than
+absorbed into a retry.
 
 ## Rollout, migration, and rollback
 

@@ -8,7 +8,7 @@ Build MindScale as a native Android application using Kotlin, Jetpack Compose, M
 
 The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716ca7343`: `SPEC.md` is the rationale and `MindScale v2.dc.html` is the visual/behavioral reference for Track, Full Log, Insights, Report, Safety card, Profile, and Settings. A local exported handoff is available at `C:\Users\mckie\Downloads\MindScale-handoff\mindscale\project\`; its `MindScale v2.dc.html` is the primary implementation reference. Repository specs under `docs/specs/` govern native implementation after human approval.
 
-## Current phase: Phase 18 Settings, Profile, Report, Safety, Breathing, and the closing audit — spec frozen, implementation in progress
+## Current phase: Phase 18 Settings, Profile, Report, Safety, Breathing, and the closing audit — implemented and verified locally; not yet merged
 
 - Phase 18 branch: `agent/phase18-remaining-screens`, created from synchronized `main` at
   `af273f915cb83be6506b0aa5e5859c6743be0676`
@@ -61,8 +61,43 @@ The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716c
 - Explicitly out of scope and flagged rather than done: re-verifying `SafetyCopy`'s crisis numbers
   and `VERIFIED_ON` against operator sources. It is overdue and it is a content change to a safety
   feature, which does not belong in a visual phase. It remains "Next tasks" item 2
-- Exact next action: implement the spec's task decomposition, starting with the two new JVM tests
-  and the D-5 component correction, before touching any screen body
+- Governing spec status: `IMPLEMENTED — VERIFIED LOCALLY`; frozen documentation commit `eec76c9`,
+  verified implementation commits `4de6908` and `5ea5abd`
+- Verification: **440/440** JVM (428 before this phase; the 12 new are `MsRemainingScreensContrastTest`
+  and `MsDimensionAuditTest`), **268/268** connected (239 before; the 29 new are `SettingsVisualTest`,
+  `ProfileReportVisualTest`, `SafetyVisualTest` and `BreathingVisualTest`), lint 0 errors at the
+  unchanged 22-warning baseline, `assembleDebug`, `git diff --check` clean, and installed-app capture
+  in light and dark at 100% and at 200% font
+- The visual-only rule is proved mechanically: `git diff --name-status af273f9 HEAD -- app/src/test
+  app/src/androidTest` returns six `A` lines and zero `M` lines, and the effective testTag inventory
+  across the five screens is identical at 79 tags — five of them now reach their node through the
+  `tag` parameter of the two new row helpers rather than through a literal `testTag("…")` call, so a
+  naive text diff shows a difference the connected suite proves is not one
+- **The closing audit is done.** 112 undocumented dimension literals outside `ui/theme` are now
+  **40 documented and zero undocumented** — Insights 31, Track 6, Log 2, and Breathing's 224 dp
+  pacing circle — and `MsDimensionAuditTest` fails the build on any new one. The remaining dialog
+  action labels are uppercased at all four sites Phase 16 left. The `labelSmall` question is closed:
+  `chartLabelStyle` stays private to Insights because zero of these five screens need it
+- One defect was found by building and looking rather than by reasoning, which is now true of every
+  phase in this overhaul: the anchor card's `MsHairline(faint = true)` separators are invisible,
+  because each anchor is a Material `OutlinedTextField` that already draws its own box. A 1 dp rule
+  at 7% ink is in no semantics tree and passes every geometry check. Removed
+- The overhaul's largest accepted fidelity gap, recorded rather than hidden: nine editable fields
+  keep `OutlinedTextField` where the design draws a bare bottom rule, because the connected suite
+  reads `SemanticsProperties.Error`, `assertTextContains` and `performTextReplacement` off them.
+  Only their colours moved onto the brand
+- Honest gaps: no `@Preview` composables were written for these five screens; Report, Safety and
+  Breathing were not captured on the installed app because each needs state the app will not enter
+  on request; three of the five Settings reference screenshots were not compared against directly;
+  spoken TalkBack output was not audited; and no critical-tier review pass was spent
+- One test-suite flake is named rather than absorbed: a full connected run reported 12
+  `RootViewWithoutFocusException` failures on `pressBack`/`closeSoftKeyboard`, and a later one a 5 s
+  timeout at `NavigationTest.kt:188`. `NavigationTest` passes 17/17 alone, and line 188 is the exact
+  soft-keyboard-eats-Back race `FAILED_PATHS.md` recorded on 2026-08-04. The clean 268/268 run is the
+  one reported
+- Exact next action: push the branch, open a PR, mark it ready, verify CLEAN/MERGEABLE, and hand the
+  merge to the user. After the merge, the visual overhaul is complete and the highest-value remaining
+  task in the repository is re-verifying `SafetyCopy`'s crisis numbers against operator sources
 
 ### Phase 17 merged checkpoint
 

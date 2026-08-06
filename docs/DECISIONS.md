@@ -199,3 +199,62 @@ separation is carried by the legend and the readout in words.
 rating of 10, which is the opposite of what the design intends. Reversing that needs an authorized
 edit to a pre-existing test file, which the phase's acceptance criteria forbid, so it was not taken
 unilaterally. It is flagged in the spec's open questions and in the completion report.
+
+## D-018 — Phase 18 closes the visual overhaul: the last five screens, and the audit that guards it
+
+Date: 2026-08-06. Governing spec: `docs/specs/SPEC-remaining-screens-visual.md` (D-1 through D-17,
+frozen before any application-code edit). This is the final phase of the four-phase overhaul begun
+by `SPEC-visual-foundation.md`.
+
+**Settings, Profile, Report, Safety and the Breathing body now carry the design's card, hairline,
+eyebrow, pill, segmented-control and text-action idioms.** The visual-only rule held: 268/268
+connected and 440/440 JVM, with `git diff --name-status af273f9 HEAD -- app/src/test
+app/src/androidTest` showing only `A` lines, and every one of the 79 testTags across the five
+screens still resolving.
+
+**Two audits are now standing tests rather than promises.** `MsDimensionAuditTest` scans the source
+tree and fails on any `.dp`/`.sp` literal outside `ui/theme` that is not a documented one-off; the
+count went from 112 undocumented to **40 documented and zero undocumented**. It is a source scan
+rather than a custom lint rule because a lint rule is a toolchain change.
+`MsRemainingScreensContrastTest` reuses the Phase 16 and Phase 17 contrast tables rather than
+re-deriving them, and asserts this phase's two exemptions stay *below* 3:1 so a later phase cannot
+"fix" them into heavy rules without breaking a test.
+
+**A recorded layout flaw named the wrong screen, and the record is corrected rather than obeyed.**
+`SPEC-visual-foundation.md` D-22's L-5 describes "Settings' DATE / PHQ-8 / GAD-7 / ADD row". The
+prototype puts that row on Settings; MindScale puts external totals on **Profile**, and
+`SettingsScreen.kt` has no date field, no PHQ-8 control and no `ADD`. Moving the row to match the
+screenshot would be a navigation change, so L-5 was implemented on `ProfileScreen.kt` and D-22
+amended. This is the second time a flaw needed diagnosis before correction — Phase 17 found L-3's
+flaw was the prototype's flex layout, which Compose's `weight(1f)` already satisfied.
+
+**L-6 was verified rather than reinvented, and verifying it found a fifth component defect.**
+`MsSegmentedControl` has carried `weight(1f)` since Phase 15, but until this phase its only call
+sites were in the debug gallery. Putting it on a real screen exposed `maxLines = 1` with no
+`overflow`, which resolves to `TextOverflow.Clip` — the same arithmetic that clipped the `INSIGHTS`
+tab in Phase 15. It is removed, and the component gained a defaulted `optionModifier` so a caller
+can attach the per-segment content description `NavigationTest` asserts without the component owning
+it.
+
+**The type question `SPEC-insights-visual.md` D-19 deferred here is closed by evidence.** The
+0.067 em data-label idiom stays private to `InsightsScreen.kt` and `Type.kt` keeps fifteen Material
+slots, because **zero of these five screens need it**. Widening a shared scale on one screen's
+evidence is how a scale acquires values nobody can justify later.
+
+**Nine editable fields keep Material's `OutlinedTextField` where the design draws a bare bottom
+rule, and this is the overhaul's largest accepted fidelity gap.** The connected suite reads
+`SemanticsProperties.Error`, `assertTextContains` and `performTextReplacement` off those fields, all
+of which depend on the floating label, error state and supporting text that `OutlinedTextField`
+supplies. Rebuilding them on `BasicTextField` to win a bottom rule would be a behavioural change in
+a visual costume. Only their colours moved onto the brand, via `msFieldColors()`. Phase 16's
+underlined From/To fields are *display* controls that open a picker, which is the difference.
+
+**Safety's crisis actions deliberately refuse the design's bare text idiom** and stay filled pills
+in the ink/`onInk` pair. Prominence is the affordance on the one screen where a user may be in
+crisis. `SafetyIntents.kt` is byte-identical, `ACTION_CALL` stays forbidden, no permission is added,
+and the name → actions → detail order is now pinned by an assertion rather than by convention.
+
+**Re-verifying `SafetyCopy`'s crisis numbers and `VERIFIED_ON` is explicitly out of scope and
+overdue.** It is a content change to a safety feature and does not belong in a visual phase. It
+remains `PROJECT_STATE.md` "Next tasks" item 2, and it is the highest-value next task in the
+repository.
