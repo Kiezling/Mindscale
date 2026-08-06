@@ -1,6 +1,6 @@
 # MindScale project state
 
-Last updated: 2026-08-06 (Phase 18 spec freeze)
+Last updated: 2026-08-06 (Phase 18 merge)
 
 ## Goal
 
@@ -8,7 +8,7 @@ Build MindScale as a native Android application using Kotlin, Jetpack Compose, M
 
 The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716ca7343`: `SPEC.md` is the rationale and `MindScale v2.dc.html` is the visual/behavioral reference for Track, Full Log, Insights, Report, Safety card, Profile, and Settings. A local exported handoff is available at `C:\Users\mckie\Downloads\MindScale-handoff\mindscale\project\`; its `MindScale v2.dc.html` is the primary implementation reference. Repository specs under `docs/specs/` govern native implementation after human approval.
 
-## Current phase: Phase 18 Settings, Profile, Report, Safety, Breathing, and the closing audit — implemented and verified locally; not yet merged
+## Current phase: Phase 18 merged and complete — the visual overhaul is finished; Phase 19 not started
 
 - Phase 18 branch: `agent/phase18-remaining-screens`, created from synchronized `main` at
   `af273f915cb83be6506b0aa5e5859c6743be0676`
@@ -98,8 +98,25 @@ The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716c
 - Phase 18 PR #15 was opened as draft, marked ready, and verified `MERGEABLE`/`clean` at exact head
   `0a4c9db30087205b1447584ded25f3f4abe3f326`; no remote status checks are configured. `gh pr merge`
   was not attempted, per the user's standing instruction carried since Phase 15
-- Exact next action: the user merges PR #15. After the merge, the visual overhaul is complete and the highest-value remaining
-  task in the repository is re-verifying `SafetyCopy`'s crisis numbers against operator sources
+- PR #15 merged into `main` as `9d6767a5520307e9f3ffb6bcbeca409a40f0e818` on 2026-08-06
+  (`2026-08-06T21:42:04Z`) by the user. Local `HEAD`, local `main`, and `origin/main` all matched that
+  merge before this phase-boundary documentation commit; `git merge-base --is-ancestor` confirmed both
+  the verified head `0a4c9db` and the branch head `998c502` are ancestors of it, and
+  `git diff --stat 998c502 9d6767a` is empty, so the merge tree is byte-identical to the verified head.
+  The visual-only rule was re-checked at the exact merge head:
+  `git diff --name-status af273f9 9d6767a -- app/src/test app/src/androidTest` still shows six `A`
+  lines and zero `M` lines
+- **The visual overhaul is complete.** Phases 15 through 18 are all merged, and the four-phase rule
+  "change how the app looks and nothing about how it works" is now retired by the user. It is replaced
+  by a narrower rule for Phase 19: behaviour may change, but every behavioural change needs a frozen
+  decision recorded before the edit, and a pre-existing test file may be modified only where a frozen
+  decision authorises that exact edit, with the diff naming the decision
+- Exact next action: freeze a Phase 19 spec covering the user's own defect list plus the accumulated
+  "Not met" acceptance criteria, "Honest gaps", and "Accepted consequences" of
+  `SPEC-visual-foundation.md`, `SPEC-track-and-log-visual.md`, `SPEC-insights-visual.md`, and
+  `SPEC-remaining-screens-visual.md`, before any application-code edit. Re-verifying `SafetyCopy`'s
+  crisis numbers and `VERIFIED_ON` against operator sources remains the highest-value single item in
+  that backlog
 
 ### Phase 17 merged checkpoint
 

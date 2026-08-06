@@ -22,7 +22,7 @@ four phases, 15 through 18:
   keeps an ascending luminance direction because `IntensityRampTest` is a pre-existing JVM test
   that pins it. D-5 resolves the 0-versus-1 question and D-6 re-checks
   `SPEC-track-numpad-logging.md` Invariant 14 at all three fill sites.
-- Phase 18 — Settings, Profile, Report, Safety, Breathing, and the closing audit. Started
+- Phase 18 — Settings, Profile, Report, Safety, Breathing, and the closing audit. Merged
   2026-08-06, governed by `docs/specs/SPEC-remaining-screens-visual.md`, which is frozen. Its D-3
   corrects `SPEC-visual-foundation.md` D-22's L-5 row, which names Settings but describes a row
   that lives on Profile in MindScale; D-4 and D-5 verify L-6 at the component layer and correct a
@@ -31,6 +31,15 @@ four phases, 15 through 18:
   open, with the evidence that zero of these five screens need the data-label idiom. Active work
   is tracked in `PROJECT_STATE.md`.
 
-Every phase inherits the visual-only rule frozen as `SPEC-visual-foundation.md` D-1: the phases
-change how the app looks and nothing about how it works. Each needs its own spec frozen before
-any application-code edit.
+Phases 15 through 18 each inherited the visual-only rule frozen as `SPEC-visual-foundation.md` D-1:
+the phases change how the app looks and nothing about how it works. All four are merged, so that
+rule has done its job and the user retired it on 2026-08-06. It does **not** extend to Phase 19.
+
+Phase 19 — the closing form-and-function pass over what the four visual phases recorded as
+unfinished. Its backlog is the union of the user's own defect list and the "Not met" acceptance
+criteria, "Honest gaps", and "Accepted consequences" paragraphs of the four visual specs; those
+lists are the input and are not re-derived. Behaviour may change, but under a narrower rule that
+replaces D-1: every behavioural change needs a frozen decision recorded before the edit, and a
+pre-existing test file may be modified only where a frozen decision authorises that exact edit,
+with the diff naming the decision. Anywhere else a broken test is still evidence of an accidental
+behaviour change and is still a defect. Needs its own spec frozen before any application-code edit.
