@@ -194,23 +194,27 @@ shows. This is recorded because it is an easy and invisible mistake to make from
 
 The prototype expresses its whole hierarchy as `rgba(var(--ink-rgb), a)` across 30 distinct
 alpha values from `.03` to `.62`, concentrated at `.35`, `.38`, `.40`, and `.45`. Measured, ink
-`#17130C` at `.45` over `#FCFBF9` is **2.96:1** — a WCAG AA failure at any text size, and it is
+`#17130C` at `.45` over `#FCFBF9` is **2.99:1** — a WCAG AA failure at any text size, and it is
 applied to 9.5 px text. `SPEC-safety-card.md` D-13 and `SPEC-paced-breathing.md` D-14 already
 rejected these alphas on their own screens; this decision generalizes that rejection.
 
 Four text emphasis levels replace the thirty. They preserve the prototype's visible ordering at
-values that pass AA for normal text on both `bg` and `card` in both themes:
+values that pass AA for normal text on **every** surface in the scheme, not merely on `bg` and
+`card`:
 
 | Level | Alpha | Light on bg | Light on card | Dark on bg | Dark on card | Replaces |
 |---|---|---|---|---|---|---|
 | `primary` | 1.00 | 17.89 | 18.50 | 16.96 | 15.86 | full ink |
 | `secondary` | 0.80 | 9.80 | 10.00 | 10.95 | 10.38 | `.55`–`.62` |
-| `tertiary` | 0.70 | 6.75 | 6.86 | 8.53 | 8.23 | `.45`–`.52` |
+| `tertiary` | 0.70 | 6.85 | 6.97 | 8.60 | 8.25 | `.45`–`.52` |
 | `quaternary` | 0.60 | 4.77 | 4.85 | 6.53 | 6.34 | `.30`–`.42` |
 
-Ratios are sRGB WCAG 2.x relative-luminance ratios of the alpha-composited foreground against
-the stated backdrop, rounded to two decimals. Every level clears 4.5:1 with margin; the floor,
-`quaternary` on light `bg`, measures 4.77:1.
+Ratios are sRGB WCAG 2.x relative-luminance ratios of the alpha-composited foreground against the
+stated backdrop, rounded to two decimals, composited in floating point as the compositor does.
+The true floor of the scale is `quaternary` on the *dimmest* surface in each theme:
+**4.58:1** on light `surfaceContainerHighest` and **5.94:1** on dark `surfaceContainerHighest`.
+`MindScaleContrastTest` asserts every level against every surface, not just the two tabulated
+here, so a new container step cannot quietly drop a level below the floor.
 
 Non-text ink alphas are a separate scale and are **kept verbatim from the prototype**, because
 WCAG imposes no minimum on decorative separators:
@@ -234,14 +238,23 @@ The divergence is confined to text. `#AE8C4F` remains the light-theme gold for e
 use — the header rule, the armed-pad ring, chip and card borders — where the applicable floor is
 3:1 or none, and where `#AE8C4F` measures 3.15:1 against `card`.
 
-| Token | Light | Dark | Light ratio (bg / card) | Dark ratio (bg / card) |
+| Token | Light | Dark | Light ratio (bg / card / dimmest) | Dark ratio (bg / card / dimmest) |
 |---|---|---|---|---|
-| `goldText` | `#886D3E` | `#C9A96A` | 4.72 / 4.88 | 8.60 / 8.04 |
-| `gold` (non-text) | `#AE8C4F` | `#C9A96A` | 3.05 / 3.15 | 8.60 / 8.04 |
+| `goldText` | `#7D6539` | `#C9A96A` | 5.35 / 5.54 / 4.70 | 8.60 / 8.04 / 7.15 |
+| `gold` (non-text) | `#AE8C4F` | `#C9A96A` | 3.05 / 3.15 / — | 8.60 / 8.04 / — |
 
-`#886D3E` is `#AE8C4F` scaled to 78% luminance along the same hue, chosen as the lightest value
-on that ramp with a comfortable margin over 4.5:1. The dark theme needs no divergence:
-`#C9A96A` already measures 8.60:1.
+`#7D6539` is `#AE8C4F` scaled to 72% luminance along the same hue: the lightest value on that
+ramp that clears 4.5:1 on *every* surface in the light scheme. The calibration first reached
+`#886D3E` at 78%, which passes on `bg` (4.72) and `card` (4.88) and then drops to 4.14 on
+`surfaceContainerHighest`. That candidate is rejected and the rejection is pinned by a test: a
+token safe on only two of five surfaces is a token that will eventually be painted on the third.
+
+The cost is recorded honestly — `#7D6539` is visibly darker than the design's `#9A7B44`. What
+survives is the hue and the idiom; what changes is the value. The *non-text* gold is unchanged
+at `#AE8C4F`, so every rule, ring, chip border, and armed-pad ring on screen is still the
+design's exact gold. Only small text is darkened.
+
+The dark theme needs no divergence: `#C9A96A` already measures 8.60:1.
 
 ### D-8 — Danger colour: light kept, dark introduced
 
@@ -255,13 +268,26 @@ value to copy. `danger` dark is `#D17466`, measuring 5.87:1 on `bg` and 5.50:1 o
 
 Thirteen roles set and the rest defaulted is how a half-populated scheme leaks Material's purple
 into a warm bone-and-gold app. Every role the installed Material 3 `ColorScheme` exposes is
-assigned a MindScale token. This is enforced by a reflective JVM test, not by review.
+assigned a MindScale token. This is enforced by a reflective JVM test, not by review — and the
+test earned its place immediately: the installed Material 3 exposes **47** roles, not the ~35 a
+hand-written list would have covered, and the twelve `…Fixed` roles
+(`primaryFixed`, `primaryFixedDim`, `onPrimaryFixed`, `onPrimaryFixedVariant`, and the secondary
+and tertiary equivalents) were still holding Material's purple and pink after the first pass.
 
 The mapping that carries meaning:
 
-- `background`, `surface` → `bg`. `surfaceContainerLowest` and `surfaceContainer` → `card`, so a
-  Material component that reaches for its default container reads as a MindScale card.
-- `primary` → `goldText`; `onPrimary` → `onInk` in light and `bg` in dark.
+- `background`, `surface` → `bg`.
+- **The card is not a Material role.** Material's ladder assumes containers step monotonically
+  away from the background; MindScale's card is *lighter* than the page in light and *darker*
+  than the brightest container in dark, so it lands on `surfaceContainerLowest` in one theme and
+  `surfaceContainer` in the other. Reading a role whose meaning changes between themes is the
+  drift this phase exists to end, so MindScale surfaces read `MaterialTheme.ms.card` and the
+  Material ladder is populated separately and coherently for any stray Material component.
+- `primary` → `goldText`; `onPrimary` → `bg` in both themes (4.72:1 light, 8.60:1 dark). The
+  warm `onInk` was considered for light `onPrimary` and rejected at 3.16:1.
+- The twelve `…Fixed` roles hold one value across both themes by definition. MindScale uses none
+  of them; they are assigned warm neutrals purely so no role is left purple. `onFixed` and
+  `onFixedVariant` are both full ink because ink at 70% over `#AE8C4F` measures 3.68:1.
 - `outlineVariant` → ink at `hairline`; `outline` → ink at the D-23 control-boundary alpha.
 - `error` → `danger`.
 - **`inverseSurface` → `ink` and `inverseOnSurface` → `onInk`.** This is the exact Material
@@ -276,14 +302,34 @@ Dynamic colour stays off, as decided in Phase 4.
 
 ### D-10 — Typography: Instrument Sans, bundled, at the design's sizes
 
-The OFL-licensed Instrument Sans variable font (`wdth`, `wght`) is bundled into
-`res/font/instrument_sans_variable.ttf`, 194,336 bytes, SHA-256
-`B24F1812584816958AFCF22E22D08E44318C5E51651E25D2438EFDDE389B33B1`, obtained from
-`google/fonts` at `ofl/instrumentsans/`. The `OFL.txt` licence ships alongside it as
-`docs/design/InstrumentSans-OFL.txt`. One variable file covers weights 400, 500, and 600 through
-`FontVariation.weight(...)`, which requires API 26; `minSdk` is 26. There is no new Gradle
-dependency and no runtime network access — Downloadable Fonts is explicitly rejected because it
-would introduce exactly the network dependency MindScale does not have.
+Three OFL-licensed **static** Instrument Sans instances are bundled into `res/font`:
+
+| File | Weight | Bytes | SHA-256 |
+|---|---|---|---|
+| `instrument_sans_regular.ttf` | 400 | 86,232 | `69FD3F7C467C70C1F73B232812407F688F3D87DD7A801EA7281AA97D29CF53D5` |
+| `instrument_sans_medium.ttf` | 500 | 86,924 | `56BA599D12B7CF2FFF4EEBF46D29253231B6F49BC5B6CE7733DFBF3D7940BFAE` |
+| `instrument_sans_semibold.ttf` | 600 | 87,004 | `7151CF505F897E17B4E9B956293B5A60046EC39DA3923A8FEBA29CE86FD14E12` |
+
+Obtained from the upstream `Instrument/instrument-sans` project at `fonts/ttf`, which is what
+`google/fonts` packages; the two projects' `OFL.txt` are byte-identical, and it ships as
+`docs/design/InstrumentSans-OFL.txt`.
+
+**Static instances, not the variable font, and `minSdk` is the reason.** The first
+implementation bundled the single `InstrumentSans[wdth,wght].ttf` and pinned each weight with
+`android:fontVariationSettings`. The platform honours that attribute from **API 28**. MindScale's
+minimum is 26, so on API 26 and 27 all three families would have resolved to the variable font's
+default instance and the whole weight hierarchy — the 500 identity, the 400 prose, the 600
+selected tab — would have silently collapsed into a single weight. Lint surfaced it as an
+`UnusedAttribute` warning; the collapse is what actually mattered. Three files cost 260 KB
+against the variable font's 194 KB, which is the right trade for a brand that is defined by its
+weight.
+
+The Compose `Font(resId, weight, style, variationSettings)` overload was also considered and
+rejected: it is annotated experimental, and it carries the same API 28 floor.
+
+There is no new Gradle dependency and no runtime network access — Downloadable Fonts is
+explicitly rejected because it would introduce exactly the network dependency MindScale does not
+have.
 
 **Unit conversion.** The prototype renders in a 402 CSS-px-wide iOS frame, where 1 CSS px is one
 iOS point, which is the same physical construct as one Android dp. The rule is therefore
@@ -514,11 +560,16 @@ Phase 12 clipping defect at 200% font, and replacing it with the prototype's in-
 would change structure, focus order, dismissal, and back handling — all behavioral.
 
 `MsDialog` wraps `AlertDialog` and applies the design's container: 16 dp radius, `card`
-background, a 1 dp `gold` border, the `0 6px 18px rgba(ink,.22)` shadow from D-13, uppercase
-tracked confirm and dismiss actions as bare gold text rather than filled buttons, and the
+background, a 1 dp `gold` border, the `0 6px 18px rgba(ink,.22)` shadow from D-13, and the
 existing scroll behavior untouched. Titles, body content, button callbacks, dismiss behavior, and
 every `testTag` pass through unchanged. `onNodeWithText("Backdate entry")`,
 `onNodeWithText("Edit entry")`, and `onNodeWithText("Edit note")` must still resolve.
+
+The action labels need no call-site edit to become the design's bare gold text: Material's
+`TextButton` resolves its content colour to `colorScheme.primary`, which D-9 sets to `goldText`,
+and D-13 leaves no filled container behind it. **Uppercasing** those labels is a per-call-site
+change across 9 dialogs and is deferred to the phase that owns each screen. Phase 15 restyles
+the container only.
 
 ### D-20 — The toast is an ink pill
 
@@ -577,8 +628,9 @@ decided correction rather than reinventing one.
 - **Never colour alone**: every selected state pairs colour with a second signal — a fill, a
   weight change, or a border. The selected navigation tab carries `goldText` *and* weight 600.
 - **Touch targets**: at least 48 dp for every interactive element, regardless of the painted size.
-  The design's 26 dp help button, 34 dp header buttons, and 42 dp entry dots keep their painted
-  size and gain transparent padding to a 48 dp target.
+  The design's 26 dp help button, 34 dp header buttons, 42 dp entry dots, 44 dp toggles, ~35 dp
+  segments, and zero-padding bare text actions all keep their painted size and gain transparent
+  padding to a 48 dp target. The painted geometry is the design's; the target is MindScale's.
 - **Font scale**: every screen reflows without clipping at 200%. Every size is `sp`; every
   tracking is `em` (D-10); no text container has a fixed height.
 
