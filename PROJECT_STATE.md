@@ -8,17 +8,24 @@ Build MindScale as a native Android application using Kotlin, Jetpack Compose, M
 
 The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716ca7343`: `SPEC.md` is the rationale and `MindScale v2.dc.html` is the visual/behavioral reference for Track, Full Log, Insights, Report, Safety card, Profile, and Settings. A local exported handoff is available at `C:\Users\mckie\Downloads\MindScale-handoff\mindscale\project\`; its `MindScale v2.dc.html` is the primary implementation reference. Repository specs under `docs/specs/` govern native implementation after human approval.
 
-## Current phase: Phase 17 Insights and the intensity ramp — spec frozen, implementation in progress
+## Current phase: Phase 17 Insights and the intensity ramp — implemented and verified locally; not yet merged
 
 - Phase 17 branch: `agent/phase17-insights-visual`, created from synchronized `main` at `18ab15d746abe21a4651547f2e850d7fe7256d09`
 - Starting synchronization: `HEAD`, local `main`, local `origin/main`, and live GitHub `refs/heads/main` all resolved to `18ab15d746abe21a4651547f2e850d7fe7256d09` before branching
-- Governing spec: `docs/specs/SPEC-insights-visual.md` — `FROZEN — IN PROGRESS`; D-1 through D-18 frozen on 2026-08-06 before any application-code edit
+- Governing spec: `docs/specs/SPEC-insights-visual.md` — `IMPLEMENTED — VERIFIED LOCALLY`; D-1 through D-18 frozen on 2026-08-06 before any application-code edit, and D-19 added during implementation because capture found what no test could; frozen documentation commit `c1420c7`
 - Selected work: Phase 17 of 18 in the visual overhaul — Insights' body and `IntensityRamp.kt`, and nothing else. Settings, Profile, Report, Safety, Breathing, and the closing audit are Phase 18
 - Inherited rule: **the phase changes how the app looks and nothing about how it works.** 226/226 connected and 411/411 JVM must pass with no pre-existing test file modified; `git diff --name-status 18ab15d HEAD -- app/src/test app/src/androidTest` must show only `A` lines
 - The ramp decision D-24 reserved for this phase is resolved by measurement plus a pre-existing test, not by taste. The prototype's low anchors are invisible in **both** themes, not only in light: `#F0E4CC` measures 1.26:1 against `card` and 1.11:1 against the asleep fill, and `#3A2F1C` measures 1.38:1 and 1.22:1. Separately, the prototype's light ramp *descends* in relative luminance, and `IntensityRampTest` — pre-existing since Phase 1, and uneditable under D-1 — asserts the light ramp is monotonically non-decreasing. The adopted ramp therefore runs `#6E5220` → `#AE8C4F` in light and `#856F46` → `#C9A96A` in dark over the prototype's own `(v-1)/9` mapping: one rule for both themes, from a dim warm brown into the theme's own gold, with every value `1..10` clearing 3:1 against `card` and `bg`. The app's shipped dark low anchor `#3A4652` was also found to fail, at 1.87:1
 - The 0-versus-1 question is settled structurally: `EpisodeEngine.kt:384` drops zero-valued entries before any `IntensitySegment` is built, so `RasterState.INTENSITY` carries only `1..10` and a 0 rating is `WELL`. `intensityColor(0)` maps to the low anchor and cannot render
 - One conflict is flagged rather than smuggled, in the spec's open questions and due in the completion report: obeying `IntensityRampTest` costs the light ramp its *direction*, so on a light page a rating of 1 carries more visual weight than a rating of 10. The alternative needs an authorized edit to a pre-existing test file, which is exactly what the acceptance criteria forbid, so it was not taken unilaterally
-- Exact next action: implement task 2 of the spec's decomposition — the two new contrast tests and `IntensityRamp.kt` — then the raster, the chart, L-3, and the remaining sections
+- Verification: 428/428 JVM (411 before this phase; the 17 new are `MsIntensityRampContrastTest` and `MsInsightsContrastTest`), 239/239 connected (226 before; the 13 new are `InsightsVisualTest`), lint 0 errors at the unchanged 22-warning baseline, `assembleDebug`, `git diff --check` clean, and installed-app capture in light and dark at 100% and at 200% font
+- The visual-only rule is proved mechanically: `git diff --name-status 18ab15d HEAD -- app/src/test app/src/androidTest` returns three `A` lines and zero `M` lines; a sorted diff of every testTag in `InsightsScreen.kt` is byte-identical at 23 tags; and a sorted diff of every double-quoted literal shows the only changes are LazyColumn item keys and KDoc prose, so no visible string moved
+- Delivered: Insights as the design's screen — pill range chips over a hairline-ruled equal-column summary strip, a hairline-bordered card holding the day/hour raster with the design's own `wellC` and `sleepC` fills, a gold step chart on a matching card, one card each of hairline-separated fact and episode rows, gold histogram bars that invert to ink when selected, and the design's centred ink report pill — plus L-3 and all 93 dimension literals on `MsSpacing` or a commented one-off
+- One defect was found by building and looking rather than by reasoning, and it is the kind no assertion sees: every small label was painted at `labelSmall`'s 0.244 em eyebrow tracking, so `Jul 8` rendered as `J u l  8` and `nothing` as `n o t h i n g`. The design has a second small-label idiom at 0.5 to 0.6 px for data, now carried by a private `chartLabelStyle()` and recorded as D-19. The same capture caught histogram bar labels reading `<1D` and `12A`, because they had been routed through `MsUppercaseText` where the design uppercases nothing
+- Two test-authoring mistakes are recorded because they are easy to repeat: `boundsInRoot` is clipped by a horizontal scroller, so the first run measured gap bucket 4 at 156 px against a 189 px reference and the test now uses `getUnclippedBoundsInRoot()`; and `setContent` may be called only once per test, so the selection test drives a `mutableStateOf` as `TrackVisualTest` does
+- One constraint came from reading the connected suite before touching layout: the raster's legend cannot move inside the panel as the design puts it, because `InsightsScreenTest` clicks the panel's centre and a legend would push that centre past the only row a one-day snapshot has. `InsightsVisualTest` now pins the panel height and the centre click
+- Honest gaps: the sleep-count cells, the loading state, the range-empty line and the stale-snapshot banner were not captured on the installed app because each needs state the app will not enter on request; the histogram cells at 200% font are covered by an assertion rather than a screenshot; the selected cell's inverted fill and every border colour are verified by capture rather than assertion because neither is in the semantics tree; spoken TalkBack output was not audited; and no critical-tier review pass was spent
+- Exact next action: push the branch, open a PR, mark it ready, verify CLEAN/MERGEABLE, and hand the merge to the user. Then freeze a Phase 18 spec before any application-code edit
 
 ### Phase 16 merged checkpoint
 
@@ -314,9 +321,9 @@ The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716c
 
 ## Active blocker
 
-No active blocker. Phase 16 is merged and complete. Phase 17's spec is frozen and implementation
-is under way on `agent/phase17-insights-visual`. Phase 18 is scoped in `docs/specs/BACKLOG.md` and
-needs its own spec frozen before any application-code edit.
+No active blocker. Phase 16 is merged and complete. Phase 17 is implemented and verified locally on
+`agent/phase17-insights-visual` and is waiting on publication and merge. Phase 18 is scoped in
+`docs/specs/BACKLOG.md` and needs its own spec frozen before any application-code edit.
 
 One environment constraint, not a repository problem: the harness permission classifier declined
 `gh pr merge` and `gh pr view` during Phase 15, so it was not attempted for Phase 16 either. `gh
@@ -341,6 +348,20 @@ user, or to have the permission granted, at each future phase boundary.
 3. Continue excluding `.agents/` and `.codex/` from product/documentation commits.
 
 ## Last verification
+
+Phase 17 final local verification completed 2026-08-06 for `agent/phase17-insights-visual`:
+
+- `test`: 428/428 JVM tests passed; 0 failures, errors, or skips (411 before this phase). The 17 new ones are `MsIntensityRampContrastTest` (9) and `MsInsightsContrastTest` (8). `IntensityRampTest`'s five pre-existing tests pass against the new ramp anchors **unedited**, which is the whole of D-4's argument.
+- `lint`: passed with 0 errors and the same 22 existing warnings. One new `ComposableNaming` warning appeared from the visual test's shared composable helper and was fixed by renaming it rather than accepted.
+- `assembleDebug`: passed.
+- `adb devices -l` and `emu avd name`: the intended `MindScale_API_36` API 36 emulator connected as `emulator-5554`.
+- `connectedDebugAndroidTest`: 239/239 passed; 0 failures or skips (226 before this phase; the 13 new ones are `InsightsVisualTest`).
+- `git diff --check`: passed with only the configured LF-to-CRLF notices.
+- The visual-only rule was checked mechanically three ways: `git diff --name-status 18ab15d HEAD -- app/src/test app/src/androidTest` returned three `A` lines and zero `M` lines; a sorted diff of every testTag call site in `InsightsScreen.kt` before and after returned empty at 23 tags; and a sorted diff of every double-quoted literal showed the only changes were four LazyColumn item keys and one phrase inside new KDoc.
+- Installed-app capture covered, and was compared against `docs/design/reference/`: Insights top in light and dark at 100%; the raster with its card, its legend and its caveat; the entry chart with its axis, gridlines, gold step line, ticks and legend; the Episodes fact card and the Each-episode card; the gap histogram and the onset-hour histogram with their bars; a selected gap bucket showing the ink fill with its bar and label inverted to `onInk` and its geometry unmoved; the sleep-counts refusal panel; the report link as the design's centred ink pill; and Insights at 200% font, top and bottom.
+- Emulator font scale, night mode, and auto-rotate were restored to `1.0`, `no`, and enabled, and the app's data was cleared.
+- The ramp decision was settled by measurement plus a pre-existing test rather than by taste, and measurement corrected the spec once before implementation depended on it: D-4's finding 3 had recorded the design's raw light pair as separating its endpoints at 2.24:1, and it actually separates at 5.77:1. The finding survives with a rebuilt argument — the design buys that width by putting one end at 1.26:1 against `card`, and raising it to the palest compliant point on its own line drops it to 2.24:1, below the adopted ramp's 2.31:1.
+- No manifest permission, dependency, Room schema, migration, exported schema JSON, backup, CSV, or toolchain file changed. Room stays at schema 7 and the records CSV header is byte-identical. `TrackScreen.kt`, `LogScreen.kt`, every file under `ui/components/`, and every `ui/theme/` file other than `IntensityRamp.kt` are untouched.
 
 Phase 16 publication checkpoint completed 2026-08-06:
 

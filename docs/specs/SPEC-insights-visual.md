@@ -1,14 +1,15 @@
 # SPEC-insights-visual: applying the brand foundation to Insights, and resolving the intensity ramp
 
-Status: FROZEN — IN PROGRESS
+Status: IMPLEMENTED — VERIFIED LOCALLY
 
 Owner: Claude Code (Phase 17 of 18), on the user's instruction of 2026-08-06
 
 Date: 2026-08-06
 
-Frozen documentation commit: recorded below on freeze
+Frozen documentation commit: `c1420c7`
 
-Verified implementation commits: recorded below on completion
+Verified implementation commits: `4dd99eb` (the ramp and its two contrast tests), and the screen
+restyle plus the visual test and previews recorded in the implementation section below
 
 ## Purpose
 
@@ -169,6 +170,13 @@ prevent — and routing it through `MsUppercaseText` would *add* thirty date str
 tree that today holds none of them, next to a node whose `contentDescription` and
 `stateDescription` are asserted by `InsightsScreenTest`. The label keeps its formatter's case and
 its empty semantics. This is a divergence from the design and it is recorded rather than smuggled.
+
+**A second set of labels is left in its own case, and this one was corrected during
+implementation rather than foreseen: the histogram bucket boundaries and clock hours.** They were
+first built as `MsUppercaseText`, which rendered `<1d` as `<1D` and `12a` as `12A`. The design's
+own `gapBars` and `hourBars` labels at lines 1461 and 1469 set neither `text-transform` nor
+tracking, because a bucket boundary is *data* rather than a label — the same distinction that keeps
+an onset chip in the user's own words. Both are plain `Text` now.
 
 Onset chips, note previews, marker text, and the user's own words are never uppercased, as
 `SPEC-track-and-log-visual.md` D-3 already established.
@@ -515,7 +523,8 @@ dp targets, exact spoken semantics, a `Polite` live readout, and parent vertical
 | Cell, unselected | `surfaceVariant` fill, 1 dp `outlineVariant` | transparent, 1 dp `ms.outline` (D-7) |
 | Cell, selected | `secondaryContainer` fill, 2 dp `onSecondaryContainer` | `ms.ink` fill, 2 dp `ms.ink` — the design's selected idiom |
 | Bar | `primary`, square | `ms.gold` on an unselected cell and `ms.onInk` on a selected one, 2 dp top corners (`extraSmall`) as the design draws them |
-| Count and label | `labelLarge` / `labelMedium` | unchanged sizes; `inkPrimary`/`inkQuaternary` unselected and `onInk` selected |
+| Count | `labelLarge` | unchanged size; `inkPrimary` unselected and `onInk` selected |
+| Bucket and hour label | `labelMedium` | the D-19 data-label style, in its own case and untracked (D-3) |
 | Denominator, readout, caveat | `bodySmall` | unchanged size, at `inkSecondary`/`inkTertiary` levels |
 
 **Selection is never colour alone**: a selected cell changes *fill* (transparent → ink) and border
@@ -629,6 +638,29 @@ column, the 30 dp tick-row inset, the 24 dp event-snap radius, the 14 dp stripe 
 and 18 × 10 dp legend swatches, the 72/64 dp histogram cell widths, the 88/80 dp bar wells, the
 28/26 dp bar widths, the 152/144/96 dp cell minimum heights, and the 96 dp loading well.
 
+### D-19 — The design has two small-label idioms, and `labelSmall` is only one of them
+
+Added during implementation, because installed-app capture found it and no test would have.
+
+`labelSmall` is 9 sp tracked **0.244 em**, which is D-10's transcription of the design's eyebrow
+tracking of 2.2–2.4 px. Insights has a second, quieter small-label idiom the foundation did not
+separate out: the raster's row dates (line 358), the legend labels (lines 367 and 374), the chart's
+axis and tick labels (line 405) and the histogram bar labels (lines 1461, 1469) are tracked
+**0.5–0.6 px**, which at 9 sp is 0.067 em. They are data, not identity.
+
+Painting them at the eyebrow's tracking rendered `Jul 8` as `J u l  8`, `nothing` as
+`n o t h i n g` and `recorded intensity` as `r e c o r d e d  i n t e n s i t y`. Nothing was
+clipped and no assertion could see it; it was simply wrong, in the way the first capture of a
+screen usually is.
+
+A private `chartLabelStyle()` in `InsightsScreen.kt` carries `labelSmall.copy(letterSpacing =
+0.067.em)` and is used at all eight sites. The eyebrow tracking stays where it belongs — section
+titles, the summary strip's labels, `MsEyebrow`. **This is deliberately not pushed into
+`ui/theme/Type.kt`**: Insights is the first screen with enough small data labels to need it, and
+widening the shared type scale on one screen's evidence is how a scale acquires values nobody can
+justify later. Phase 18's closing audit is the right place to decide whether it becomes a
+sixteenth style.
+
 ### D-18 — What is deliberately not copied
 
 Recorded so a later phase does not "restore" one of these while chasing fidelity:
@@ -645,6 +677,8 @@ Recorded so a later phase does not "restore" one of these while chasing fidelity
 | `One page for your doctor` as the report link's label | MindScale's string is `Clinician summary` and Invariant 3 freezes it |
 | The prototype's light ramp direction | Fails `IntensityRampTest`; D-4 |
 | `#F0E4CC` and `#3A2F1C` as ramp low anchors | 1.26:1 and 1.38:1 against `card`; D-4 |
+| The eyebrow's 2.4 px tracking on a raster date or a bar label | The design tracks those 0.5–0.6 px; D-19 |
+| Uppercasing a bucket boundary or a clock hour | The design sets no `text-transform` there; D-3 |
 | `rgba(ink,.14–.16)` as a control boundary | Fails the 3:1 non-text floor; D-7 |
 | `rgba(gold,.85–.95)` as a data mark | Fails the 3:1 non-text floor; D-7 |
 | The legend inside the raster panel | Would move the panel's centre off its only row and break a connected test; D-8 |
@@ -725,44 +759,78 @@ unaffected because no state is added or removed.
 
 ## Acceptance criteria
 
-- [ ] **REGRESSION**: `connectedDebugAndroidTest` passes **226 + new** with no pre-existing test
-      file modified.
-- [ ] **REGRESSION**: `test` passes **411 + new** with no pre-existing test file modified, and
-      `IntensityRampTest`'s five tests pass against the new anchors **unedited**.
-- [ ] **DIFF**: `git diff --name-status 18ab15d HEAD -- app/src/test app/src/androidTest` shows
-      only `A` lines. `git diff --check` passes.
-- [ ] **LINT/BUILD**: `lint` reports 0 errors and the unchanged 22-warning baseline;
-      `assembleDebug` passes.
-- [ ] **UNIT**: `MsIntensityRampContrastTest` reproduces D-4's tables to two decimals, asserts the
+- [x] **REGRESSION**: `connectedDebugAndroidTest` passes **239/239** — the 226 baseline plus 13 new
+      — with no pre-existing test file modified.
+- [x] **REGRESSION**: `test` passes **428/428** — the 411 baseline plus 17 new — with no
+      pre-existing test file modified, and `IntensityRampTest`'s five tests pass against the new
+      anchors **unedited**, which is the whole of D-4's argument.
+- [x] **DIFF**: `git diff --name-status 18ab15d HEAD -- app/src/test app/src/androidTest` shows
+      three `A` lines and zero `M` lines. `git diff --check` passes.
+- [x] **LINT/BUILD**: `lint` reports 0 errors and the unchanged 22-warning baseline;
+      `assembleDebug` passes. One new warning appeared and was fixed rather than accepted — see the
+      record below.
+- [x] **UNIT**: `MsIntensityRampContrastTest` reproduces D-4's tables to two decimals, asserts the
       prototype's two low anchors fail 3:1 against `card`, `bg` and the asleep fill, asserts the
       prototype's light ramp descends in luminance and would therefore fail `IntensityRampTest`,
-      asserts today's dark low anchor fails, and asserts every adopted value `1..10` clears 3:1
-      against `card` and `bg` in both themes.
-- [ ] **UNIT**: the same test asserts `intensityColor(0)` equals `intensityColor(1)` in both
-      themes and pins D-5's reason — that the engine cannot emit intensity 0.
-- [ ] **UNIT**: `MsInsightsContrastTest` reproduces every figure in D-7's tables, asserts each
+      asserts today's dark low anchor fails at 1.87:1, and asserts every adopted value `1..10`
+      clears 3:1 against `card` and `bg` in both themes. **Writing it corrected D-4's finding 3**
+      — see the record below.
+- [x] **UNIT**: the same test asserts `intensityColor(0)` equals `intensityColor(1)` in both themes
+      and that intensity 10 is the theme's own `gold`, pinning D-5.
+- [x] **UNIT**: `MsInsightsContrastTest` reproduces every figure in D-7's tables, asserts each
       rejected design value fails 3:1, asserts each adopted replacement clears it on both `bg` and
-      `card` in both themes, and asserts the five exempt values stay deliberately below it.
-- [ ] **INSTRUMENTED**: `InsightsVisualTest` asserts the summary strip's four columns share one
-      width to within 1.5 px at 100% **and** 200% font (L-3), and that their four values share one
+      `card` in both themes, and asserts the exempt values stay deliberately below it. Every figure
+      passed on the first run against the Phase 16 tables.
+- [x] **INSTRUMENTED**: `InsightsVisualTest` asserts the summary strip's four columns share one
+      width at 100% **and** 200% font with even gaps (L-3), and that their four values share one
       top edge.
-- [ ] **INSTRUMENTED**: `InsightsVisualTest` asserts every range chip, every gap bucket, every
-      onset hour and both sleep cells reach 48 dp on both axes, at 100% and 200% font.
-- [ ] **INSTRUMENTED**: `InsightsVisualTest` asserts selecting a histogram cell changes neither its
-      position nor its size, so the 2 dp selected border is drawn in space reserved in every state.
-- [ ] **INSTRUMENTED**: `InsightsVisualTest` asserts the raster panel's centre still lands on a day
-      row, which is the geometric fact D-8 depends on.
-- [ ] **UI/ACCESSIBILITY**: `@Preview` composables over Insights in light and dark at 100% and 200%
-      font, plus the empty state and a refusal state, in `src/debug/…/InsightsPreviews.kt`.
-- [ ] **MANUAL**: installed-app capture on the API 36 emulator, compared screen by screen against
-      `docs/design/reference/`: Insights top and scrolled in dark against the two dark references,
-      the raster and entry chart in light against the light reference, and Insights at 200% font.
-      Light top/scrolled and the dark entry chart are compared against the HTML only, because
-      **no such screenshot exists**.
-- [ ] **MANUAL**: capture of the surfaces no screenshot covers — a selected gap bucket, a selected
-      onset hour, a selected sleep cell, the empty state, and at least one refusal panel.
-- [ ] **MANUAL**: emulator font scale, night mode, and rotation restored to `1.0`, `no`, and
-      enabled, with the app's data cleared.
+- [x] **INSTRUMENTED**: `InsightsVisualTest` asserts every range chip, every gap bucket, every
+      onset hour and both sleep cells reach 48 dp on both axes, at 100% and at 200% font, and that
+      all ten gap buckets share one width and one height.
+- [x] **INSTRUMENTED**: `InsightsVisualTest` asserts selecting a histogram cell changes neither its
+      size nor its position relative to its neighbours, so the 2 dp selected border is drawn in
+      space reserved in every state. Restated honestly: it does **not** assert that the fill
+      inverts, because a background colour is not in the semantics tree. That is verified by
+      installed-app capture instead.
+- [x] **INSTRUMENTED**: `InsightsVisualTest` asserts the raster panel is exactly its padded day
+      rows and that a centre click still reaches one — the geometric fact D-8 depends on.
+- [x] **INSTRUMENTED**: `InsightsVisualTest` asserts the report link is a centred pill narrower
+      than the screen, at a 48 dp height.
+- [x] **UI/ACCESSIBILITY**: eight `@Preview` composables over Insights in light and dark at 100%
+      and 200% font, plus every cell selected at once, the refusal state, the empty state and the
+      stale-snapshot banner, in `src/debug/…/InsightsPreviews.kt`. They compile and are debug-only.
+      Stated honestly: they were **not** rendered in the IDE preview pane in this session; the same
+      theme and scale combinations were verified by installed-app capture instead, which is the
+      stronger oracle and is what found this phase's one defect.
+- [x] **MANUAL**: installed-app capture on the API 36 emulator against `docs/design/reference/`:
+      Insights top in dark against `dark-insights-top.png`; the raster, legend and entry chart in
+      light against `light-insights-raster-entry-chart.png`; Insights scrolled in dark against
+      `dark-insights-scrolled.png`. Light top and the dark entry chart are compared against the
+      HTML only, because **no such screenshot exists** — stated rather than papered over.
+- [x] **MANUAL**: capture of surfaces no screenshot covers — the gap histogram and the onset-hour
+      histogram with their bars, a **selected** gap bucket showing the ink fill with its bar and
+      label inverted to `onInk`, the sleep-counts refusal panel, and the report link as the
+      design's centred ink pill.
+- [x] **MANUAL**: Insights at 200% font, top and bottom, with nothing clipped. Emulator font scale,
+      night mode, and rotation restored to `1.0`, `no`, and enabled, and the app's data cleared.
+
+Not met, and stated rather than quietly dropped:
+
+- [ ] **MANUAL**: the sleep-count **cells**, the loading state, the range-empty line and the
+      stale-snapshot error banner were not captured on the installed app. Each needs state the app
+      will not enter on request: two completed Sleep/Wake pairs inside the range, a slow Room read,
+      a range with entries outside it, and an injected read failure. What does cover them: the
+      connected suite asserts each one's presence, tag, strings and actions; each is built from
+      primitives whose rendering *was* captured — `MsCard` by the refusal panel, the cell treatment
+      by both histograms, `MsTextAction`'s tone by the report link; and all four have `@Preview`
+      composables. That is compositional, not the same as having looked at them.
+- [ ] **MANUAL**: the histogram cells at 200% font were not captured — the 200% screenshots caught
+      the top of the screen and the bottom, and the histograms sit between them at a scroll
+      position a screenshot reaches only by accident. They are covered by an assertion instead:
+      `everyHistogramCellStillReachesTheTouchTargetFloorAt200PercentFont`.
+- [ ] **REVIEW**: no critical-tier review pass was spent on this phase. The 239 connected tests, the
+      428 JVM tests, the mechanical `testTag` and string diffs, and the capture matrix were treated
+      as the evidence instead. This is recorded as a gap, not as a claim of equivalence.
 
 ## Task decomposition
 
@@ -779,6 +847,81 @@ unaffected because no state is added or removed.
    oracle: the full `InsightsScreenTest` and `NavigationTest`.
 7. Previews, then full verification and installed-app capture — oracle: all four Gradle oracles
    plus the manual matrix.
+
+## Implementation and verification record
+
+Completed 2026-08-06 on `agent/phase17-insights-visual`.
+
+**Measurement corrected the spec before any screen code depended on it, which is the reason the
+tests are written before the restyle.** D-4's finding 3 originally recorded the design's raw light
+pair as separating its endpoints at 2.24:1, and argued from that that obeying `IntensityRampTest`
+cost nothing. `MsIntensityRampContrastTest` measured 5.77:1 — the design's raw pair really is far
+wider. The finding survives, but the argument had to be rebuilt rather than patched: the design
+buys that width by putting one end at 1.26:1 against `card`, and raising that end to the palest
+compliant point on its own line collapses it to 2.24:1, *below* the adopted ramp's 2.31:1. So most
+of the width is lost to the 3:1 floor whichever direction is chosen, and the direction the
+pre-existing test allows costs nothing beyond direction. The table and the surrounding prose now
+say that.
+
+**Two findings came out of measuring that the brief did not anticipate.** `SPEC-visual-foundation.md`
+D-24 flagged the light low anchor `#F0E4CC`; the dark one fails as well, at 1.38:1 against `card`
+and 1.22:1 against the asleep band. And the ramp MindScale has shipped since Phase 1 fails in dark
+too, at 1.87:1 — a pre-existing defect this phase fixes rather than a regression it avoids.
+
+**One defect was found by building and looking rather than by reasoning, and it is the one no test
+could have caught.** Every small label on the screen was painted at `labelSmall`'s 0.244 em, which
+is D-10's transcription of the design's *eyebrow* tracking. The design has a second small-label
+idiom at 0.5–0.6 px for data — raster dates, legend labels, axis ticks, bar labels — and at the
+eyebrow's tracking `Jul 8` rendered as `J u l  8` and `nothing` as `n o t h i n g`. Nothing was
+clipped, every assertion passed, and it was simply wrong. Fixed by a private `chartLabelStyle()`
+and recorded as D-19. The same capture showed the histogram bar labels reading `<1D` and `12A`,
+because they had been routed through `MsUppercaseText` when the design uppercases neither; both are
+plain `Text` now, and D-3 names them.
+
+**Two test-authoring mistakes are worth recording because they are easy to repeat.**
+`InsightsVisualTest`'s first run reported gap bucket 4 as 156 px wide against a 189 px reference:
+`boundsInRoot` is **clipped** by the horizontal scroller the buckets live in, so measuring equal
+widths from it asserts "every visible sliver is the same size", which is not the claim. The test
+uses `getUnclippedBoundsInRoot()`. Separately, the selection test called `setContent` twice in one
+test, which the Compose rule rejects; it drives a `mutableStateOf` instead, exactly as
+`TrackVisualTest.armingThePadDoesNotMoveOrResizeAnyKey` does.
+
+**One new lint warning appeared and was fixed rather than accepted.** The visual test's shared
+`@Composable` helper was named `screen`, which trips `ComposableNaming`. Renamed
+`InsightsUnderTest`; lint is back at the unchanged 22-warning baseline.
+
+**One constraint was found by reading the connected suite before touching layout, and it changed
+the design.** The prototype puts the raster's legend *inside* the raster panel.
+`InsightsScreenTest.rasterTouchAndAccessibilityActionUseOneExplorationSurface` clicks that panel's
+**centre** and requires the click to reach a day row; on the one-day snapshot it builds, the panel
+is exactly its 10 dp padding around one 20 dp row. A legend inside would have pushed the centre
+about 38 dp down, past the only row there is. The legend stays below the panel, and
+`InsightsVisualTest` now pins both the panel's height and the centre click so a later phase cannot
+undo the reasoning by accident.
+
+Accepted consequences, stated rather than discovered later:
+
+- **On a light page a rating of 1 now carries more visual weight than a rating of 10**, because
+  `IntensityRampTest` pins the light ramp's luminance direction and the design's direction is the
+  other one. This is the phase's one place where a frozen constraint and the design point opposite
+  ways, and it is the item flagged in "Open questions" rather than buried here.
+- **At 200% font the summary strip's labels wrap to as many as four lines** — `TYPICAL LENGTH`
+  becomes `TYPICA / L / LENGT / H`. That is the direct cost of L-3's equal-weight columns, and the
+  alternative is the prototype's flaw. Nothing clips, and the columns stay equal, which is what
+  D-9 asserts.
+- **The Episodes and Each-episode lists each compose as one `LazyColumn` item now**, because the
+  design draws them as one card of hairline-separated rows. Both are bounded by the engine — six
+  facts and eight episodes — so no laziness that matters was lost.
+- **The entry chart's sleep bands lost their diagonal hatching**, adopting the design's solid
+  column. It is redundant reinforcement: the step line genuinely stops across a sleep span. The
+  raster's FUTURE hatching is *not* removed, because there it is the only thing distinguishing
+  future from no-data.
+
+Honest gaps beyond the unmet criteria above: spoken TalkBack output was not audited, only the
+semantics tree; the selected cell's inverted fill and every border colour are verified by capture
+rather than by an assertion, because neither is in the semantics tree; and the raster's light-theme
+`no data` band measures 1.06:1 against the card, so on a page with no records the panel reads as
+almost empty — that is the design's own intent and the legend names the state, but it is faint.
 
 ## Rollout, migration, and rollback
 
