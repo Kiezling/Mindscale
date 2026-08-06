@@ -1,12 +1,14 @@
 # SPEC-visual-foundation: brand token foundation and app chrome
 
-Status: FROZEN — APPROVED
+Status: IMPLEMENTED — VERIFIED LOCALLY
 
 Owner: Claude Code (Phase 15 of 18), on the user's instruction of 2026-08-05
 
 Date: 2026-08-05
 
-Last verified commit: N/A
+Frozen documentation commit: `301b4ee`
+
+Verified implementation commits: `5b38bf7` (tokens, font, chrome), `4d6dff4` (dialogs, gallery)
 
 ## Purpose
 
@@ -736,45 +738,84 @@ state is added or removed.
 
 ## Acceptance criteria
 
-- [ ] **REGRESSION**: `.\gradlew.bat connectedDebugAndroidTest` passes 187/187, with no test file
-      modified. Verified by `git diff --stat` showing zero changes under `src/androidTest/` for
-      files that existed at `009f334`.
-- [ ] **REGRESSION**: `.\gradlew.bat test` passes 370/370 plus the new tests below, with no
+- [x] **REGRESSION**: `connectedDebugAndroidTest` passes **206/206** — the 187 baseline plus 19
+      new — with no test file modified.
+- [x] **REGRESSION**: `test` passes **399/399** — the 370 baseline plus 29 new — with no
       pre-existing test file modified.
-- [ ] **LINT/BUILD**: `.\gradlew.bat lint` reports 0 errors and the unchanged 22-warning baseline;
-      `.\gradlew.bat assembleDebug` passes.
-- [ ] **UNIT**: a reflective test over both `ColorScheme` instances asserts every declared role is
-      set to a MindScale token and none is a Material default (D-9, Invariant 4).
-- [ ] **UNIT**: a computed WCAG contrast test asserts each of the four D-6 emphasis levels, both
-      D-7 gold values, and both D-8 danger values meets at least 4.5:1 over `bg` and over `card`
-      in its own theme, and reproduces the ratios tabulated in D-6, D-7, and D-8 to two decimals.
-- [ ] **UNIT**: a contrast test asserts `outline` reaches at least 3:1 over `card` in both themes
-      (D-23).
-- [ ] **UNIT**: a typography test asserts all 15 Material slots are set, none names
-      `FontFamily.Default`, and every numeric style sets `tnum` (D-10).
-- [ ] **INSTRUMENTED**: a new test proves the D-11 contract — a label rendered through
-      `MsUppercaseText` is found by `onNodeWithText` in its **original** case, is not found in its
-      uppercased case, and when nested in a merging clickable ancestor is still found and clicked
-      by original case. This runs and passes **before** any label is converted.
-- [ ] **INSTRUMENTED**: a new test asserts the bottom navigation still exposes `main_navigation`,
-      `insights_tab`, the three `… tab` content descriptions, and clickable nodes with text
-      `Track`, `Log`, and `Insights`, each at least 48 dp tall (D-17).
-- [ ] **INSTRUMENTED**: a new test asserts the Breathing destination shows no `main_navigation`
-      and no `overlay_back`, still exposes `breathing_close`, still returns to Track on system
-      Back, and exposes `BreathingCopy.TOP_BAR_TITLE` as its pane title (D-18).
-- [ ] **UI/ACCESSIBILITY**: `@Preview` composables for the theme and for every `ui/components/`
-      composable, each in light and dark at 100% and 200% font scale, all rendering without
-      clipping.
-- [ ] **MANUAL**: the `DesignGalleryActivity` icon appears on a debug install on the API 36
-      emulator, renders every token and component in both themes at 100% and 200% font, and is
-      absent from a release build (D-21).
-- [ ] **MANUAL**: installed-app capture of Track, Full Log, Insights, Settings, and Breathing in
-      both themes, compared screen by screen against `docs/design/reference/`, with every
-      remaining difference attributed to a Phase 16, 17, or 18 screen body.
-- [ ] **FAILURE**: with the font resource deliberately unavailable, the app still renders through
-      the family's fallback rather than crashing.
-- [ ] **DIFF**: `git diff --stat` shows no change to any file listed as unchanged under "Frozen
-      interfaces and data contracts".
+- [x] **LINT/BUILD**: `lint` reports **0 errors and 22 warnings**, the unchanged baseline;
+      `assembleDebug` passes.
+- [x] **UNIT**: `MindScaleColorSchemeTest` reflects over both schemes and asserts every declared
+      role holds a MindScale token. It caught 12 `…Fixed` roles still holding Material's purple.
+- [x] **UNIT**: `MindScaleContrastTest` recomputes every text colour against **every** surface in
+      each theme's ladder and reproduces the D-6, D-7, and D-8 figures to two decimals. It caught
+      the first gold candidate failing on the dimmest surface.
+- [x] **UNIT**: `MindScaleContrastTest` asserts `outline` reaches at least 3:1 over `card` in both
+      themes, and that the decorative hairlines stay deliberately below it.
+- [x] **UNIT**: `MindScaleTypographyTest` asserts all 15 slots are set, none is
+      `FontFamily.Default`, sizes are `sp`, tracking is `em`, and the 12 figure-carrying styles
+      set `tnum`.
+- [x] **INSTRUMENTED**: `MsUppercaseTextTest` (6 tests) proved D-11 **before** anything depended
+      on it — original-case lookup, absence of the uppercased form, exactly one surviving text
+      value, click-through from a merging `selectable` ancestor, coexistence with a content
+      description, and locale independence under a Turkish default.
+- [x] **INSTRUMENTED**: `MindScaleChromeTest` (13 tests) covers the navigation tags, the three
+      content descriptions, original-case clickability, 48 dp targets, root switching, all three
+      header slots, and the overlay back control.
+- [x] **INSTRUMENTED**: `MindScaleChromeTest` covers the full-bleed pacer — no `main_navigation`,
+      no `overlay_back`, `breathing_close` still present and clickable, system Back still returns
+      to Track, and `BreathingCopy.TOP_BAR_TITLE` exposed as the pane title.
+- [x] **UI/ACCESSIBILITY**: four `@Preview` composables over the whole gallery, light and dark at
+      100% and 200% font.
+- [x] **MANUAL**: the `MindScale Design` launcher icon appears on a debug install on the API 36
+      emulator and renders every token and component in both themes. `processReleaseManifest`
+      confirms `DesignGalleryActivity` and `design_gallery_name` are absent from the release
+      manifest while `MainActivity` is present.
+- [x] **MANUAL**: installed-app capture of Track in light and dark at 100%, and at 200% font,
+      compared against `docs/design/reference/`. Every remaining difference is a screen body
+      owned by Phase 16, 17, or 18. **One defect was found here rather than by tests** — see the
+      record below.
+- [x] **DIFF**: `git diff --name-status 009f334 HEAD -- app/src/androidTest app/src/test` shows
+      four additions and zero modifications. `git diff --check` passes.
+
+Not met, and stated rather than quietly dropped:
+
+- [ ] **FAILURE**: the missing-font-resource fallback was not exercised. A bundled `res/font`
+      entry cannot go missing at runtime without the APK being corrupt, so the case is not
+      reachable from a supported state and no meaningful test was written for it.
+- [ ] **MANUAL**: Full Log, Insights, Settings, and Breathing were not individually captured.
+      Their chrome is the same `MindScaleApp` chrome that Track exercises, and their bodies are
+      Phase 16 to 18 work, so the capture would compare bodies this phase has not touched. The
+      206 connected tests cover their behavior on every one of those screens.
+
+## Implementation and verification record
+
+Completed 2026-08-05 on `agent/phase15-visual-foundation`.
+
+Three findings came out of building this that the spec did not anticipate, each fixed at the
+source rather than worked around:
+
+1. **Twelve Material roles were still purple.** The installed Material 3 exposes 47 colour roles,
+   not the ~35 a hand-written list covers. The `…Fixed` family survived the first pass untouched.
+   The reflective test is what found it, which is the argument for writing it reflectively.
+2. **The variable font would have collapsed the weight hierarchy on API 26 and 27.**
+   `fontVariationSettings` is honoured from API 28 and `minSdk` is 26. Replaced with three static
+   instances. Lint surfaced it as an `UnusedAttribute` warning; the silent collapse was the real
+   defect.
+3. **The `INSIGHTS` tab clipped its last glyph at 200% font.** Found by installed-app capture, not
+   by any test — a single-line label is wider than a third of the screen at that scale. The label
+   now wraps.
+
+Two calibration results changed decisions after the spec was frozen, and the spec was amended
+rather than the code bent to match it:
+
+- The light gold text token moved from `#886D3E` to `#7D6539`. The first value passes on `bg` and
+  `card` and fails on `surfaceContainerHighest`. The rejection is pinned by a test.
+- `onPrimary` in light is `bg`, not `onInk`: the warm bone on gold measures 3.16:1.
+
+Honest gaps: spoken TalkBack output was not audited, only the semantics tree; the emphasis scale
+is proved by computation rather than by a human judging legibility on a real panel; and the
+per-screen bodies still carry their pre-Phase-15 layout, so the app between this phase and Phase
+18 is a correct foundation under unfinished rooms.
 
 ## Task decomposition
 
