@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Debug source set only. Never present in a release build. -->
+<resources>
+    <string name="design_gallery_name">MindScale Design</string>
+</resources>

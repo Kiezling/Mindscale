@@ -30,6 +30,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import com.kieslingdev.mindscale.ui.components.MsCircularHeaderButton
 import com.kieslingdev.mindscale.ui.components.MsEyebrow
 import com.kieslingdev.mindscale.ui.components.MsHairline
@@ -349,16 +350,20 @@ private fun NavigationTab(
             .defaultMinSize(minHeight = MsSpacing.minTouchTarget)
             .selectable(selected = selected, onClick = onClick)
             .semantics { this.contentDescription = contentDescription }
-            .padding(vertical = MsSpacing.lgPlus),
+            .padding(horizontal = MsSpacing.xxs, vertical = MsSpacing.lgPlus),
         contentAlignment = Alignment.Center
     ) {
+        // Deliberately unbounded lines. At 200% font `INSIGHTS` is wider than a third of the
+        // screen, and a single-line label clipped its last glyph at the edge. Wrapping is not
+        // pretty at that scale, but D-23 requires reflow without clipping and a label that has
+        // lost a letter is worse than one that has taken two lines.
         MsUppercaseText(
             text = label,
             style = MaterialTheme.typography.labelLarge.copy(
                 fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium
             ),
             color = if (selected) palette.goldText else palette.inkQuaternary,
-            maxLines = 1
+            textAlign = TextAlign.Center
         )
     }
 }

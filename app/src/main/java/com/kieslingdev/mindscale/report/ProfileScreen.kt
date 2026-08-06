@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -27,6 +26,7 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.kieslingdev.mindscale.ui.components.MsDialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kieslingdev.mindscale.data.ExternalInstrument
 import com.kieslingdev.mindscale.safety.SafetyCopy
@@ -238,7 +238,7 @@ fun ProfileScreen(
     }
 
     if (pendingDelete != null) {
-        AlertDialog(
+        MsDialog(
             onDismissRequest = viewModel::cancelDeleteScore,
             title = { Text("Delete external total?") },
             text = {

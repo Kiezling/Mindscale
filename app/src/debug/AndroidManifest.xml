@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Debug-only manifest additions.
+
+    The design gallery needs to be reachable to be useful, and adding an `AppDestination` for it
+    would add a navigation destination to the shipping app, which the visual-only rule forbids
+    outright (`docs/specs/SPEC-visual-foundation.md`, D-1 and D-21).
+
+    So it is a separate launcher activity that exists only in the debug source set: absent from
+    the release manifest and the release APK, invisible to MindScale's own UI, and invisible to
+    the connected suite, which launches MainActivity explicitly.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+        <activity
+            android:name=".designgallery.DesignGalleryActivity"
+            android:exported="true"
+            android:label="@string/design_gallery_name"
+            android:theme="@style/Theme.MindScale">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+
+</manifest>
