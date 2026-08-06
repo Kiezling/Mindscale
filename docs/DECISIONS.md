@@ -149,3 +149,53 @@ Record stable decisions that should survive chat resets and model/provider chang
 - Accepted consequences, stated rather than discovered later: **Log's rows are about 1.6× taller than the design's**, because the design fits three actions inline only where they are 9 px labels with no touch target and D-23's 48 dp floor is MindScale's addition; Track's prompt row is usually empty beside the help toggle, because MindScale has no `padPrompt` string and adding one would be a copy addition; and the help toggle now renders above the anchor prompt rather than below it, a consequence of merging the readout and help row as the design does.
 - Verified: 226/226 connected tests (206 baseline plus 20 new), 411/411 JVM tests (399 plus 12), lint 0 errors at the unchanged 22-warning baseline, `assembleDebug`, `git diff --check`, and a capture matrix covering Track and Full Log in light and dark at 100% and 200% font plus the armed pad, the toast, the help card, the marker input, the backdate and delete dialogs, the date picker, the Log inline edit panel, and both empty states. The visual-only rule is proved mechanically: `git diff --name-status 238b0ba HEAD` over both test trees shows three additions and **zero modifications**, all 52 testTags are byte-identical, and a diff of every literal string in both screens shows no removal and no addition outside KDoc.
 - Honest gaps: six state-gated surfaces — the onset-chip prompt, the check-in card, the anchor card, the paused card, the Log inline note panel, and Log's message and read-error banners — were not captured on the installed app, because each needs state the app will not enter on request (40 entries over 60 days, a one-shot flag, an episode classification, or an injected failure). The connected suite asserts each one's presence, tag, strings, and actions, and each is built from primitives whose rendering *was* captured, so their geometry is compositional rather than novel — but that is not the same as having looked at them. The armed rings' colour is verified by capture rather than by an assertion, because a border is not in the semantics tree. Spoken TalkBack output was not audited, only the semantics tree. No critical-tier review pass was spent on this phase.
+
+## D-017 — The intensity ramp runs from a dim warm brown into the theme's own gold, and its light direction is set by a test rather than by the design
+
+Date: 2026-08-06. Scope: Phase 17 of the visual overhaul, `docs/specs/SPEC-insights-visual.md` D-4
+through D-6. Status: implemented and verified locally.
+
+`SPEC-visual-foundation.md` D-24 deferred `intensityColor`'s colour mapping to this phase and asked
+for two things: resolve the prototype's 0-versus-1 low anchor, and re-check whether its warm low end
+is safe as a fill. Both resolve by measurement, and a third question resolved them the rest of the
+way.
+
+**The prototype's low anchors are invisible in both themes, not only in light.** D-24 flagged
+`#F0E4CC`; measured, it is 1.26:1 against `card`, 1.22:1 against `bg` and 1.11:1 against the asleep
+band, so a light-theme rating of 1 cannot be told from *nothing recorded* or from *asleep*. The dark
+anchor `#3A2F1C` fails too, at 1.38:1 and 1.22:1. In a symptom tracker that is a false statement
+about the user's own data, not a cosmetic weakness. The ramp MindScale has shipped since Phase 1
+also fails in dark, at 1.87:1 — a pre-existing defect this phase fixes.
+
+**The light direction is decided by a pre-existing test, not by taste.** The prototype's light ramp
+runs pale to dark, so its relative luminance descends. `IntensityRampTest` has asserted a
+monotonically non-decreasing light ramp since Phase 1; it is a pre-existing file and the visual-only
+rule forbids editing one. The adopted pair is the same two design hexes in the other order.
+Measurement showed this costs less than it looks: the design's raw pair separates its endpoints at
+5.77:1, but only by putting one end where it cannot be seen, and raising that end to the palest
+compliant point on its own line collapses it to 2.24:1 — below the adopted ramp's 2.31:1. Almost all
+the width is lost to the 3:1 floor whichever direction is chosen.
+
+**Adopted**: light `#6E5220` to `#AE8C4F`, dark `#856F46` to `#C9A96A`, over the prototype's own
+`(v-1)/9` mapping clamped to 1..10. One rule for both themes — a dim warm brown into the theme's own
+gold, so intensity 10 is painted the same colour as the armed pad ring, the header rule and the
+episode peak. Both low anchors are points on the design's own ramp lines; both high anchors are the
+palette golds already in use. Every value 1..10 clears 3:1 against `card` and `bg`.
+
+**0 versus 1 is settled structurally rather than by preference.** `EpisodeEngine` drops a
+zero-valued entry before any `IntensitySegment` exists, so `RasterState.INTENSITY` carries only
+1..10 and a 0 rating is classified `WELL` — which the raster paints as the card itself. `0` maps to
+the low anchor and cannot render. Under the `(v-1)/9` mapping the legend's two swatches labelled `1`
+and `10` are literally the ramp's anchors, so the legend promises what the raster paints.
+
+**Invariant 14 was re-checked at all three sites where a fill carries a value** and holds at each:
+the raster's cells are read by a live-region readout that spells `intensity 7` and by four TalkBack
+custom actions, and each legend swatch sits beside its own numeral. One consequence is recorded
+rather than fudged: a ten-step ramp cannot sit 3:1 from every other raster category at once, so the
+floor that binds is intensity against the *nothing recorded* ground, and category-versus-category
+separation is carried by the legend and the readout in words.
+
+**The cost, stated plainly**: on a light page a rating of 1 now carries more visual weight than a
+rating of 10, which is the opposite of what the design intends. Reversing that needs an authorized
+edit to a pre-existing test file, which the phase's acceptance criteria forbid, so it was not taken
+unilaterally. It is flagged in the spec's open questions and in the completion report.
