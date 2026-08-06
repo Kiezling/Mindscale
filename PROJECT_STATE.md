@@ -1,6 +1,6 @@
 # MindScale project state
 
-Last updated: 2026-08-05
+Last updated: 2026-08-06
 
 ## Goal
 
@@ -8,7 +8,31 @@ Build MindScale as a native Android application using Kotlin, Jetpack Compose, M
 
 The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716ca7343`: `SPEC.md` is the rationale and `MindScale v2.dc.html` is the visual/behavioral reference for Track, Full Log, Insights, Report, Safety card, Profile, and Settings. A local exported handoff is available at `C:\Users\mckie\Downloads\MindScale-handoff\mindscale\project\`; its `MindScale v2.dc.html` is the primary implementation reference. Repository specs under `docs/specs/` govern native implementation after human approval.
 
-## Current phase: Phase 14 optional paced-breathing object merged and complete
+## Current phase: Phase 15 visual foundation merged and complete; Phase 16 not started
+
+- Phase 15 branch: `agent/phase15-visual-foundation`, created from synchronized `main` at `009f33455a8f79263f5a17de16d00f57ebec45d7`
+- Starting synchronization: `HEAD`, local `main`, local `origin/main`, and live GitHub `refs/heads/main` all resolved to `009f33455a8f79263f5a17de16d00f57ebec45d7` before branching
+- Governing spec: `docs/specs/SPEC-visual-foundation.md` — `IMPLEMENTED — VERIFIED LOCALLY`; D-1 through D-25 frozen on 2026-08-05 before application-code edits; frozen documentation commit `301b4ee`, verified implementation commits `5b38bf7` and `4d6dff4`
+- Selected work: Phase 15 of 18 in the visual overhaul — the token foundation and the app chrome. Authorized by `SPEC-full-log.md` D-9, which deferred "the shared gold/ink light/dark token foundation until the later global brand phase"
+- The governing rule, inherited by Phases 16 through 18: **the phases change how the app looks and nothing about how it works.** No feature added, removed, renamed, reordered, or rewired; no navigation change, no new entry point, no copy edit, no data/export/migration change, no dependency/permission/toolchain change. A broken test is evidence that behavior changed and is a defect in the phase, not a test to update
+- Delivered: the complete palette from `MindScale v2.dc.html`; a four-level ink emphasis scale replacing the prototype's thirty alphas; all 47 Material 3 colour roles; all 15 text styles in bundled Instrument Sans; the shape scale passed to `MaterialTheme` for the first time; a spacing scale; a presentation-only component layer that owns no state and sets no testTag; and the chrome — flat three-cell header with the wordmark treatment and its gold rule, text-only bottom navigation, full-bleed Breathing overlay, and nine dialogs routed through one gold-bordered container
+- The load-bearing technique: case is presentation, never semantics. `MsUppercaseText` renders `uppercase(Locale.ROOT)` and restores the original through `clearAndSetSemantics` — not `semantics`, because the `Text` key merges by appending and would leave both strings on the node. Proved by six connected tests before anything depended on it
+- Three defects were found by building rather than by reasoning: twelve Material `…Fixed` colour roles still held Material's purple after the first pass; the Instrument Sans **variable** font would have silently collapsed the 400/500/600 hierarchy on API 26 and 27 because `fontVariationSettings` needs API 28 while `minSdk` is 26, so three static instances are bundled instead; and the `INSIGHTS` tab clipped its last glyph at 200% font, caught by installed-app capture and by no test
+- Two frozen decisions were amended by measurement: light gold text is `#7D6539` rather than the first candidate `#886D3E`, which passes on `bg` and `card` and drops to 4.14:1 on the dimmest container; and light `onPrimary` is `bg` after the warm `onInk` measured 3.16:1
+- Design reference now lives in the repository at `docs/design/reference/` as fourteen named screenshots, plus `docs/design/InstrumentSans-OFL.txt`. Its absence was a named cause of the drift this phase corrects
+- Frozen constraints held: no Room schema, migration, backup, CSV, export, import, dependency, permission, manifest permission, or toolchain change. Room stays at schema 7 and the records CSV header is byte-identical. `IntensityRamp.kt` is untouched
+- Expected untracked paths remain `.agents/` and `.codex/`; they are excluded from product/documentation scope
+- Verification: 399/399 JVM tests (370 before this phase), lint with 0 errors and the unchanged 22-warning baseline, debug assembly, confirmed API 36 emulator, 206/206 connected tests (187 before this phase), `git diff --check`, `processReleaseManifest` confirming the debug gallery is absent from release, and installed-app capture in light, dark, and at 200% font
+- The visual-only rule is proved objectively: `git diff --name-status 009f334 HEAD` over `app/src/test` and `app/src/androidTest` shows four additions and **zero modifications**
+- Accepted consequence of the phasing: between this phase and Phase 18 the app is a correct foundation under unfinished rooms. The chrome is the design; the screen bodies still carry their pre-Phase-15 layout
+- Honest gaps: spoken TalkBack output was not audited, only the semantics tree; the emphasis scale is proved by computation rather than by a human judging legibility on a real panel; Full Log, Insights, Settings, and Breathing were not individually captured because their chrome is the same chrome Track exercises and their bodies belong to later phases; the missing-font-resource fallback was not exercised because a bundled resource cannot go missing without a corrupt APK; and no critical-tier review pass was spent on this phase
+- Verification-state commit: `4a43a56e9a9c47ad74cd1a863480aa7fbd7d370d`
+- Phase 15 PR #12 was opened as draft, marked ready, and verified `CLEAN`/`MERGEABLE` at exact head `4a43a56e9a9c47ad74cd1a863480aa7fbd7d370d`; no remote status checks are configured
+- PR #12 merged into `main` as `e22ee6b843445614f2aef5f62c727269469ce232` on 2026-08-06 by the user, after the agent's `gh pr merge` was declined by the harness permission classifier. Local `HEAD`, local `main`, `origin/main`, and live GitHub `refs/heads/main` all matched that merge before this phase-boundary documentation commit, and the verified head is an ancestor of it
+- Exact next action: freeze `docs/specs/SPEC-track-and-log-visual.md` for Phase 16 before any application-code edit. Phase 16 applies the P15 foundation to Track and Full Log, including layout corrections L-1, L-2, and L-4 recorded in `SPEC-visual-foundation.md` D-22
+- Explicitly not started: Phases 16, 17, and 18
+
+### Phase 14 merged checkpoint
 
 - Phase 14 branch: `agent/phase14-paced-breathing`, created from synchronized `main` at `82ca7041120df0903738645f1a6d46cec44a2fb6`
 - Starting synchronization: `HEAD`, local `main`, local `origin/main`, and live GitHub `refs/heads/main` all resolved to `82ca7041120df0903738645f1a6d46cec44a2fb6` before branching
@@ -252,7 +276,12 @@ The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716c
 
 ## Active blocker
 
-No active blocker. Phase 14 is merged and complete, and no scoped backlog work remains.
+No active blocker. Phase 15 is merged and complete. Phases 16 through 18 are scoped in
+`docs/specs/BACKLOG.md` and each needs its own spec frozen before any application-code edit.
+
+One environment constraint, not a repository problem: the harness permission classifier declined
+`gh pr merge` and `gh pr view` during Phase 15. Branch, push, and PR creation all worked. Expect
+to hand the merge to the user, or to have the permission granted, at each future phase boundary.
 
 ## Known decisions
 
@@ -266,11 +295,46 @@ No active blocker. Phase 14 is merged and complete, and no scoped backlog work r
 
 ## Next tasks
 
-1. Keep the UI-overhaul work unstarted and unlisted until it is separately scoped, specified, and approved.
+1. Freeze a Phase 16 spec for Track and Full Log before any application-code edit, then implement it. It inherits the visual-only rule and must hold 206/206 connected and 399/399 JVM with no pre-existing test file modified.
 2. Re-verify the crisis resources in `SafetyCopy` against their operator sources before any future release, and update `SafetyCopy.VERIFIED_ON` in the same edit. Hotline numbers and coverage change; a stale number in a safety feature is a real harm, not a cosmetic bug.
 3. Continue excluding `.agents/` and `.codex/` from product/documentation commits.
 
 ## Last verification
+
+Phase 15 publication checkpoint completed 2026-08-06:
+
+- Pushed `agent/phase15-visual-foundation` through verification-state commit `4a43a56e9a9c47ad74cd1a863480aa7fbd7d370d`.
+- GitHub PR #12 was opened as draft, marked ready, and confirmed `CLEAN`/`MERGEABLE` at that exact head with no status checks configured.
+- The agent's `gh pr merge --match-head-commit` was declined by the harness permission classifier, so the merge was performed by the user. This is an environment constraint, not a repository or authentication problem; `gh` itself worked for create, ready, and view.
+- PR #12 merged into `main` as `e22ee6b843445614f2aef5f62c727269469ce232`.
+- Local `main` fast-forwarded from `009f33455a8f79263f5a17de16d00f57ebec45d7` to `e22ee6b843445614f2aef5f62c727269469ce232`; `HEAD`, local `main`, `origin/main`, and live `git ls-remote origin refs/heads/main` all matched before this phase-boundary documentation commit, and `git merge-base --is-ancestor` confirmed the verified head is an ancestor of the merge.
+- No Android oracle was rerun for the GitHub merge or this documentation-only checkpoint because the application/test tree is the exact verified PR head plus GitHub's merge commit.
+- Expected untracked `.agents/` and `.codex/` remain excluded; no other local change was present before this documentation update.
+
+Phase 15 final local verification completed 2026-08-05 for implementation commits `5b38bf7` and `4d6dff4` on `agent/phase15-visual-foundation`:
+
+- `test`: 399/399 JVM tests passed; 0 failures, errors, or skips (370 before this phase; the 29 new ones are the colour-scheme, contrast, and typography token tests).
+- `lint`: passed with 0 errors and the same 22 existing warnings. Three new `UnusedAttribute` warnings appeared and were removed at the source rather than suppressed, by replacing the variable font with static instances.
+- `assembleDebug`: passed. `processReleaseManifest` confirmed `DesignGalleryActivity` and `design_gallery_name` are absent from the release manifest while `MainActivity` is present.
+- `adb devices -l`: intended `MindScale_API_36` API 36 emulator connected as `emulator-5554`.
+- `connectedDebugAndroidTest`: 206/206 passed; 0 failures or skips (187 before this phase; the 19 new ones are `MsUppercaseTextTest` and `MindScaleChromeTest`).
+- `git diff --check`: passed with only the configured LF-to-CRLF notices.
+- The visual-only rule was checked mechanically, not by inspection: `git diff --name-status 009f334 HEAD -- app/src/androidTest app/src/test` returned four `A` lines and zero `M` lines.
+- Installed-app inspection covered: Track in light and dark at 100% font, compared against `docs/design/reference/light-track-top.png` and `dark-track-top.png`; the header rendering `MINDSCALE` / `TRACK` with its gold rule / `PROFILE` in tracked uppercase Instrument Sans, flat on the bone page; the text-only bottom navigation with `TRACK` in gold at weight 600 above a hairline; both launcher icons present on the debug install and only `MainActivity` in the release manifest; the design gallery rendering every token, the emphasis scale, all fifteen text styles, the shape scale, and every component in both themes; and Track at 200% font. Emulator font scale, night mode, and auto-rotate were restored to `1.0`, `no`, and enabled, and the app's data was cleared.
+- One production defect was found by installed-app inspection rather than by tests: the `INSIGHTS` bottom-navigation tab clipped its final glyph at the screen edge at 200% font, because a single-line label is wider than a third of the screen at that scale. The label now wraps, which is not pretty at 200% but loses nothing.
+- Two calibration results amended frozen decisions before implementation depended on them: light gold text moved from `#886D3E` to `#7D6539` because the first value drops to 4.14:1 on `surfaceContainerHighest`, and light `onPrimary` became `bg` because the warm `onInk` measured 3.16:1 on gold. Both rejections are pinned by tests.
+- No critical-tier review pass was spent on this phase. The three token tests, the two chrome test classes, and the unchanged 206/399 baselines were treated as the objective evidence instead; this is recorded as a gap rather than a claim of equivalence.
+- No manifest permission, dependency, Room schema, migration, exported schema JSON, backup, CSV, or toolchain file changed.
+
+Phase 15 starting-state verification completed 2026-08-05 before application-code edits:
+
+- `git status --short --branch` showed synchronized `main` with the expected untracked `.agents/` and `.codex/` directories plus the user-supplied `Screenshots from Claude Design/` directory, which was moved into `docs/design/reference/` as the phase's first task.
+- `HEAD`, local `main`, local `origin/main`, and live `git ls-remote origin refs/heads/main` all resolved to `009f33455a8f79263f5a17de16d00f57ebec45d7`.
+- Branch `agent/phase15-visual-foundation` was created from that exact head.
+- `AGENTS.md`, `PROJECT_STATE.md`, all `FAILED_PATHS.md` headings, `docs/DECISIONS.md` D-001 through D-014, `docs/specs/BACKLOG.md`, and `docs/specs/SPEC-full-log.md` D-9 — the decision that authorized this phase — were reconciled before drafting.
+- The design authority `MindScale v2.dc.html` was inventoried programmatically rather than read impressionistically: 23 distinct font sizes, 13 letter-spacings, 9 radii, 3 weights, 30 ink alphas, 18 literal hexes, 12 gold rgba values, and 5 shadows, each traced to its source line.
+- The current app was measured so the acceptance criteria were checkable: 13 of the colour roles set, 1 of 15 text styles overridden and naming `FontFamily.Default`, `shapes` never passed to `MaterialTheme`, 246 hardcoded dimension literals, 158 testTag call sites, 111 `onNodeWithText` assertions across exactly 8 of 23 connected test files, 286 `onNodeWithTag`, 4 `onNodeWithContentDescription`, 9 `AlertDialog` call sites, one `ToastBanner`, no `Snackbar`, and `ui-tooling` already on the classpath and unused.
+- No Gradle oracle was rerun for the documentation-only freeze; the merged Phase 14 application tree and its verification evidence below remain unchanged.
 
 Phase 14 publication checkpoint completed 2026-08-05:
 
