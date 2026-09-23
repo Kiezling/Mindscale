@@ -1,11 +1,12 @@
 # MindScale project state
 
-## Track polish verified; commit and phone update — 2026-09-23
+## Track polish committed and installed — 2026-09-23
 
 - User requests Sleep/Wake help, centered larger Recent Logs, smaller event button, bordered note input and centered toolbar, one Ended badge, closer italic safety link, and bottom JSON import/export shortcuts. Governing spec: `docs/specs/SPEC-track-polish-backup-2026-09-23.md`.
 - User explicitly authorizes committing all accumulated project changes and an in-place phone update after verification. No push/publication or personal-data deletion. Preserve unrelated IDE-local state and attachments outside the commit.
-- Same checkout/branch/base as below. All workers are settled. Verification: 490 JVM tests pass; lint 0 errors/26 warnings/2 hints; assembly passes. All 313 current API36 device cases have passing latest results across a full run and focused reruns. Actual Android 200% text and 360dp Light/Dark screenshots inspected. Exact evidence: `docs/reviews/2026-09-23-track-polish.md`.
-- Final APK SHA-256: `C93A3A35D595A633B05A6FD859058D7626C97C2235E885BD83BB84BA943EFC8C`. Installed/launched on the isolated emulator; size/font restored. Next: commit the reviewed accumulated changes, then install this APK in place on the confirmed Pixel 10. Keep `.idea/misc.xml`, machine-specific `.codex/hooks.json`, attachments and generated artifacts outside the commit. No push/publication. API26 runtime and spoken TalkBack remain broader-release gaps.
+- Application checkpoint: `a5a6a4537180018d45ae96a5828f4172280c1641` on `codex/release-readiness`, same checkout. All workers are settled. Verification: 490 JVM tests pass; lint 0 errors/26 warnings/2 hints; assembly passes. All 313 current API36 device cases have passing latest results across a full run and focused reruns. Actual Android 200% text and 360dp Light/Dark screenshots inspected. Exact evidence: `docs/reviews/2026-09-23-track-polish.md`.
+- Final APK SHA-256: `C93A3A35D595A633B05A6FD859058D7626C97C2235E885BD83BB84BA943EFC8C`. Installed/launched on the isolated emulator; size/font restored. The same APK was installed with `adb install -r` on the confirmed Pixel 10: Success, lastUpdateTime `2026-09-23 14:37:03`. MainActivity launch returned Status ok and the process was running. No phone tests, uninstall, clear-data or record changes. Next: owner tests the installed update.
+- Accumulated app/tests/docs and portable project configuration are committed. `.idea/misc.xml`, machine-specific `.codex/hooks.json` and user attachments remain uncommitted; generated artifacts stay ignored. No push/publication. API26 runtime and spoken TalkBack remain broader-release gaps. No continuation is needed for this completed scope.
 
 ## Prior owner feedback complete — verified 2026-09-23
 

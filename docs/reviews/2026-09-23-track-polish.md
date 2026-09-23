@@ -66,3 +66,17 @@ Include accumulated application, tests, specs/reviews/release drafts and portabl
 configuration. Keep `.idea/misc.xml`, `.codex/hooks.json` (absolute machine-specific hook path),
 user attachments and ignored generated artifacts outside the commit. No push or publication.
 API26 runtime and spoken TalkBack remain broader-release coverage gaps.
+
+## Commit and phone installation
+
+Committed all reviewed accumulated work as `a5a6a4537180018d45ae96a5828f4172280c1641`
+(`Complete release fixes, UI polish, and Track backup shortcuts`). Exclusions above remain local.
+Confirmed the connected wireless device is Pixel 10 and rechecked the APK hash before installation.
+`adb -s <confirmed-phone-serial> install -r app/build/outputs/apk/debug/app-debug.apk` returned
+Success. Device lastUpdateTime: `2026-09-23 14:37:03`.
+
+The initial launch encountered Android's package-update activity. A subsequent explicit
+`am start -W -n com.kieslingdev.mindscale/.MainActivity` returned Status ok with MainActivity;
+the app process was running. This was an in-place update retaining app data. No uninstall,
+clear-data, personal-phone instrumented tests or record mutations were performed. Ready for
+owner testing; no push, publication or signing change.
