@@ -90,6 +90,7 @@ class ReportProfileViewModel(
 ) : ViewModel() {
     private val retryVersion = MutableStateFlow(0)
     private val mutationMutex = Mutex()
+    private var nameDraftVersion = 0L
     private val _uiState = MutableStateFlow(
         ReportProfileUiState(
             nameDraft = savedStateHandle[NAME_DRAFT_KEY] ?: "",
@@ -131,6 +132,25 @@ class ReportProfileViewModel(
     }
 
     private suspend fun publishRead(read: ProfileRead) {
+        val report = read.insights.snapshot?.let { snapshot ->
+            try {
+                val source = dataControlDao.snapshot()
+                withContext(computationDispatcher) {
+                    buildClinicianReport(
+                        source = source,
+                        range = read.insights.range,
+                        generatedAt = Instant.ofEpochMilli(snapshot.nowMillis),
+                        zoneId = zoneProvider()
+                    )
+                }
+            } catch (error: Throwable) {
+                if (error is CancellationException) throw error
+                null
+            }
+        }
+        // Report construction suspends while it reads and computes. Re-read all mutable UI
+        // state after that suspension so typing, opening/changing an editor, or requesting a
+        // delete during generation cannot be overwritten by this older snapshot (R-5).
         val previous = _uiState.value
         val baseline = savedStateHandle.get<String>(NAME_BASELINE_KEY)
         val nameDraft = if (!previous.nameDirty) read.profile.displayName else previous.nameDraft
@@ -151,23 +171,6 @@ class ReportProfileViewModel(
             deleteId = null
             savedStateHandle.remove<Long>(SCORE_DELETE_ID_KEY)
             staleMessage = "That stored total no longer exists."
-        }
-
-        val report = read.insights.snapshot?.let { snapshot ->
-            try {
-                val source = dataControlDao.snapshot()
-                withContext(computationDispatcher) {
-                    buildClinicianReport(
-                        source = source,
-                        range = read.insights.range,
-                        generatedAt = Instant.ofEpochMilli(snapshot.nowMillis),
-                        zoneId = zoneProvider()
-                    )
-                }
-            } catch (error: Throwable) {
-                if (error is CancellationException) throw error
-                null
-            }
         }
         _uiState.update {
             it.copy(
@@ -201,6 +204,7 @@ class ReportProfileViewModel(
             _uiState.update { it.copy(message = "Name must be one line with at most 80 characters.") }
             return
         }
+        nameDraftVersion++
         if (!_uiState.value.nameDirty) savedStateHandle[NAME_BASELINE_KEY] = _uiState.value.profile.displayName
         savedStateHandle[NAME_DRAFT_KEY] = value
         savedStateHandle[NAME_DIRTY_KEY] = true
@@ -208,50 +212,53 @@ class ReportProfileViewModel(
     }
 
     fun saveName(forceReplace: Boolean = false) {
-        val state = _uiState.value
-        val normalized = state.nameDraft.trim()
-        if (normalized.codePointCount(0, normalized.length) > 80 ||
-            normalized.any { it == '\n' || it == '\r' || it.isISOControl() }
-        ) {
-            _uiState.update { it.copy(message = "Name must be one line with at most 80 characters.") }
-            return
-        }
-        val baseline = savedStateHandle.get<String>(NAME_BASELINE_KEY) ?: state.profile.displayName
         viewModelScope.launch {
             mutationMutex.withLock {
-                runCatching {
-                    if (forceReplace) profileDao.setDisplayName(normalized)
-                    else profileDao.setDisplayNameIfUnchanged(normalized, baseline)
-                }
-                    .onSuccess { count ->
-                        if (count != 1) {
-                            _uiState.update {
-                                it.copy(
-                                    nameConflict = !forceReplace,
-                                    message = if (forceReplace) {
-                                        "Could not save the name. Your draft is still here."
-                                    } else {
-                                        "The saved name changed. Choose Replace saved name to use this draft."
-                                    }
-                                )
-                            }
-                        } else {
-                            savedStateHandle[NAME_DRAFT_KEY] = normalized
-                            savedStateHandle[NAME_BASELINE_KEY] = normalized
-                            savedStateHandle[NAME_DIRTY_KEY] = false
-                            _uiState.update {
-                                it.copy(
-                                    nameDraft = normalized,
-                                    nameDirty = false,
-                                    nameConflict = false,
-                                    message = "Name saved."
-                                )
-                            }
+                var replace = forceReplace
+                do {
+                    val state = _uiState.value
+                    if (state.loading || (!replace && !state.nameDirty)) return@withLock
+                    val normalized = state.nameDraft.trim()
+                    if (normalized.codePointCount(0, normalized.length) > 80 ||
+                        normalized.any { it == '\n' || it == '\r' || it.isISOControl() }
+                    ) {
+                        _uiState.update { it.copy(message = "Name must be one line with at most 80 characters.") }
+                        return@withLock
+                    }
+                    val version = nameDraftVersion
+                    val baseline = savedStateHandle.get<String>(NAME_BASELINE_KEY) ?: state.profile.displayName
+                    _uiState.update { it.copy(message = "Saving…") }
+                    val count = try {
+                        if (replace) profileDao.setDisplayName(normalized)
+                        else profileDao.setDisplayNameIfUnchanged(normalized, baseline)
+                    } catch (error: Throwable) {
+                        if (error is CancellationException) throw error
+                        _uiState.update { it.copy(message = "Could not save the name. Your draft is still here.") }
+                        return@withLock
+                    }
+                    if (count != 1) {
+                        _uiState.update {
+                            it.copy(
+                                nameConflict = !replace,
+                                message = if (replace) "Could not save the name. Your draft is still here."
+                                else "The saved name changed. Choose Replace saved name to use this draft."
+                            )
+                        }
+                        return@withLock
+                    }
+                    savedStateHandle[NAME_BASELINE_KEY] = normalized
+                    val hasNewerDraft = version != nameDraftVersion || _uiState.value.nameDraft.trim() != normalized
+                    if (hasNewerDraft) {
+                        replace = false
+                        _uiState.update { it.copy(message = "Saving…") }
+                    } else {
+                        savedStateHandle[NAME_DRAFT_KEY] = normalized
+                        savedStateHandle[NAME_DIRTY_KEY] = false
+                        _uiState.update {
+                            it.copy(nameDraft = normalized, nameDirty = false, nameConflict = false, message = "Name saved.")
                         }
                     }
-                    .onFailure {
-                        _uiState.update { state -> state.copy(message = "Could not save the name. Your draft is still here.") }
-                    }
+                } while (_uiState.value.nameDirty)
             }
         }
     }

@@ -261,6 +261,7 @@ class SafetyViewModelTest {
         assertTrue("Opening or tapping must write nothing", dao.rows.value.isEmpty())
     }
 
+    /** R-4: retry must replace the terminal collector, then continue observing updates. */
     @Test
     fun aReadFailureIsSurfacedAndRetryable() = runTest {
         val dao = FakeSafetyPlanDao()
@@ -269,7 +270,24 @@ class SafetyViewModelTest {
         dispatcher.scheduler.advanceUntilIdle()
 
         assertEquals("Could not open your safety plan.", vm.uiState.value.readError)
+        dao.failReads = false
         vm.retry()
+        dispatcher.scheduler.runCurrent()
         assertNull(vm.uiState.value.readError)
+        dao.rows.value = listOf(SafetyPlanItem(11, SafetyPlanStep.WARNING_SIGNS, 0, "Notice it"))
+        dispatcher.scheduler.runCurrent()
+        assertEquals(
+            listOf("Notice it"),
+            vm.uiState.value.plan.getValue(SafetyPlanStep.WARNING_SIGNS).map { it.text }
+        )
+        dao.rows.value = listOf(
+            SafetyPlanItem(11, SafetyPlanStep.WARNING_SIGNS, 0, "Notice it"),
+            SafetyPlanItem(12, SafetyPlanStep.INTERNAL_COPING, 0, "Take a walk")
+        )
+        dispatcher.scheduler.runCurrent()
+        assertEquals(
+            listOf("Take a walk"),
+            vm.uiState.value.plan.getValue(SafetyPlanStep.INTERNAL_COPING).map { it.text }
+        )
     }
 }

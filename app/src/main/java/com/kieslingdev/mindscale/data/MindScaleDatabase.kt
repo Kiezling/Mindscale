@@ -55,7 +55,7 @@ abstract class MindScaleDatabase : RoomDatabase() {
                 db.execSQL(
                     "INSERT INTO track_settings (id, sleepOn, askChips, paused, checkinAt, sleepIntroShown, " +
                         "themeMode, hourFormat, anchor2, anchor5, anchor8, onsetChips, hideNotes, anchorPromptDone, holdDuration, breathingOn) " +
-                        "VALUES (0, 1, 0, 0, 0, 0, 'SYSTEM', 'TWELVE', '', '', '', " +
+                        "VALUES (0, 1, 0, 0, 0, 0, 'LIGHT', 'TWELVE', '', '', '', " +
                         "'${DEFAULT_ONSET_CHIPS.joinToString("\u001F").replace("'", "''")}', 0, 0, 'SIXTEEN', 1)"
                 )
                 db.execSQL("INSERT INTO user_profile (id, displayName) VALUES (0, '')")

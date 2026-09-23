@@ -53,6 +53,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.text
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
@@ -71,6 +72,9 @@ import com.kieslingdev.mindscale.ui.components.MsCard
 import com.kieslingdev.mindscale.ui.components.MsChip
 import com.kieslingdev.mindscale.ui.components.MsCircularHeaderButton
 import com.kieslingdev.mindscale.ui.components.MsDialog
+import com.kieslingdev.mindscale.ui.components.MsDateTimeFields
+import com.kieslingdev.mindscale.ui.components.RichNoteEditor
+import com.kieslingdev.mindscale.ui.components.richNoteAnnotatedString
 import com.kieslingdev.mindscale.ui.components.MsEyebrow
 import com.kieslingdev.mindscale.ui.components.MsHairline
 import com.kieslingdev.mindscale.ui.components.MsPillButton
@@ -145,7 +149,9 @@ fun TrackRoute(
     modifier: Modifier = Modifier,
     onOpenSettings: (SettingsFocus) -> Unit = {},
     onOpenSafety: () -> Unit = {},
-    onOpenBreathing: () -> Unit = {}
+    onOpenBreathing: () -> Unit = {},
+    onImportLogs: () -> Unit = {},
+    onExportLogs: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     TrackScreen(
@@ -154,6 +160,8 @@ fun TrackRoute(
         onOpenSettings = onOpenSettings,
         onOpenSafety = onOpenSafety,
         onOpenBreathing = onOpenBreathing,
+        onImportLogs = onImportLogs,
+        onExportLogs = onExportLogs,
         modifier = modifier
     )
 }
@@ -172,7 +180,9 @@ fun TrackScreen(
     modifier: Modifier = Modifier,
     onOpenSettings: (SettingsFocus) -> Unit = {},
     onOpenSafety: () -> Unit = {},
-    onOpenBreathing: () -> Unit = {}
+    onOpenBreathing: () -> Unit = {},
+    onImportLogs: () -> Unit = {},
+    onExportLogs: () -> Unit = {}
 ) {
     Box(modifier = modifier.fillMaxSize()) {
         LazyColumn(
@@ -192,16 +202,12 @@ fun TrackScreen(
                     PausedBanner(onEvent = onEvent, onOpenData = { onOpenSettings(SettingsFocus.DATA) })
                 }
             } else {
-                // The design puts the readout and the help toggle on one row, lines 73-86. They
-                // were two separate items; combining them is layout only. One consequence is
-                // recorded rather than discovered later: when the anchor prompt is showing, the
-                // help toggle now sits above it rather than below (D-13).
                 item {
-                    ReadoutAndHelpRow(
-                        readout = uiState.transientReadout,
-                        helpOpen = uiState.helpOpen,
-                        onEvent = onEvent
-                    )
+                    uiState.transientReadout?.let { readout ->
+                        Column(Modifier.fillMaxWidth().padding(bottom = MsSpacing.md)) {
+                            TransientReadout(readout)
+                        }
+                    }
                 }
                 if (uiState.showAnchorPrompt) {
                     item {
@@ -214,9 +220,7 @@ fun TrackScreen(
                         )
                     }
                 }
-                if (uiState.helpOpen) {
-                    item { HelpCard() }
-                }
+
                 item {
                     Numpad(
                         armed = uiState.armedCapture,
@@ -224,19 +228,18 @@ fun TrackScreen(
                         onLongPress = { value -> onEvent(TrackEvent.KeyLongPressed(value)) }
                     )
                 }
-                if (uiState.onsetChipPrompt != null) {
-                    item {
-                        OnsetChipCard(
-                            prompt = uiState.onsetChipPrompt,
-                            vocabulary = uiState.settings.onsetChips,
-                            onEvent = onEvent
-                        )
-                    }
-                }
                 if (uiState.sleepOn) {
                     item {
                         SleepWakeRow(uiState = uiState, onEvent = onEvent)
                     }
+                }
+                item {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        HelpToggle(helpOpen = uiState.helpOpen, onEvent = onEvent)
+                    }
+                }
+                if (uiState.helpOpen) {
+                    item { HelpCard() }
                 }
                 item {
                     MarkerSection(uiState = uiState, onEvent = onEvent)
@@ -248,6 +251,19 @@ fun TrackScreen(
                 }
             }
 
+            item(key = "recent_logs_header") {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = MsSpacing.lg, bottom = MsSpacing.md),
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    MsUppercaseText(
+                        text = "Recent Logs",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.ms.inkQuaternary,
+                        modifier = Modifier.testTag("recent_logs_header")
+                    )
+                }
+            }
             if (uiState.isEmpty) {
                 item { EmptyState() }
             } else {
@@ -272,19 +288,26 @@ fun TrackScreen(
                 }
             }
 
-            // Unconditional, including while paused, and last so it never competes with
-            // logging. Its presence depends on nothing recorded — that is the whole point
+            // Unconditional, including while paused. Its presence depends on nothing recorded —
+            // that is the whole point
             // (`docs/specs/SPEC-safety-card.md`, D-6).
             item(key = "safety_link") {
-                SafetyLink(onOpenSafety = onOpenSafety)
+                SafetyLink(
+                    onOpenSafety = onOpenSafety,
+                    afterBreathing = uiState.settings.breathingOn && !uiState.isPaused
+                )
+            }
+            item(key = "backup_shortcuts") {
+                BackupShortcuts(onImportLogs = onImportLogs, onExportLogs = onExportLogs)
             }
         }
     }
 
     when (val modal = uiState.activeModal) {
-        is TrackModalState.Backdate -> BackdateDialog(modal = modal, onEvent = onEvent)
+        is TrackModalState.Backdate -> BackdateDialog(modal = modal, hourFormat = uiState.settings.hourFormat, onEvent = onEvent)
         is TrackModalState.Edit -> EditDialog(
             modal = modal,
+            hourFormat = uiState.settings.hourFormat,
             vocabulary = vocabularyForEntry(uiState.settings, modal.draft.chips.toSet()),
             onEvent = onEvent
         )
@@ -307,34 +330,6 @@ private fun ToastBanner(toast: String?) {
         horizontalArrangement = Arrangement.Center
     ) {
         MsToastPill(text = toast, modifier = Modifier.testTag("toast_banner"))
-    }
-}
-
-/**
- * The design's prompt row, lines 73-86: the readout on the left and the 26 dp help toggle at the
- * trailing edge, over the hairline at line 97 that separates the prompt from the pad.
- */
-@Composable
-private fun ReadoutAndHelpRow(
-    readout: ReadoutState?,
-    helpOpen: Boolean,
-    onEvent: (TrackEvent) -> Unit
-) {
-    Column(modifier = Modifier.fillMaxWidth().padding(top = MsSpacing.xxs)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(MsSpacing.md),
-            verticalAlignment = Alignment.Top
-        ) {
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(MsSpacing.xxxs)
-            ) {
-                if (readout != null) TransientReadout(readout)
-            }
-            HelpToggle(helpOpen = helpOpen, onEvent = onEvent)
-        }
-        MsHairline(modifier = Modifier.padding(top = MsSpacing.lg, bottom = MsSpacing.lgPlus))
     }
 }
 
@@ -393,14 +388,18 @@ private fun TransientReadout(readout: ReadoutState) {
  * rather than the design's `rgba(ink,.35)`, which measures 2.2:1.
  */
 @Composable
-private fun SafetyLink(onOpenSafety: () -> Unit) {
+private fun SafetyLink(onOpenSafety: () -> Unit, afterBreathing: Boolean) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(top = MsSpacing.xxl, bottom = MsSpacing.xxs),
+        modifier = Modifier.fillMaxWidth().padding(
+            top = if (afterBreathing) MsSpacing.sm else MsSpacing.xxl,
+            bottom = MsSpacing.xxs
+        ),
         horizontalArrangement = Arrangement.Center
     ) {
         PlainTextLink(
             text = SafetyCopy.TRACK_LINK,
             onClick = onOpenSafety,
+            italic = true,
             modifier = Modifier
                 .testTag("safety_link")
                 .semantics { contentDescription = SafetyCopy.TRACK_LINK_DESCRIPTION }
@@ -438,7 +437,8 @@ private fun BreathingLink(onOpenBreathing: () -> Unit) {
 private fun PlainTextLink(
     text: String,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    italic: Boolean = false
 ) {
     Box(
         modifier = modifier
@@ -449,9 +449,31 @@ private fun PlainTextLink(
     ) {
         Text(
             text = text,
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.bodySmall.copy(
+                fontStyle = if (italic) FontStyle.Italic else FontStyle.Normal
+            ),
             color = MaterialTheme.ms.inkQuaternary,
             textAlign = TextAlign.Center
+        )
+    }
+}
+
+@Composable
+private fun BackupShortcuts(onImportLogs: () -> Unit, onExportLogs: () -> Unit) {
+    FlowRow(
+        modifier = Modifier.fillMaxWidth().padding(top = MsSpacing.sm, bottom = MsSpacing.sm),
+        horizontalArrangement = Arrangement.Center,
+        verticalArrangement = Arrangement.Center
+    ) {
+        PlainTextLink(
+            text = "Import logs",
+            onClick = onImportLogs,
+            modifier = Modifier.testTag("track_import_logs")
+        )
+        PlainTextLink(
+            text = "Export logs",
+            onClick = onExportLogs,
+            modifier = Modifier.testTag("track_export_logs")
         )
     }
 }
@@ -540,6 +562,13 @@ private fun HelpCard(modifier: Modifier = Modifier) {
                     "means nothing was happening.",
                 style = MaterialTheme.typography.bodySmall,
                 color = palette.inkTertiary
+            )
+            Text(
+                text = "When you go to sleep, tap Sleep, then a number for how you're feeling. " +
+                    "When you wake up, tap Wake, then a number. These mark a sleep interval. " +
+                    "Tap the selected Sleep or Wake button again to cancel it.",
+                style = MaterialTheme.typography.bodySmall,
+                color = palette.inkSecondary
             )
         }
     }
@@ -759,10 +788,10 @@ private fun MarkerSection(uiState: TrackUiState, onEvent: (TrackEvent) -> Unit) 
 
     Column(modifier = Modifier.fillMaxWidth().padding(top = MsSpacing.xl)) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-            MsTextAction(
+            CompactMarkerButton(
                 text = if (uiState.markerOpen) "Event" else "Mark an event",
                 onClick = { onEvent(TrackEvent.MarkerToggled) },
-                tone = MsActionTone.Muted,
+                selected = uiState.markerOpen,
                 modifier = Modifier
                     .testTag("marker_toggle")
                     .semantics {
@@ -790,7 +819,9 @@ private fun MarkerSection(uiState: TrackUiState, onEvent: (TrackEvent) -> Unit) 
                         shape = MaterialTheme.shapes.small,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .testTag("marker_input")
+                            .testTag("marker_input"),
+                        isError = uiState.markerError != null,
+                        supportingText = uiState.markerError?.let { error -> { Text(error) } }
                     )
                     FlowRow(
                         modifier = Modifier.fillMaxWidth(),
@@ -802,6 +833,7 @@ private fun MarkerSection(uiState: TrackUiState, onEvent: (TrackEvent) -> Unit) 
                         MsTextAction(
                             text = "Save",
                             onClick = { onEvent(TrackEvent.MarkerSaveConfirmed) },
+                            enabled = !uiState.markerSaving,
                             modifier = Modifier.testTag("marker_save")
                         )
                         MsTextAction(
@@ -813,6 +845,36 @@ private fun MarkerSection(uiState: TrackUiState, onEvent: (TrackEvent) -> Unit) 
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun CompactMarkerButton(
+    text: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val palette = MaterialTheme.ms
+    Box(
+        modifier = modifier.heightIn(min = MsSpacing.minTouchTarget).clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .testTag("marker_painted")
+                .clip(MsShapes.pill)
+                .background(if (selected) palette.ink else Color.Transparent)
+                .border(MsSpacing.hairline, if (selected) palette.ink else palette.gold, MsShapes.pill)
+                .padding(horizontal = MsSpacing.mdPlus, vertical = MsSpacing.xxs),
+            contentAlignment = Alignment.Center
+        ) {
+            MsUppercaseText(
+                text = text,
+                style = MaterialTheme.typography.labelMedium,
+                color = if (selected) palette.onInk else palette.goldText
+            )
         }
     }
 }
@@ -873,7 +935,8 @@ private fun Numpad(
     armed: EntryKind?,
     onTap: (Int) -> Unit,
     onLongPress: (Int) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    editing: Boolean = false
 ) {
     val palette = MaterialTheme.ms
     val isArmed = armed != null
@@ -921,7 +984,8 @@ private fun Numpad(
                                         size = keySize,
                                         armed = isArmed,
                                         onTap = onTap,
-                                        onLongPress = onLongPress
+                                        onLongPress = onLongPress,
+                                        editing = editing
                                     )
                                 }
                             }
@@ -942,7 +1006,8 @@ private fun Numpad(
                                     size = keySize,
                                     armed = isArmed,
                                     onTap = onTap,
-                                    onLongPress = onLongPress
+                                    onLongPress = onLongPress,
+                                    editing = editing
                                 )
                             }
                         }
@@ -960,6 +1025,7 @@ private fun NumpadKey(
     armed: Boolean,
     onTap: (Int) -> Unit,
     onLongPress: (Int) -> Unit,
+    editing: Boolean,
     modifier: Modifier = Modifier
 ) {
     val palette = MaterialTheme.ms
@@ -981,12 +1047,14 @@ private fun NumpadKey(
                 // long-press timeout rather than a hand-rolled duration (D-4).
                 detectTapGestures(
                     onTap = { onTap(value) },
-                    onLongPress = { onLongPress(value) }
+                    onLongPress = if (editing) null else { _ -> onLongPress(value) }
                 )
             }
             .testTag("numpad_key_$value")
             .semantics {
-                contentDescription = "Log value $value now. Long-press to backdate."
+                contentDescription = if (editing) "Select value $value" else {
+                    "Log value $value now. Long-press to backdate."
+                }
             },
         contentAlignment = Alignment.Center
     ) {
@@ -1070,9 +1138,10 @@ private fun EntryRow(
                 .padding(top = MsSpacing.mdPlus)
                 .semantics(mergeDescendants = true) {
                     contentDescription = buildString {
-                        append("${entry.value}, $bandText, logged $formatted")
+                        append(entry.value)
+                        if (badge != "ended") append(", $bandText")
+                        append(", logged $formatted")
                         if (badge != null) append(", $badge")
-                        if (entry.chips.isNotEmpty()) append(", ${entry.chips.joinToString(", ")}")
                     }
                 },
             verticalAlignment = Alignment.CenterVertically
@@ -1108,12 +1177,14 @@ private fun EntryRow(
                     horizontalArrangement = Arrangement.spacedBy(MsSpacing.sm),
                     verticalArrangement = Arrangement.spacedBy(MsSpacing.xxs)
                 ) {
-                    MsUppercaseText(
-                        text = bandText,
-                        modifier = Modifier.align(Alignment.CenterVertically),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = palette.inkQuaternary
-                    )
+                    if (badge != "ended") {
+                        MsUppercaseText(
+                            text = bandText,
+                            modifier = Modifier.align(Alignment.CenterVertically),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = palette.inkQuaternary
+                        )
+                    }
                     if (badge != null) {
                         KindBadge(
                             text = badge,
@@ -1122,21 +1193,11 @@ private fun EntryRow(
                                 .testTag("entry_badge_${entry.id}")
                         )
                     }
-                    if (entry.chips.isNotEmpty()) {
-                        Text(
-                            text = entry.chips.joinToString(" · "),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = palette.inkTertiary,
-                            modifier = Modifier
-                                .align(Alignment.CenterVertically)
-                                .testTag("entry_chips_${entry.id}")
-                        )
-                    }
                 }
                 val note = entry.note
                 if (!hideNote && !note.isNullOrBlank()) {
                     Text(
-                        text = note,
+                        text = richNoteAnnotatedString(note),
                         style = MaterialTheme.typography.bodySmall,
                         color = palette.inkTertiary,
                         maxLines = 1,
@@ -1254,6 +1315,7 @@ private fun TimestampEditDialog(
     statusMessage: String?,
     isSaving: Boolean,
     canSave: Boolean,
+    hourFormat: HourFormat,
     saveLabel: String,
     onValueChanged: ((Int) -> Unit)?,
     onDateTextChanged: (String) -> Unit,
@@ -1274,48 +1336,30 @@ private fun TimestampEditDialog(
         text = {
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                 if (onValueChanged != null) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        TextButton(
-                            onClick = { if (value > 0) onValueChanged(value - 1) },
-                            enabled = !isSaving,
-                            modifier = Modifier.semantics { contentDescription = "Decrease value" }
-                        ) { Text("-") }
-                        Text(
-                            text = "Value: $value",
-                            style = MaterialTheme.typography.titleLarge,
-                            // A minimum rather than a fixed width, so the label stops the +/-
-                            // controls jumping as the number's width changes while still growing
-                            // at 200% font instead of wrapping inside a fixed slot (D-17).
-                            modifier = Modifier
-                                .widthIn(min = DialogValueSlotWidth)
-                                .padding(horizontal = MsSpacing.sm)
-                        )
-                        TextButton(
-                            onClick = { if (value < 10) onValueChanged(value + 1) },
-                            enabled = !isSaving,
-                            modifier = Modifier.semantics { contentDescription = "Increase value" }
-                        ) { Text("+") }
-                    }
+                    Text(
+                        "Value: $value",
+                        style = MaterialTheme.typography.titleLarge,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Numpad(
+                        armed = null,
+                        onTap = { selected -> if (!isSaving) onValueChanged(selected) },
+                        onLongPress = {},
+                        editing = true,
+                        modifier = Modifier.testTag("track_edit_numpad")
+                    )
                 } else {
                     Text(text = "Value: $value", style = MaterialTheme.typography.titleLarge)
                 }
-                OutlinedTextField(
-                    value = dateText,
-                    onValueChange = onDateTextChanged,
+                MsDateTimeFields(
+                    dateText = dateText,
+                    timeText = timeText,
+                    onDateChanged = onDateTextChanged,
+                    onTimeChanged = onTimeTextChanged,
+                    hourFormat = hourFormat,
                     enabled = !isSaving,
-                    singleLine = true,
-                    label = { Text("Date (yyyy-MM-dd)") },
-                    modifier = Modifier
-                        .testTag("track_dialog_date")
-                        .focusRequester(focusRequester)
-                )
-                OutlinedTextField(
-                    value = timeText,
-                    onValueChange = onTimeTextChanged,
-                    enabled = !isSaving,
-                    singleLine = true,
-                    label = { Text("Time (HH:mm)") },
-                    modifier = Modifier.testTag("track_dialog_time")
+                    tagPrefix = "track_dialog"
                 )
                 if (chips != null && onChipToggled != null) {
                     MsEyebrow(
@@ -1389,7 +1433,7 @@ private fun TimestampEditDialog(
 }
 
 @Composable
-private fun BackdateDialog(modal: TrackModalState.Backdate, onEvent: (TrackEvent) -> Unit) {
+private fun BackdateDialog(modal: TrackModalState.Backdate, hourFormat: HourFormat, onEvent: (TrackEvent) -> Unit) {
     TimestampEditDialog(
         title = "Backdate entry",
         value = modal.draft.value,
@@ -1399,6 +1443,7 @@ private fun BackdateDialog(modal: TrackModalState.Backdate, onEvent: (TrackEvent
         statusMessage = modal.mutationError,
         isSaving = modal.isSaving,
         canSave = modal.timestampError == null,
+        hourFormat = hourFormat,
         saveLabel = "Save",
         onValueChanged = null,
         onDateTextChanged = { onEvent(TrackEvent.BackdateDateTextChanged(it)) },
@@ -1411,6 +1456,7 @@ private fun BackdateDialog(modal: TrackModalState.Backdate, onEvent: (TrackEvent
 @Composable
 private fun EditDialog(
     modal: TrackModalState.Edit,
+    hourFormat: HourFormat,
     vocabulary: List<String>,
     onEvent: (TrackEvent) -> Unit
 ) {
@@ -1418,7 +1464,7 @@ private fun EditDialog(
     val checking = modal.validation == RecordValidation.Checking
     val readFailed = modal.validation == RecordValidation.ReadFailed
     val conflictMessage = if (conflict) {
-        "This rating changed elsewhere. Saving will replace its current value, time, and chips. " +
+        "This rating changed elsewhere. Saving will replace its current value and time. " +
             "Cancel and reopen to use the latest record."
     } else null
     val status = listOfNotNull(conflictMessage, modal.mutationError).joinToString("\n").ifEmpty { null }
@@ -1431,14 +1477,15 @@ private fun EditDialog(
         statusMessage = if (checking) "Checking record" else status,
         isSaving = modal.isSaving,
         canSave = modal.timestampError == null && !checking && !readFailed,
+        hourFormat = hourFormat,
         saveLabel = if (conflict) "Save my changes" else "Save",
         onValueChanged = { onEvent(TrackEvent.EditValueChanged(it)) },
         onDateTextChanged = { onEvent(TrackEvent.EditDateTextChanged(it)) },
         onTimeTextChanged = { onEvent(TrackEvent.EditTimeTextChanged(it)) },
         onSave = { onEvent(TrackEvent.EditSaveConfirmed) },
         onCancel = { onEvent(TrackEvent.EditCancelled) },
-        chips = modal.draft.chips,
-        onChipToggled = { onEvent(TrackEvent.EditChipToggled(it)) },
+        chips = null,
+        onChipToggled = null,
         vocabulary = vocabulary,
         onRetryValidation = if (readFailed) {
             { onEvent(TrackEvent.DialogValidationRetry) }
@@ -1464,15 +1511,26 @@ private fun NoteDialog(modal: TrackModalState.Note, onEvent: (TrackEvent) -> Uni
         title = { Text("Edit note") },
         text = {
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                OutlinedTextField(
+                RichNoteEditor(
                     value = modal.draft.text,
                     onValueChange = { onEvent(TrackEvent.NoteTextChanged(it)) },
                     enabled = !modal.isSaving,
-                    label = { Text("Note") },
-                    modifier = Modifier
-                        .testTag("track_note_text")
-                        .focusRequester(focusRequester)
+                    modifier = Modifier.testTag("track_note_text")
                 )
+                if (modal.draft.baselineText.isNotBlank()) {
+                    MsTextAction(
+                        text = "Delete note",
+                        onClick = { onEvent(TrackEvent.NoteDeleteRequested) },
+                        enabled = !modal.isSaving,
+                        tone = MsActionTone.Muted,
+                        modifier = Modifier.testTag("track_delete_note")
+                    )
+                    Text(
+                        "Deletes only the note when you save. The rating stays in your log.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = palette.inkTertiary
+                    )
+                }
                 if (checking) {
                     Text(
                         text = "Checking record",

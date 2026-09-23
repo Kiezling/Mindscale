@@ -306,6 +306,9 @@ class EpisodeEngineTest {
         )
 
         assertEquals(3 * hour, snapshot.summary.typicalLengthMillis)
+        assertEquals("5.0", snapshot.summary.medianPeak)
+        assertEquals(6, snapshot.summary.peak)
+        assertEquals(32.0, snapshot.summary.intensityHours, 0.0001)
         assertEquals("1h", formatDuration(59 * 60_000L + 30_000L))
         assertEquals("2m", formatDuration(90_000L))
     }

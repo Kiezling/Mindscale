@@ -31,7 +31,7 @@ class BreathingContentTest {
             BreathingCopy.INSTRUCTIONS
         )
         assertEquals(
-            "MindScale makes no claim about what this does. It is a circle that keeps a pace.",
+            "MindScale makes no claim about what this does.",
             BreathingCopy.NO_CLAIM
         )
         assertEquals(

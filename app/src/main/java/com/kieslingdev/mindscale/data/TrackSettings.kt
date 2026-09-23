@@ -11,7 +11,7 @@ data class TrackSettings(
     val paused: Boolean = false,
     val checkinAt: Long = 0L,
     val sleepIntroShown: Boolean = false,
-    val themeMode: ThemeMode = ThemeMode.SYSTEM,
+    val themeMode: ThemeMode = ThemeMode.LIGHT,
     val hourFormat: HourFormat = HourFormat.TWELVE,
     val anchor2: String = "",
     val anchor5: String = "",

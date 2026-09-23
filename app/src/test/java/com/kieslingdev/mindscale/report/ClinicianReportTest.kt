@@ -103,7 +103,7 @@ class ClinicianReportTest {
     }
 
     @Test
-    fun emptyThirtyDayReportIsExactAndNonInferential() {
+    fun emptyThirtyDayReportIsConciseAndNonInferential() {
         val report = buildClinicianReport(
             DataSnapshot(emptyList(), emptyList(), emptyList(), TrackSettings()),
             InsightRange.THIRTY_DAYS,
@@ -111,39 +111,14 @@ class ClinicianReportTest {
             ZoneOffset.UTC
         )
 
-        assertEquals(
-            """MINDSCALE — USER-RECORDED CLINICIAN SUMMARY
-Window: 2026-07-06 through 2026-08-04 · 30 days
-Generated: 2026-08-04T12:00:00Z · current zone Z
-
-MindScale stores and arranges user-recorded information. It does not diagnose,
-interpret, administer questionnaires, or provide a clinical assessment.
-Times reflect when recording was possible.
-
-RECORDED COURSE
-No ratings were recorded in this window.
-
-EVENTS MARKED
-No events were marked in this window.
-
-EPISODE STRUCTURE
-No derived episode spans touched this window.
-
-TIME OF DAY
-Fewer than 6 recorded starts are in this window, so no time-of-day count is shown.
-
-SLEEP
-No completed sleep periods had a recorded Wake in this window.
-These counts do not establish whether sleep affected later records or later records affected sleep.
-
-EXTERNALLY OBTAINED TOTALS
-No externally obtained PHQ-8 or GAD-7 totals are stored in this window.
-MindScale did not administer, calculate, or interpret PHQ-8 or GAD-7 totals.
-
-Generated locally on this device. This text may contain sensitive health information.
-Review the underlying records before relying on this summary.""",
-            report.text
-        )
+        assertTrue(report.text.startsWith("MINDSCALE — CLINICIAN SUMMARY\nWindow: 2026-07-06 through 2026-08-04 · 30 days"))
+        assertTrue(report.text.contains("No ratings were recorded in this window."))
+        assertTrue(report.text.contains("No events were marked in this window."))
+        assertTrue(report.text.contains("Gaps reflect when recording was possible."))
+        assertTrue(report.text.contains("not a clinical assessment"))
+        assertFalse(report.text.contains("EXTERNALLY OBTAINED TOTALS"))
+        assertTrue(report.text.length < 1_100)
+        assertEquals(report.presentation.rangeText, "2026-07-06 through 2026-08-04 · 30 days")
     }
 
     @Test
@@ -182,10 +157,35 @@ Review the underlying records before relying on this summary.""",
         assertTrue(report.contains("2 additional marked events not shown."))
         assertTrue(report.contains("4 additional externally obtained totals not shown.").not())
         assertTrue(report.contains("1 additional externally obtained total not shown."))
-        assertTrue(report.contains("PHQ-8 total 0 — entered by the user from a result obtained elsewhere."))
+        assertTrue(report.contains("PHQ-8 total 0 (entered from a result obtained elsewhere)"))
         assertFalse(report.contains("event\n"))
         listOf(" improved ", " worse ", " higher ", " lower ", " severity ", " moderate ", " symptom-free ")
             .forEach { banned -> assertFalse("banned report term $banned", report.lowercase().contains(banned)) }
+    }
+
+    @Test
+    fun screenFactsAndExportUseTheSameSnapshotAndRetainExactRatings() {
+        val todayStart = Instant.parse("2026-08-04T00:00:00Z").toEpochMilli()
+        val source = DataSnapshot(
+            entries = listOf(Entry(1, todayStart + 1_000, 5), Entry(2, todayStart + 3_601_000, 0)),
+            sleeps = emptyList(),
+            markers = listOf(Marker(1, todayStart + 2_000, "Meeting")),
+            settings = TrackSettings(),
+            profile = UserProfile(displayName = "Ada")
+        )
+        val report = buildClinicianReport(source, InsightRange.THIRTY_DAYS, generatedAt, ZoneOffset.UTC)
+        val view = report.presentation
+
+        assertEquals("Ada", view.name)
+        assertEquals(listOf(5, 0), view.ratings.map { it.value })
+        assertEquals(2, view.ratingCount)
+        assertTrue(view.metrics.all { report.text.contains("${it.label}: ${it.value}") })
+        assertTrue(view.ratings.all { report.text.contains("${it.time} — ${it.value}/10") })
+        assertTrue(view.events.all(report.text::contains))
+        assertTrue(report.text.contains(view.episodeDetail))
+        assertTrue(report.text.contains(view.onsetDetail))
+        assertTrue(report.text.contains(view.sleepDetail))
+        assertTrue(report.text.contains(view.context))
     }
 
     @Test

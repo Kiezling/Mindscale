@@ -1,6 +1,20 @@
 # MindScale project state
 
-Last updated: 2026-08-06 (Phase 18 merge)
+## Track polish verified; commit and phone update — 2026-09-23
+
+- User requests Sleep/Wake help, centered larger Recent Logs, smaller event button, bordered note input and centered toolbar, one Ended badge, closer italic safety link, and bottom JSON import/export shortcuts. Governing spec: `docs/specs/SPEC-track-polish-backup-2026-09-23.md`.
+- User explicitly authorizes committing all accumulated project changes and an in-place phone update after verification. No push/publication or personal-data deletion. Preserve unrelated IDE-local state and attachments outside the commit.
+- Same checkout/branch/base as below. All workers are settled. Verification: 490 JVM tests pass; lint 0 errors/26 warnings/2 hints; assembly passes. All 313 current API36 device cases have passing latest results across a full run and focused reruns. Actual Android 200% text and 360dp Light/Dark screenshots inspected. Exact evidence: `docs/reviews/2026-09-23-track-polish.md`.
+- Final APK SHA-256: `C93A3A35D595A633B05A6FD859058D7626C97C2235E885BD83BB84BA943EFC8C`. Installed/launched on the isolated emulator; size/font restored. Next: commit the reviewed accumulated changes, then install this APK in place on the confirmed Pixel 10. Keep `.idea/misc.xml`, machine-specific `.codex/hooks.json`, attachments and generated artifacts outside the commit. No push/publication. API26 runtime and spoken TalkBack remain broader-release gaps.
+
+## Prior owner feedback complete — verified 2026-09-23
+
+- Implemented all criteria in `docs/specs/SPEC-owner-feedback-2026-09-20.md`: Track/header layouts, note-only deletion, Log row parity/event editing, chart rounding/selection, compact Insights metrics/sections/distributions, and concise visual/text clinician summary. Final decisions and exact evidence: `docs/reviews/2026-09-23-owner-feedback.md`.
+- Same checkout `S:\Android\AndroidProjects\MindScale`, branch `codex/release-readiness`, HEAD `937ab49f169cfccffec94bf640fe99b14246ba51`. All earlier release/simplification work, `.idea/misc.xml`, `.agents/`, `.codex/` and attachments remain uncommitted and preserved. Dirty inventory: ignored `build/review/owner-final-status.txt`.
+- Verification: 489 JVM tests pass; lint 0 errors/26 warnings/2 hints; debug assembly passes. All 305 current API 36 device cases have passing latest results across full run and focused reruns (not a single 305-case run). Light/Dark, 100%/200%, 360dp width, actual Android 200% note dialog, dense 30-day chart, distributions and report/text output inspected.
+- Final APK `app/build/outputs/apk/debug/app-debug.apk`, SHA-256 `3E185991BDE64371CD6F2765F82D4E008506270961CCD869DFCFD42974118F4C`, installed/launched successfully on isolated `MindScaleReview_API36` / `emulator-5554`. Emulator restored to 100% font/physical size and Light default. After the user's explicit request, the same verified APK was installed on their Pixel 10 with `adb install -r` (Success) and MainActivity launched (Status ok, cold launch 614ms). Device lastUpdateTime: `2026-09-23 14:08:34`. Existing app data was retained by the in-place update; no phone tests or clear/uninstall operations were performed.
+- Three bounded `gpt-6-sol` workers completed and are settled; no build/capture jobs remain. No continuation needed for this completed scope. No commit, push, publication, signing/toolchain/schema change or personal-data deletion performed.
+- Next: owner reviews the verified debug build. API 26 runtime and spoken TalkBack remain coverage gaps; broader release/signing gates remain separate. Preserve the user's standing continuation and approval boundaries for future work.
 
 ## Goal
 
@@ -8,7 +22,80 @@ Build MindScale as a native Android application using Kotlin, Jetpack Compose, M
 
 The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716ca7343`: `SPEC.md` is the rationale and `MindScale v2.dc.html` is the visual/behavioral reference for Track, Full Log, Insights, Report, Safety card, Profile, and Settings. A local exported handoff is available at `C:\Users\mckie\Downloads\MindScale-handoff\mindscale\project\`; its `MindScale v2.dc.html` is the primary implementation reference. Repository specs under `docs/specs/` govern native implementation after human approval.
 
-## Current phase: Phase 18 merged and complete — the visual overhaul is finished; Phase 19 not started
+## Prior simplification checkpoint: installed for owner testing
+
+- User supplied a detailed walkthrough, authorized implementation, paused, then resumed.
+- Governing spec: `docs/specs/SPEC-simplification.md`, IMPLEMENTED — VERIFIED LOCALLY. Center Track branding; formatted
+  notes; calendar/wheel time and keypad edits; park onset UI while preserving data; reduce
+  Settings/Insights noise with expanders; autosave Profile name; default new installs to Light;
+  soften Breathing footer; visual-only 15-minute chart easing without changing measurements.
+- Branch/base remains `codex/release-readiness`, `937ab49`; prior Phase 19 repairs remain dirty.
+  Simplification is implemented. Verification: 480 JVM tests passed; lint has 0 errors and 26
+  warnings; debug assembly passed. All 281 distinct API 36 device cases have passing latest
+  results across the full run and targeted reruns. Exact commands and the full-run/rerun split
+  are recorded in `docs/reviews/2026-09-17-simplification.md` (not a claim of a single 281-test run).
+- Routing followed the two-attempt rule: Luna completed two incomplete S-1/S-3/S-5 passes, then
+  Terra completed the focused integration and contract updates. Root owns frozen decisions,
+  integration, emulator checks and final review. Rapid rich-note typing was repaired and checked
+  with delayed-echo tests and real input. Light/dark, 200% headers, edit keypad, note editor and
+  time wheels were inspected; system-bar contrast now follows the actual app theme.
+- Isolated API 36 review emulator is used for tests, never the phone's personal records. No
+  commit, push, publication, signing change, destructive phone test or data deletion authorized.
+- Latest APK: `app/build/outputs/apk/debug/app-debug.apk`, SHA-256
+  `C317F0A80CD545802E29A6C393141873381D1ECD8C799FC170C6A7516927AC96`.
+- Re-paired the intended Pixel 10 and installed the verified APK with `adb install -r`: Success.
+  MainActivity cold launch returned Status: ok; the Track screen and running process were confirmed.
+  Package lastUpdateTime: 2026-09-17 23:00:53 (device clock). No uninstall, clear-data operation or
+  personal-phone test suite was run. Existing data was retained by the in-place update.
+  Theme selection was not confirmed because navigation changed during the UI check; no theme
+  override is claimed. Next action: owner tests the updated app and reports remaining issues.
+- Remaining broader-release coverage: API 26 runtime and spoken TalkBack checks. Durable signing
+  and version policy remain gates before wider distribution. The review emulator is left at
+  100% text size; no personal-phone test suite, commit, push or publication was performed.
+
+## Phase 19 — first-release correctness and readiness (verified checkpoint)
+
+- User direction on 2026-09-17: take the lead to finish the existing product for real users;
+  defer the forgotten personal improvement list, orchestrate through inexpensive agents.
+- Governing spec: `docs/specs/SPEC-release-readiness.md`, frozen before production edits and now
+  IMPLEMENTED — VERIFIED LOCALLY.
+- Branch/base: `codex/release-readiness`, `937ab49` (base main is one documentation commit ahead of local `origin/main`).
+  The starting application tree matched Phase 18 merge `9d6767a`; Phase 19 repairs are uncommitted.
+  No commit/push/publication authorized.
+- Verification: `test lint assembleDebug connectedDebugAndroidTest` passed 462 JVM and 273 API 36
+  tests with 0 failures/errors/skips; lint passed with 0 errors and 26 warnings (the four added
+  warnings are dependency-availability notices; versions are unchanged). See
+  `docs/reviews/2026-09-17-verification.md`.
+- Five isolated review probes failed as expected, proving: unrestorable long-note backup,
+  CSV pipe-chip identity loss, cross-type duplicate collisions, future-time edit bypass,
+  and Safety retry that never resubscribes. Probe source is retained under
+  `docs/reviews/2026-09-04/` outside the normal test source set.
+- Additional baseline findings, now repaired: platform backup violated the local-only promise; unhandled capture
+  failures; nonfunctional Breathing Close; Profile draft refresh race; erase after intervening
+  writes could delete records absent from the exported snapshot. Repairs are R-1 through R-10.
+- Lower-cost Luna workers implemented the bounded data, capture, interaction, content and test
+  tasks; root owns integration/spec/state, operator-source checks and final review.
+- User selected private APK distribution first. Publisher/support: Kiesling Dev,
+  corykiesling@gmail.com. Play account is personal; creation date and policy-hosting URL are unknown.
+  Do not put account identifiers or signing credentials in the repository. Drafts are in `docs/release/`.
+- Existing unrelated changes preserved: `.idea/misc.xml`, untracked `.agents/` and `.codex/`.
+  New review/spec files and completed repair files are uncommitted. Build evidence is in
+  ignored `build/review/`. The saved AVD's read-only clone had insufficient storage, so validation
+  moved to a clean independent `MindScaleReview_API36` AVD under `build/review/avd`; saved data is untouched.
+- Physical-phone follow-up: the original APK exposed both the gallery and product launchers.
+  R-11 removes the gallery launcher while retaining explicit developer access. Latest
+  `app/build/outputs/apk/debug/app-debug.apk` installed successfully with `adb install -r` on
+  the user's Pixel 10 (API 37), preserving app data. Exactly one launcher (MainActivity) is now
+  advertised; normal launcher selection opened Track with rating controls and all three tabs.
+  `test lint assembleDebug --console=plain` passed (462 JVM tests, lint 0 errors/26 warnings).
+  Prior 273 API 36 device tests predate this manifest-only change; no instrumented suite was run
+  against personal phone data. The older dated beta APK/ZIP are superseded by this new APK.
+- Exact next action: continue physical-phone core-flow testing, then run the API 26 and spoken
+  TalkBack checks. Durable signing and version
+  policy remain gates before any wider distribution; public policy and Play gates are conditional
+  on choosing that route.
+
+### Phase 18 merged checkpoint (historical)
 
 - Phase 18 branch: `agent/phase18-remaining-screens`, created from synchronized `main` at
   `af273f915cb83be6506b0aa5e5859c6743be0676`
@@ -431,10 +518,10 @@ The product source is the Claude Design project `1c630a7b-57ce-4bf0-81b7-9b6716c
 
 ## Active blocker
 
-No active blocker. Phases 15, 16, and 17 are merged and complete; `main` is at `af273f9`. Phase 18
-is the last phase of the visual overhaul: its spec is frozen at
-`docs/specs/SPEC-remaining-screens-visual.md` and implementation is in progress on
-`agent/phase18-remaining-screens`.
+Phase 19 repairs are complete and locally verified under `docs/specs/SPEC-release-readiness.md`.
+The private beta candidate is prepared, but release readiness remains gated by the physical-phone,
+API 26, and spoken TalkBack checks, followed by durable signing and version/update decisions before
+wider distribution. Public policy hosting and Play declarations remain conditional on that route.
 
 One environment constraint, not a repository problem: the harness permission classifier declined
 `gh pr merge` and `gh pr view` during Phase 15, so it was not attempted for Phase 16 either. `gh
@@ -454,11 +541,27 @@ user, or to have the permission granted, at each future phase boundary.
 
 ## Next tasks
 
-1. Implement `docs/specs/SPEC-remaining-screens-visual.md`, which is frozen. It inherits the visual-only rule and must hold 239/239 connected and 428/428 JVM with no pre-existing test file modified. It is the last phase of the visual overhaul; after it, the closing audit's two new JVM tests are the standing guard against literal and contrast drift.
-2. Re-verify the crisis resources in `SafetyCopy` against their operator sources before any future release, and update `SafetyCopy.VERIFIED_ON` in the same edit. Hotline numbers and coverage change; a stale number in a safety feature is a real harm, not a cosmetic bug.
+1. Install and verify the prepared private APK on a physical phone, including API 26 compatibility
+   and spoken TalkBack behavior; record the results in `docs/release/BETA-CHECKLIST.md`.
+2. Resolve durable signing ownership and version/update policy before wider distribution; keep
+   public policy hosting and Play declarations conditional on selecting that route.
 3. Continue excluding `.agents/` and `.codex/` from product/documentation commits.
 
 ## Last verification
+
+Phase 19 final local verification completed 2026-09-17 on `codex/release-readiness` at base
+`937ab49`, with changes still uncommitted. The exact command
+`.\gradlew.bat test lint assembleDebug connectedDebugAndroidTest --console=plain` passed in 5m 17s:
+462 JVM tests and 273 API 36 device tests passed with 0 failures/errors/skips. Lint passed with
+0 errors and 26 warnings; the four-warning increase is the documented dependency-availability
+notice group, with toolchain versions unchanged. Manual API 36 checks covered idle/finished
+Breathing Close, active Stop, privacy cards at 200% in light and dark themes, and the light
+intensity legend. Evidence is in `docs/reviews/2026-09-17-verification.md`.
+
+The private beta artifact is prepared at `build/private-beta/2026-09-17/app-debug.apk`, signed by
+the existing debug key for private testing. Publisher/support details recorded for a possible
+later Play route are Kiesling Dev and corykiesling@gmail.com. No commit, push, upload, publication,
+account identifier, or production signing key was created.
 
 Phase 17 final local verification completed 2026-08-06 for `agent/phase17-insights-visual`:
 
@@ -840,7 +943,7 @@ Results:
 - Phase 1 backdate/edit/note dialog-open restoration is implemented and verified by Phase 7; see `docs/specs/SPEC-track-dialog-restoration.md`.
 - JSON/CSV import and restore is implemented and merged by Phase 12; see `docs/specs/SPEC-import-restore.md` for its frozen semantics and honest coverage gaps. Saved backups are now restorable inputs rather than one-way export evidence.
 - The time-weighted/hold episode model and Phase 2 onset reconciliation are implemented and verified by `docs/specs/SPEC-insights-foundation.md`.
-- Gold/ink theming is implemented; approved typography assets remain a future design decision.
+- Gold/ink theming and the bundled InstrumentSans typography assets are implemented from Phase 15 onward; any remaining font-provenance verification is evidence to document, not a future feature decision.
 - Full Log import/export and clinician-report data actions remain deferred; no inert controls are shown.
 - The optional paced-breathing object is implemented by Phase 14; see `docs/specs/SPEC-paced-breathing.md`. Sessions are exported facts only: they appear in the JSON backup, the records CSV, the restore preview, and the erase dialog, and deliberately in no in-app view, with no per-session delete. A future Full Log row type for them would need its own edit, delete, and filter contract, and any Insights view of them is rejected outright rather than deferred, because a chart placing sessions beside intensity would manufacture the causal reading two placebo-controlled trials failed to support.
 - The Safety card and the user's own Stanley-Brown safety plan are implemented and merged by Phase 13; see `docs/specs/SPEC-safety-card.md`. Its crisis resources were verified on 2026-08-05 and carry a visible in-app check date, so currency is a maintenance obligation rather than a settled fact.

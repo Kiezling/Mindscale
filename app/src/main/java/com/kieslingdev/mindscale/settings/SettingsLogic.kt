@@ -38,6 +38,8 @@ fun normalizeOnsetWords(draft: String): ValidationResult<List<String>> {
     return when {
         normalized.isEmpty() -> ValidationResult.Invalid("Keep at least one onset word.")
         normalized.size > MAX_ONSET_WORDS -> ValidationResult.Invalid("Use no more than 20 onset words.")
+        normalized.any { it.contains('|') || it.hasDisallowedControls(allowLineBreaks = false) } ->
+            ValidationResult.Invalid("Onset words cannot contain pipes or control characters.")
         normalized.any { it.codePointCount() > MAX_CHIP_CODE_POINTS } ->
             ValidationResult.Invalid("Each onset word must be 32 characters or fewer.")
         else -> ValidationResult.Valid(normalized)

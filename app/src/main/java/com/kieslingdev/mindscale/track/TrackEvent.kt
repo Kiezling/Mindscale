@@ -19,6 +19,7 @@ sealed interface TrackEvent {
     data object EditCancelled : TrackEvent
     data class NoteRequested(val entry: Entry) : TrackEvent
     data class NoteTextChanged(val text: String) : TrackEvent
+    data object NoteDeleteRequested : TrackEvent
     data object NoteSaveConfirmed : TrackEvent
     data object NoteCancelled : TrackEvent
     data class DeleteRequested(val entry: Entry) : TrackEvent

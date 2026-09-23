@@ -111,7 +111,15 @@ fun encodeBackup(snapshot: DataSnapshot, exportedAt: Instant): String = buildStr
     append("]\n}")
 }
 
-fun encodeRecordsCsv(snapshot: DataSnapshot): String = buildString {
+class CsvExportException(message: String) : IllegalArgumentException(message)
+
+fun encodeRecordsCsv(snapshot: DataSnapshot): String {
+    if (snapshot.entries.any { entry -> entry.chips.any { it.contains('|') } }) {
+        throw CsvExportException(
+            "CSV export is unavailable because a stored onset word contains a pipe. Use JSON backup instead."
+        )
+    }
+    return buildString {
     append("record_type,timestamp,end_timestamp,intensity,kind,chips,note,text\r\n")
     snapshot.entries.forEach { entry ->
         appendCsvRow(
@@ -136,6 +144,7 @@ fun encodeRecordsCsv(snapshot: DataSnapshot): String = buildString {
             "breathing", Instant.ofEpochMilli(session.startedAt).toString(),
             Instant.ofEpochMilli(session.endedAt).toString(), "", "", "", "", ""
         )
+    }
     }
 }
 

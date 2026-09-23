@@ -27,6 +27,7 @@ class FakeEntryDao : EntryDao {
     var deleteByIdError: Throwable? = null
     var observeByIdError: Throwable? = null
     var insertError: Throwable? = null
+    var updateChipsError: Throwable? = null
     var updateEditableFieldsResult: Int? = null
     var updateNoteResult: Int? = null
     var deleteByIdResult: Int? = null
@@ -75,6 +76,7 @@ class FakeEntryDao : EntryDao {
             .maxWithOrNull(compareBy<Entry> { it.ts }.thenBy { it.id })
 
     override suspend fun updateChips(entryId: Long, chips: List<String>) {
+        updateChipsError?.let { throw it }
         updateChipsCalls += entryId to chips
         entriesFlow.value = entriesFlow.value.map { if (it.id == entryId) it.copy(chips = chips) else it }
     }

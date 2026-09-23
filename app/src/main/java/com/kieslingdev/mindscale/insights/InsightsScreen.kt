@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -19,6 +20,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.CircularProgressIndicator
@@ -29,17 +31,23 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.clickable
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
@@ -59,6 +67,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kieslingdev.mindscale.data.HourFormat
+import com.kieslingdev.mindscale.notes.RichNoteCodec
 import com.kieslingdev.mindscale.ui.components.MsCard
 import com.kieslingdev.mindscale.ui.components.MsChip
 import com.kieslingdev.mindscale.ui.components.MsEyebrow
@@ -72,7 +81,7 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
-import kotlin.math.abs
+import java.util.Locale
 import kotlin.math.roundToLong
 
 /*
@@ -99,7 +108,7 @@ private val ChartAxisColumnWidth: Dp = 24.dp
 private val ChartTickRowInset: Dp = 30.dp
 
 /** How near a marker a touch must land before the chart snaps its readout to that event. */
-private val ChartEventSnapRadius: Dp = 24.dp
+private val ChartEventSnapRadius: Dp = 8.dp
 
 /** The step line's stroke, its selection dot, its dash pitch, and the sleep hatching pitch. */
 private val ChartStrokeWidth: Dp = 2.dp
@@ -115,18 +124,16 @@ private val ChartSwatchWidth: Dp = 18.dp
 private val ChartSwatchHeight: Dp = 10.dp
 
 /** Gap-histogram cell geometry. Ten buckets, so the cell is wider than the onset hour's. */
-private val GapCellWidth: Dp = 72.dp
-private val GapCellMinHeight: Dp = 152.dp
+private val GapCellMinHeight: Dp = 126.dp
 private val GapBarWellHeight: Dp = 88.dp
-private val GapBarWidth: Dp = 28.dp
+private val GapBarWidth: Dp = 14.dp
 private const val GapBarMaxHeight = 80f
 
 /** Onset-hour cell geometry. Twenty-four buckets, so the cell is narrower. */
-private val HourCellWidth: Dp = 64.dp
-private val HourCellMinHeight: Dp = 144.dp
-private val HourBarWellHeight: Dp = 80.dp
-private val HourBarWidth: Dp = 26.dp
-private const val HourBarMaxHeight = 72f
+private val HourBarWellHeight: Dp = 100.dp
+private const val HourBarMaxHeight = 100f
+/** Centered sparse hour tick labels in the single 24-column plot. */
+private val HourTickLabelWidth: Dp = 24.dp
 
 /** A non-zero count always draws something, however small its share of the maximum. */
 private const val BarMinHeight = 4f
@@ -165,6 +172,32 @@ private val NoCardPadding: Dp = 0.dp
  * (`docs/specs/SPEC-insights-visual.md`, D-19).
  */
 private val ChartLabelTracking = 0.067.em
+
+@Composable
+private fun InsightsDisclosure(
+    title: String,
+    expanded: Boolean,
+    onClick: () -> Unit,
+    testTag: String
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = MsSpacing.minTouchTarget)
+            .clickable(onClick = onClick)
+            .testTag(testTag)
+            .semantics {
+                role = Role.Button
+                stateDescription = if (expanded) "Expanded" else "Collapsed"
+            }
+            .padding(horizontal = MsSpacing.xs),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.ms.inkPrimary)
+        Text(if (expanded) "−" else "+", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.ms.gold)
+    }
+}
 
 @Composable
 fun InsightsRoute(
@@ -223,6 +256,9 @@ fun InsightsScreen(
     zoneId: ZoneId = ZoneId.systemDefault()
 ) {
     val palette = MaterialTheme.ms
+    var dayByDayExpanded by rememberSaveable { mutableStateOf(false) }
+    var detailsExpanded by rememberSaveable { mutableStateOf(false) }
+    var episodesExpanded by rememberSaveable { mutableStateOf(false) }
     LazyColumn(
         modifier = modifier.testTag("insights_screen"),
         contentPadding = PaddingValues(MsSpacing.lgPlus),
@@ -301,13 +337,23 @@ fun InsightsScreen(
                 ) {
                     MsEyebrow("Nothing to draw yet")
                     Text(
-                        "This page shows only what you recorded — no estimates and no guesses. It fills in as you log.",
+                        "Your entries will appear here as you log.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = palette.inkSecondary
                     )
                 }
             }
         } else if (snapshot != null) {
+            item(key = "active_range_dates") {
+                val dateFormat = DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withZone(zoneId)
+                Text(
+                    "${dateFormat.format(Instant.ofEpochMilli(snapshot.rangeStartMillis))} – " +
+                        dateFormat.format(Instant.ofEpochMilli(snapshot.nowMillis)),
+                    modifier = Modifier.testTag("insights_active_dates"),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = palette.inkSecondary
+                )
+            }
             if (!snapshot.hasRangeData) {
                 item(key = "range_empty") {
                     Text(
@@ -321,7 +367,42 @@ fun InsightsScreen(
             item(key = "summary") {
                 SummaryStrip(snapshot.summary)
             }
-            item(key = "raster") {
+            item(key = "entry_chart") {
+                val chartReadout = uiState.chartExploredInstantMillis?.let {
+                    entryChartReadout(
+                        chart = snapshot.entryChart,
+                        instantMillis = it,
+                        hourFormat = uiState.hourFormat,
+                        zoneId = zoneId,
+                        hideNotes = uiState.hideNotes
+                    )
+                } ?: "Touch or drag to read the chart"
+                EntryChartSection(
+                    chart = snapshot.entryChart,
+                    selectedInstantMillis = uiState.chartExploredInstantMillis,
+                    readout = chartReadout,
+                    holdHours = uiState.holdDuration.hours,
+                    range = uiState.range,
+                    hourFormat = uiState.hourFormat,
+                    zoneId = zoneId,
+                    onExplore = onExploreChart,
+                    onEarlierHour = onEarlierChartHour,
+                    onLaterHour = onLaterChartHour,
+                    onPreviousRating = onPreviousRating,
+                    onNextRating = onNextRating,
+                    onPreviousEvent = onPreviousEvent,
+                    onNextEvent = onNextEvent
+                )
+            }
+            item(key = "day_by_day_toggle") {
+                InsightsDisclosure(
+                    title = "Day-by-day view",
+                    expanded = dayByDayExpanded,
+                    onClick = { dayByDayExpanded = !dayByDayExpanded },
+                    testTag = "insights_day_by_day_toggle"
+                )
+            }
+            if (dayByDayExpanded) item(key = "raster") {
                 val readout = uiState.exploredInstantMillis?.let {
                     rasterReadout(snapshot, it, uiState.hourFormat, zoneId)
                 } ?: "Touch or drag to read a day and hour"
@@ -359,72 +440,19 @@ fun InsightsScreen(
                     )
                 }
             }
-            item(key = "entry_chart") {
-                val chartReadout = uiState.chartExploredInstantMillis?.let {
-                    entryChartReadout(
-                        chart = snapshot.entryChart,
-                        instantMillis = it,
-                        hourFormat = uiState.hourFormat,
-                        zoneId = zoneId,
-                        hideNotes = uiState.hideNotes
+            if (snapshot.recentEpisodes.isNotEmpty()) {
+                item(key = "episodes_toggle") {
+                    InsightsDisclosure(
+                        title = "Episodes in this Time Range",
+                        expanded = episodesExpanded,
+                        onClick = { episodesExpanded = !episodesExpanded },
+                        testTag = "insights_episodes_toggle"
                     )
-                } ?: "Touch or drag to read the chart"
-                EntryChartSection(
-                    chart = snapshot.entryChart,
-                    selectedInstantMillis = uiState.chartExploredInstantMillis,
-                    readout = chartReadout,
-                    holdHours = uiState.holdDuration.hours,
-                    range = uiState.range,
-                    hourFormat = uiState.hourFormat,
-                    zoneId = zoneId,
-                    onExplore = onExploreChart,
-                    onEarlierHour = onEarlierChartHour,
-                    onLaterHour = onLaterChartHour,
-                    onPreviousRating = onPreviousRating,
-                    onNextRating = onNextRating,
-                    onPreviousEvent = onPreviousEvent,
-                    onNextEvent = onNextEvent
-                )
-            }
-            // The design draws both lists as one card of hairline-separated rows rather than as a
-            // stack of separate cards (D-11). Both are bounded — at most six facts and eight
-            // episodes — so folding each into one list item costs no laziness that matters.
-            item(key = "facts") {
-                Column(verticalArrangement = Arrangement.spacedBy(MsSpacing.smPlus)) {
-                    SectionTitle("Episodes")
-                    MsCard(contentPadding = NoCardPadding) {
-                        snapshot.facts.forEachIndexed { index, fact ->
-                            key("fact:$index") {
-                                if (index > 0) MsHairline(faint = true)
-                                Column(
-                                    Modifier.fillMaxWidth().padding(
-                                        horizontal = MsSpacing.lgPlus,
-                                        vertical = MsSpacing.lg
-                                    ),
-                                    verticalArrangement = Arrangement.spacedBy(MsSpacing.xxs)
-                                ) {
-                                    Text(
-                                        fact.text,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = palette.inkPrimary
-                                    )
-                                    fact.detail?.let {
-                                        Text(
-                                            it,
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = palette.inkQuaternary
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
                 }
             }
-            if (snapshot.recentEpisodes.isNotEmpty()) {
+            if (episodesExpanded && snapshot.recentEpisodes.isNotEmpty()) {
                 item(key = "episodes") {
                     Column(verticalArrangement = Arrangement.spacedBy(MsSpacing.smPlus)) {
-                        SectionTitle("Each episode")
                         MsCard(contentPadding = NoCardPadding) {
                             snapshot.recentEpisodes.forEachIndexed { index, episode ->
                                 key("episode:${episode.onsetMillis}") {
@@ -436,6 +464,15 @@ fun InsightsScreen(
                     }
                 }
             }
+            item(key = "more_details_toggle") {
+                InsightsDisclosure(
+                    title = "More details",
+                    expanded = detailsExpanded,
+                    onClick = { detailsExpanded = !detailsExpanded },
+                    testTag = "insights_more_details_toggle"
+                )
+            }
+            if (detailsExpanded) {
             item(key = "onset_gap_histogram") {
                 OnsetGapSection(
                     histogram = snapshot.onsetGapHistogram,
@@ -457,6 +494,7 @@ fun InsightsScreen(
                     selectedCategoryIndex = uiState.selectedSleepCategoryIndex,
                     onSelectCategory = onSelectSleepCategory
                 )
+            }
             }
         }
         item(key = "clinician_summary") {
@@ -606,14 +644,11 @@ private fun OnsetGapSection(
 
         Denominator(onsetGapDenominator(histogram))
         val maximumCount = histogram.buckets.maxOfOrNull(OnsetGapBucket::count)?.coerceAtLeast(1) ?: 1
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState())
-                .testTag("onset_gap_bars"),
-            horizontalArrangement = Arrangement.spacedBy(MsSpacing.sm)
-        ) {
-            histogram.buckets.forEach { bucket ->
+        Column(Modifier.fillMaxWidth().testTag("onset_gap_bars"),
+            verticalArrangement = Arrangement.spacedBy(MsSpacing.xxs)) {
+            histogram.buckets.chunked(5).forEach { bucketRow ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(MsSpacing.xxs)) {
+            bucketRow.forEach { bucket ->
                 val isSelected = selectedBucketIndex == bucket.index
                 val barHeight = if (bucket.count == 0) NoBar else {
                     (GapBarMaxHeight * bucket.count / maximumCount).coerceAtLeast(BarMinHeight).dp
@@ -629,7 +664,7 @@ private fun OnsetGapSection(
                         color = if (isSelected) palette.ink else palette.outline
                     ),
                     modifier = Modifier
-                        .width(GapCellWidth)
+                        .weight(1f)
                         .heightIn(min = GapCellMinHeight)
                         .testTag("onset_gap_bucket_${bucket.index}")
                         .semantics(mergeDescendants = true) {
@@ -639,10 +674,7 @@ private fun OnsetGapSection(
                         }
                 ) {
                     Column(
-                        modifier = Modifier.padding(
-                            horizontal = MsSpacing.xs,
-                            vertical = MsSpacing.sm
-                        ),
+                        modifier = Modifier.padding(vertical = MsSpacing.sm),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.SpaceBetween
                     ) {
@@ -660,13 +692,17 @@ private fun OnsetGapSection(
                         // A bucket boundary is data, so it keeps its own case: `gapBars`'
                         // label at line 1461 sets neither `text-transform` nor tracking (D-3).
                         Text(
-                            text = bucket.visibleLabel,
+                            // The heading supplies "days"; keep every boundary fully visible at 200%.
+                            text = bucket.visibleLabel.removeSuffix("d"),
                             style = chartLabelStyle(),
                             color = if (isSelected) palette.onInk else palette.inkQuaternary,
-                            textAlign = TextAlign.Center
+                            textAlign = TextAlign.Center,
+                            maxLines = 1
                         )
                     }
                 }
+            }
+            }
             }
         }
         LiveReadout(
@@ -688,85 +724,61 @@ private fun OnsetTimeSection(
     val palette = MaterialTheme.ms
     Column(verticalArrangement = Arrangement.spacedBy(MsSpacing.smPlus)) {
         SectionTitle("Time of day it started")
-        if (!counts.isEligible) {
-            RefusalPanel(
-                text = onsetTimeRefusalText(counts),
-                modifier = Modifier.testTag("onset_time_refusal")
-            )
-            return@Column
-        }
-
         Denominator(onsetTimeDenominator(counts))
-        val maximumCount = counts.buckets.maxOfOrNull(OnsetHourBucket::count)?.coerceAtLeast(1) ?: 1
+        val observedMaximum = counts.buckets.maxOfOrNull(OnsetHourBucket::count) ?: 0
+        val maximumCount = observedMaximum.coerceAtLeast(1)
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState())
-                .testTag("onset_time_bars"),
-            horizontalArrangement = Arrangement.spacedBy(MsSpacing.sm)
+            modifier = Modifier.fillMaxWidth().testTag("onset_time_bars"),
+            verticalAlignment = Alignment.Bottom
         ) {
+            Column(
+                modifier = Modifier.width(ChartAxisColumnWidth).height(HourBarWellHeight),
+                verticalArrangement = Arrangement.SpaceBetween,
+                horizontalAlignment = Alignment.End
+            ) {
+                Text(observedMaximum.toString(), style = chartLabelStyle(), color = palette.inkQuaternary)
+                Text("0", style = chartLabelStyle(), color = palette.inkQuaternary)
+            }
+            Spacer(Modifier.width(MsSpacing.xxs))
+            Row(Modifier.weight(1f).height(HourBarWellHeight), horizontalArrangement = Arrangement.spacedBy(MsSpacing.hairline)) {
             counts.buckets.forEach { bucket ->
                 val isSelected = selectedHour == bucket.hourOfDay
                 val barHeight = if (bucket.count == 0) NoBar else {
                     (HourBarMaxHeight * bucket.count / maximumCount).coerceAtLeast(BarMinHeight).dp
                 }
-                val hourLabel = onsetHourVisibleLabel(bucket.hourOfDay, hourFormat)
                 val description = "${onsetHourSpokenLabel(bucket.hourOfDay, hourFormat)} hour, " +
                     "${bucket.count} of ${counts.eligibleOnsetCount} " +
                     "recorded starts, ${onsetHourBoundary(bucket.hourOfDay, hourFormat)}"
-                Surface(
-                    onClick = { onSelectHour(bucket.hourOfDay) },
-                    shape = MaterialTheme.shapes.small,
-                    color = if (isSelected) palette.ink else Color.Transparent,
-                    border = BorderStroke(
-                        width = if (isSelected) SelectedCellBorder else MsSpacing.hairline,
-                        color = if (isSelected) palette.ink else palette.outline
-                    ),
+                Box(
                     modifier = Modifier
-                        .width(HourCellWidth)
-                        .heightIn(min = HourCellMinHeight)
+                        .weight(1f)
+                        .height(HourBarWellHeight)
+                        .clickable { onSelectHour(bucket.hourOfDay) }
                         .testTag("onset_time_hour_${bucket.hourOfDay}")
-                        .semantics(mergeDescendants = true) {
+                        .semantics {
                             role = Role.Button
                             selected = isSelected
                             contentDescription = description
-                        }
+                        },
+                    contentAlignment = Alignment.BottomCenter
                 ) {
-                    Column(
-                        modifier = Modifier.padding(
-                            horizontal = MsSpacing.xs,
-                            vertical = MsSpacing.sm
-                        ),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(
-                            bucket.count.toString(),
-                            style = MaterialTheme.typography.labelLarge,
-                            color = if (isSelected) palette.onInk else palette.inkPrimary
-                        )
-                        HistogramBar(
-                            wellHeight = HourBarWellHeight,
-                            barWidth = HourBarWidth,
-                            barHeight = barHeight,
-                            selected = isSelected
-                        )
-                        // A clock hour is data, like the bucket boundary above (D-3).
-                        Text(
-                            text = hourLabel,
-                            style = chartLabelStyle(),
-                            color = if (isSelected) palette.onInk else palette.inkQuaternary,
-                            textAlign = TextAlign.Center
-                        )
-                    }
+                    Box(Modifier.fillMaxWidth().height(barHeight)
+                        .background(if (isSelected) palette.ink else palette.gold)
+                        .clearAndSetSemantics { })
                 }
             }
+            }
         }
-        Text(
-            onsetTimeFourHourSentence(counts, hourFormat),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.ms.inkPrimary
-        )
+        BoxWithConstraints(Modifier.fillMaxWidth().padding(start = ChartAxisColumnWidth + MsSpacing.xxs)) {
+            listOf(0, 6, 12, 18, 23).forEach { hour ->
+                val idealLeft = maxWidth * ((hour + 0.5f) / 24f) - HourTickLabelWidth / 2
+                Text(hour.toString().padStart(2, '0'),
+                    style = chartLabelStyle(), color = palette.inkQuaternary,
+                    maxLines = 1, textAlign = TextAlign.Center,
+                    modifier = Modifier.offset(x = idealLeft.coerceIn(NoBar, maxWidth - HourTickLabelWidth))
+                        .width(HourTickLabelWidth))
+            }
+        }
         LiveReadout(
             text = selectedHour?.let { onsetTimeBucketReadout(counts, it, hourFormat) }
                 ?: "Select an hour to read its exact count.",
@@ -851,28 +863,34 @@ private fun SummaryStrip(summary: InsightSummary) {
         "Episodes" to summary.episodeCount.toString(),
         "Typical length" to (summary.typicalLengthMillis?.let(::formatDuration) ?: "—"),
         "Clear days" to "${summary.clearDays}/${summary.eligibleDays}",
-        "Peak" to (summary.peak?.toString() ?: "—")
+        "Peak" to (summary.peak?.let { "$it/10" } ?: "—"),
+        "Median peak" to (summary.medianPeak?.let { "$it/10" } ?: "—"),
+        "Burden · intensity-h" to String.format(Locale.ROOT, "%.1f", summary.intensityHours)
     )
+    val columns = if (LocalDensity.current.fontScale >= 1.5f) 2 else 3
     Column {
         MsHairline()
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(vertical = MsSpacing.lg)
                 .testTag("insights_summary"),
-            horizontalArrangement = Arrangement.spacedBy(MsSpacing.xxs)
+            verticalArrangement = Arrangement.spacedBy(MsSpacing.sm)
         ) {
-            cells.forEach { (label, value) ->
+            cells.chunked(columns).forEachIndexed { rowIndex, rowCells ->
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(MsSpacing.xxs)) {
+            rowCells.forEachIndexed { cellIndex, (label, value) ->
                 Column(
                     modifier = Modifier
                         .weight(1f)
+                        .testTag("insights_summary_cell_${rowIndex * columns + cellIndex}")
                         .semantics { contentDescription = "$label, $value" },
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(MsSpacing.xxs)
                 ) {
                     Text(
                         value,
-                        style = MaterialTheme.typography.headlineLarge,
+                        style = MaterialTheme.typography.titleLarge,
                         color = palette.inkPrimary,
                         textAlign = TextAlign.Center
                     )
@@ -882,6 +900,8 @@ private fun SummaryStrip(summary: InsightSummary) {
                         color = palette.inkQuaternary,
                         textAlign = TextAlign.Center
                     )
+                }
+            }
                 }
             }
         }
@@ -1099,8 +1119,9 @@ private fun EntryChartSection(
         )
         EntryChartLegend()
         Caveat(
-            "Ratings stay flat until another rating or the ${holdHours}h waking-hour limit. " +
-                "The line stops during sleep. Dotted lines are events you marked."
+            "The line stops during sleep or after ${holdHours} waking hours without another rating. " +
+                "Dotted lines are events you marked. " +
+                "Transitions are smoothed for display; only entries are recorded."
         )
     }
 }
@@ -1204,7 +1225,9 @@ private fun EntryStepChart(
                 ) {
                     fun xOf(millis: Long): Float =
                         size.width * ((millis - chart.startMillis).toDouble() / span).toFloat().coerceIn(0f, 1f)
-                    fun yOf(value: Int): Float = size.height * (1f - value.coerceIn(0, 10) / 10f)
+                    fun yOf(value: Float): Float = size.height * (1f - value.coerceIn(0f, 10f) / 10f)
+                    fun yOf(value: Int): Float = yOf(value.toFloat())
+                    val visualTransitions = chart.visualTransitions(size.width)
 
                     chart.sleeps.forEach { band ->
                         val left = xOf(band.startMillis)
@@ -1229,7 +1252,8 @@ private fun EntryStepChart(
                     }
                     chart.segments.forEachIndexed { index, segment ->
                         val left = xOf(segment.startMillis)
-                        val right = xOf(segment.endMillis)
+                        val transition = visualTransitions.firstOrNull { it.endMillis == segment.endMillis }
+                        val right = xOf(transition?.startMillis ?: segment.endMillis)
                         val y = yOf(segment.value)
                         if (segment.value > 0) {
                             drawRect(area, Offset(left, y), Size((right - left).coerceAtLeast(1f), size.height - y))
@@ -1242,11 +1266,37 @@ private fun EntryStepChart(
                             cap = StrokeCap.Round
                         )
                         val next = chart.segments.getOrNull(index + 1)
-                        if (next != null && next.startMillis == segment.endMillis) {
+                        if (next != null && next.startMillis == segment.endMillis &&
+                            visualTransitions.none { it.startMillis < next.startMillis && it.endMillis == next.startMillis }
+                        ) {
                             drawLine(
                                 color = line,
                                 start = Offset(right, y),
                                 end = Offset(right, yOf(next.value)),
+                                strokeWidth = ChartStrokeWidth.toPx(),
+                                cap = StrokeCap.Round
+                            )
+                        }
+                    }
+                    visualTransitions.forEach { transition ->
+                        val samples = transition.samples()
+                        // The plateau stops at the easing start. Fill the same projected area as
+                        // the curve so the transition cannot leave a white wedge beneath it.
+                        drawPath(
+                            path = Path().apply {
+                                moveTo(xOf(samples.first().first), size.height)
+                                lineTo(xOf(samples.first().first), yOf(samples.first().second))
+                                samples.drop(1).forEach { (at, value) -> lineTo(xOf(at), yOf(value)) }
+                                lineTo(xOf(samples.last().first), size.height)
+                                close()
+                            },
+                            color = area
+                        )
+                        samples.zipWithNext().forEach { (from, to) ->
+                            drawLine(
+                                color = line,
+                                start = Offset(xOf(from.first), yOf(from.second)),
+                                end = Offset(xOf(to.first), yOf(to.second)),
                                 strokeWidth = ChartStrokeWidth.toPx(),
                                 cap = StrokeCap.Round
                             )
@@ -1330,24 +1380,6 @@ private fun EntryChartLegend() {
     }
 }
 
-private fun chartInstantFromPosition(
-    x: Float,
-    width: Float,
-    chart: EntryChart,
-    eventSnapPixels: Float
-): Long {
-    val safeWidth = width.coerceAtLeast(1f)
-    val fraction = (x / safeWidth).coerceIn(0f, 0.999999f)
-    val raw = chart.startMillis + ((chart.endMillis - chart.startMillis) * fraction).roundToLong()
-    val closest = chart.markers.minByOrNull { marker ->
-        abs((marker.atMillis - chart.startMillis).toDouble() / (chart.endMillis - chart.startMillis).coerceAtLeast(1L) * safeWidth - x)
-    }
-    val markerDistance = closest?.let { marker ->
-        abs((marker.atMillis - chart.startMillis).toDouble() / (chart.endMillis - chart.startMillis).coerceAtLeast(1L) * safeWidth - x)
-    }
-    return if (closest != null && markerDistance != null && markerDistance <= eventSnapPixels) closest.atMillis else raw
-}
-
 private fun entryChartTicks(
     chart: EntryChart,
     range: InsightRange,
@@ -1381,10 +1413,12 @@ private fun entryChartReadout(
         EntryChartState.ASLEEP -> "asleep"
     }
     reading.sourceEntryMillis?.let { parts += "recorded ${formatDateTime(it, hourFormat, zoneId)}" }
-    if (reading.chips.isNotEmpty()) parts += reading.chips.joinToString(", ")
-    if (!hideNotes) reading.note?.takeIf(String::isNotBlank)?.let { note ->
-        parts += if (note.length <= 120) note else note.take(120) + "…"
-    }
+    // S-3 parks onset/tag UI. The reading retains its source entry for accessibility and data
+    // provenance, but stored tags are not surfaced as an active Insights control or label.
+    if (!hideNotes) reading.note
+        ?.let(RichNoteCodec::plainText)
+        ?.takeIf(String::isNotBlank)
+        ?.let { note -> parts += if (note.length <= 120) note else note.take(120) + "…" }
     reading.markers.forEach { marker -> parts += "event: ${marker.text.ifBlank { "event" }}" }
     return parts.joinToString(" · ")
 }
@@ -1401,7 +1435,6 @@ private fun EpisodeRow(episode: DerivedEpisode, hourFormat: HourFormat, zoneId: 
     val detail = buildString {
         append(if (episode.endReason == EpisodeEndReason.ONGOING) "ongoing" else "${formatDuration(episode.awakeDurationMillis)} awake")
         if (episode.sleepCount > 0) append(" · slept ${episode.sleepCount}×")
-        if (episode.chips.isNotEmpty()) append(" · ${episode.chips.joinToString(", ")}")
         if (episode.endReason != EpisodeEndReason.ONGOING) append(" · $status")
     }
     Row(

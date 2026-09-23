@@ -19,6 +19,7 @@ import com.kieslingdev.mindscale.ui.theme.MindScaleTheme
 import java.io.ByteArrayInputStream
 import java.io.IOException
 import java.io.InputStream
+import java.time.Instant
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -147,6 +148,26 @@ class SettingsImportScreenTest {
 
         val after = runBlocking { database.dataControlDao().snapshot() }
         assertEquals(before, after)
+    }
+
+    @Test
+    fun jsonBackupRestoreShowsReplaceConfirmationAndCancelKeepsSyntheticDatabase() {
+        setContent()
+        val before = runBlocking { database.dataControlDao().snapshot() }
+        val json = encodeBackup(before, Instant.now())
+
+        viewModel.importFileSelected(ImportKind.BACKUP_RESTORE, stream(json))
+        composeTestRule.waitUntil(timeoutMillis = 5_000) {
+            composeTestRule.onAllNodes(hasTestTag("import_preview")).fetchSemanticsNodes().isNotEmpty()
+        }
+        composeTestRule.onNodeWithTag("import_preview").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Restoring replaces everything currently on this device.", substring = true).assertExists()
+        composeTestRule.onNodeWithText("Replace everything").assertExists()
+        assertEquals(before, runBlocking { database.dataControlDao().snapshot() })
+
+        composeTestRule.onNodeWithTag("cancel_import").performClick()
+        composeTestRule.onAllNodes(hasTestTag("import_preview")).assertCountEquals(0)
+        assertEquals(before, runBlocking { database.dataControlDao().snapshot() })
     }
 
     @Test

@@ -13,10 +13,11 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onLast
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
-import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
@@ -40,7 +41,9 @@ class TrackScreenTest {
     private fun setContent(
         uiState: TrackUiState = TrackUiState(),
         fontScale: Float = 1f,
-        onEvent: (TrackEvent) -> Unit = {}
+        onEvent: (TrackEvent) -> Unit = {},
+        onImportLogs: () -> Unit = {},
+        onExportLogs: () -> Unit = {}
     ) {
         composeTestRule.setContent {
             val density = LocalDensity.current
@@ -48,7 +51,12 @@ class TrackScreenTest {
                 LocalDensity provides Density(density.density, fontScale)
             ) {
                 MindScaleTheme {
-                    TrackScreen(uiState = uiState, onEvent = onEvent)
+                    TrackScreen(
+                        uiState = uiState,
+                        onEvent = onEvent,
+                        onImportLogs = onImportLogs,
+                        onExportLogs = onExportLogs
+                    )
                 }
             }
         }
@@ -181,6 +189,9 @@ class TrackScreenTest {
                 "you do. 7–10 it's most of what's happening.",
             substring = true
         ).assertExists()
+        composeTestRule.onNodeWithText("When you go to sleep, tap Sleep", substring = true).assertExists()
+        composeTestRule.onNodeWithText("Tap the selected Sleep or Wake button again", substring = true)
+            .assertExists()
     }
 
     @Test
@@ -196,19 +207,10 @@ class TrackScreenTest {
     }
 
     @Test
-    fun onsetChipPrompt_rendersChipsAndSubmitSkip_andTogglingInvokesOnsetChipToggled() {
-        val events = mutableListOf<TrackEvent>()
-        setContent(
-            uiState = TrackUiState(onsetChipPrompt = OnsetChipPromptState(entryId = 1L)),
-            onEvent = { events += it }
-        )
+    fun onsetChipPrompt_isNotRenderedEvenForLegacyState() {
+        setContent(uiState = TrackUiState(onsetChipPrompt = OnsetChipPromptState(entryId = 1L)))
 
-        composeTestRule.onNodeWithTag("onset_chip_card").assertExists()
-        composeTestRule.onNodeWithTag("onset_chip_flat").performClick()
-        composeTestRule.onNodeWithTag("onset_chips_submit").assertExists()
-        composeTestRule.onNodeWithTag("onset_chips_skip").assertExists()
-
-        assertEquals(1, events.count { it == TrackEvent.OnsetChipToggled("flat") })
+        composeTestRule.onNodeWithTag("onset_chip_card").assertDoesNotExist()
     }
 
     @Test
@@ -220,6 +222,24 @@ class TrackScreenTest {
         composeTestRule.onNodeWithTag("marker_toggle").performClick()
 
         assertEquals(1, events.count { it == TrackEvent.MarkerToggled })
+    }
+
+    @Test
+    fun recentHeadingIsCenteredAndMarkerPaintIsSmallerThanItsTouchTarget() {
+        setContent()
+
+        composeTestRule.onNodeWithTag("track_screen")
+            .performScrollToNode(hasTestTag("recent_logs_header"))
+        val screen = composeTestRule.onNodeWithTag("track_screen").fetchSemanticsNode().boundsInRoot
+        val heading = composeTestRule.onNodeWithTag("recent_logs_header").fetchSemanticsNode().boundsInRoot
+        assertTrue(kotlin.math.abs(heading.center.x - screen.center.x) < 2f)
+
+        composeTestRule.onNodeWithTag("track_screen").performScrollToNode(hasTestTag("marker_toggle"))
+        val target = composeTestRule.onNodeWithTag("marker_toggle")
+            .assertHeightIsAtLeast(48.dp).fetchSemanticsNode().boundsInRoot
+        val painted = composeTestRule.onNodeWithTag("marker_painted", useUnmergedTree = true)
+            .fetchSemanticsNode().boundsInRoot
+        assertTrue("marker paint must be shorter than its target", painted.height < target.height)
     }
 
     @Test
@@ -251,8 +271,21 @@ class TrackScreenTest {
         // child nodes out of the default tree, so assert against the unmerged tree.
         composeTestRule.onNodeWithTag("entry_badge_1", useUnmergedTree = true).assertExists()
         composeTestRule.onNodeWithText("asleep", useUnmergedTree = true).assertExists()
-        composeTestRule.onNodeWithTag("entry_chips_1", useUnmergedTree = true).assertExists()
-        composeTestRule.onNodeWithText("flat · wired", useUnmergedTree = true).assertExists()
+        composeTestRule.onNodeWithTag("entry_chips_1", useUnmergedTree = true).assertDoesNotExist()
+        composeTestRule.onNodeWithText("flat · wired", useUnmergedTree = true).assertDoesNotExist()
+    }
+
+    @Test
+    fun zeroRatingHasExactlyOneVisibleEndedMarker() {
+        val entry = Entry(id = 21L, ts = 1_000L, value = 0)
+        setContent(uiState = TrackUiState(recentEntries = listOf(entry), isEmpty = false))
+
+        composeTestRule.onNodeWithTag("track_screen", useUnmergedTree = true)
+            .performScrollToNode(hasTestTag("entry_badge_21"))
+        assertEquals(
+            1,
+            composeTestRule.onAllNodesWithText("ended", useUnmergedTree = true).fetchSemanticsNodes().size
+        )
     }
 
     @Test
@@ -264,25 +297,26 @@ class TrackScreenTest {
     }
 
     @Test
-    fun backdateDialog_rendersViewModelOwnedRawDraft_andEmitsRawTextEvents() {
+    fun backdateDialog_usesCalendarAndTimeButtons_andCancelDoesNotChangeTheDraft() {
         val events = mutableListOf<TrackEvent>()
         setContent(
             uiState = TrackUiState(
                 activeModal = TrackModalState.Backdate(
                     draft = BackdateDraft(7, "2026-0", "1", null),
-                    timestampError = "Use yyyy-MM-dd and HH:mm."
+                    timestampError = "Choose a date and time that is not in the future."
                 )
             ),
             onEvent = { events += it }
         )
 
         composeTestRule.onNodeWithText("Backdate entry").assertExists()
-        composeTestRule.onNodeWithTag("track_dialog_date").performTextReplacement("2026-08-04")
-        composeTestRule.onNodeWithTag("track_dialog_time").performTextReplacement("09:30")
+        composeTestRule.onNodeWithTag("track_dialog_date").performClick()
+        composeTestRule.onAllNodesWithText("Cancel").onLast().performClick()
+        composeTestRule.onNodeWithTag("track_dialog_time").performClick()
+        composeTestRule.onAllNodesWithText("Cancel").onLast().performClick()
         composeTestRule.onNodeWithText("Save").assertIsNotEnabled()
 
-        assertTrue(events.contains(TrackEvent.BackdateDateTextChanged("2026-08-04")))
-        assertTrue(events.contains(TrackEvent.BackdateTimeTextChanged("09:30")))
+        assertTrue(events.isEmpty())
     }
 
     @Test
@@ -307,9 +341,10 @@ class TrackScreenTest {
 
         composeTestRule.onNodeWithText("Edit entry").assertExists()
         composeTestRule.onNodeWithText("Value: 8").assertExists()
+        composeTestRule.onNodeWithTag("track_edit_numpad").assertExists()
         composeTestRule.onNodeWithText("Save my changes").assertExists()
         composeTestRule.onNodeWithText(
-            "This rating changed elsewhere. Saving will replace its current value, time, and chips. " +
+            "This rating changed elsewhere. Saving will replace its current value and time. " +
                 "Cancel and reopen to use the latest record."
         ).assertExists()
     }
@@ -333,7 +368,7 @@ class TrackScreenTest {
 
     @Test
     fun dialogErrorAndActions_remainReachableAt200PercentFont_andErrorIsLive() {
-        val error = "Use yyyy-MM-dd and HH:mm."
+        val error = "Choose a date and time that is not in the future."
         setContent(
             uiState = TrackUiState(
                 activeModal = TrackModalState.Backdate(
@@ -417,7 +452,7 @@ class TrackScreenTest {
         assertEquals(1, opened)
     }
 
-    /** Safety stays last so crisis content never sits between logging and anything else. */
+    /** Safety stays immediately after breathing when it is available. */
     @Test
     fun breathingLink_sitsAboveTheSafetyLink() {
         setContent(uiState = TrackUiState(settings = TrackSettings(breathingOn = true)))
@@ -430,5 +465,48 @@ class TrackScreenTest {
             "breathing ${breathing.boundsInRoot.top} must sit above safety ${safety.boundsInRoot.top}",
             breathing.boundsInRoot.top < safety.boundsInRoot.top
         )
+        assertTrue(
+            "safety link should stay close to breathing",
+            safety.boundsInRoot.top - breathing.boundsInRoot.bottom < breathing.boundsInRoot.height
+        )
+    }
+
+    @Test
+    fun backupFooterIsLastAndCallsBothCallbacksOnEmptyTrack() {
+        var imports = 0
+        var exports = 0
+        setContent(
+            uiState = TrackUiState(isEmpty = true),
+            onImportLogs = { imports++ },
+            onExportLogs = { exports++ }
+        )
+
+        composeTestRule.onNodeWithTag("track_screen").performScrollToNode(hasTestTag("track_export_logs"))
+        val safety = composeTestRule.onNodeWithTag("safety_link").fetchSemanticsNode().boundsInRoot
+        val footer = composeTestRule.onNodeWithTag("track_export_logs")
+            .assertHeightIsAtLeast(48.dp).fetchSemanticsNode().boundsInRoot
+        assertTrue(footer.top >= safety.top)
+        composeTestRule.onNodeWithTag("track_import_logs").assertHeightIsAtLeast(48.dp).performClick()
+        composeTestRule.onNodeWithTag("track_export_logs").performClick()
+        assertEquals(1, imports)
+        assertEquals(1, exports)
+    }
+
+    @Test
+    fun backupFooterRemainsAvailableWhileTrackingPausedAtLargeFont() {
+        var imports = 0
+        var exports = 0
+        setContent(
+            uiState = TrackUiState(isPaused = true, isEmpty = true),
+            fontScale = 2f,
+            onImportLogs = { imports++ },
+            onExportLogs = { exports++ }
+        )
+
+        composeTestRule.onNodeWithTag("track_screen").performScrollToNode(hasTestTag("track_export_logs"))
+        composeTestRule.onNodeWithTag("track_import_logs").assertHeightIsAtLeast(48.dp).performClick()
+        composeTestRule.onNodeWithTag("track_export_logs").assertHeightIsAtLeast(48.dp).performClick()
+        assertEquals(1, imports)
+        assertEquals(1, exports)
     }
 }

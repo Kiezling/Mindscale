@@ -321,6 +321,66 @@ class TrackViewModelTest {
         assertEquals(500L, updated.ts)
     }
 
+    // R-1/R-3: note limits count Unicode code points and reject controls without losing drafts.
+    @Test
+    fun `note accepts 4000 astral code points and rejects 4001 without clearing the draft`() = runTest {
+        val (vm, dao) = viewModel()
+        val id = dao.insert(Entry(ts = fixedNow, value = 4))
+        dispatcher.scheduler.runCurrent()
+        val entry = dao.insertCalls.single()
+        val valid = "😀".repeat(4_000)
+        vm.onEvent(TrackEvent.NoteRequested(entry))
+        dispatcher.scheduler.runCurrent()
+        vm.onEvent(TrackEvent.NoteTextChanged(valid))
+        vm.onEvent(TrackEvent.NoteSaveConfirmed)
+        dispatcher.scheduler.runCurrent()
+        assertEquals(valid, dao.updateCalls.single().note)
+        assertNull(vm.uiState.value.activeModal)
+
+        vm.onEvent(TrackEvent.NoteRequested(entry.copy(note = valid)))
+        dispatcher.scheduler.runCurrent()
+        vm.onEvent(TrackEvent.NoteTextChanged("😀".repeat(4_001)))
+        vm.onEvent(TrackEvent.NoteSaveConfirmed)
+        assertNotNull(vm.uiState.value.activeModal)
+        assertNotNull((vm.uiState.value.activeModal as TrackModalState.Note).mutationError)
+        assertEquals(1, dao.updateCalls.size)
+    }
+
+    @Test
+    fun `note rejects BOM and disallowed controls while retaining draft`() = runTest {
+        val (vm, dao) = viewModel()
+        dao.insert(Entry(ts = fixedNow, value = 4))
+        dispatcher.scheduler.runCurrent()
+        val entry = dao.insertCalls.single()
+        vm.onEvent(TrackEvent.NoteRequested(entry))
+        dispatcher.scheduler.runCurrent()
+        vm.onEvent(TrackEvent.NoteTextChanged("keep\uFEFFdraft\u0001"))
+        vm.onEvent(TrackEvent.NoteSaveConfirmed)
+        val modal = vm.uiState.value.activeModal as TrackModalState.Note
+        assertEquals("keep\uFEFFdraft\u0001", modal.draft.text)
+        assertNotNull(modal.mutationError)
+        assertTrue(dao.updateCalls.isEmpty())
+    }
+
+    @Test
+    fun `delete note clears draft then saves null without deleting entry`() = runTest {
+        val (vm, dao) = viewModel()
+        val id = dao.insert(Entry(ts = fixedNow, value = 6, note = "private", chips = listOf("flat")))
+        dispatcher.scheduler.runCurrent()
+        vm.onEvent(TrackEvent.NoteRequested(dao.insertCalls.single()))
+        dispatcher.scheduler.runCurrent()
+        vm.onEvent(TrackEvent.NoteDeleteRequested)
+        assertEquals("", (vm.uiState.value.activeModal as TrackModalState.Note).draft.text)
+        vm.onEvent(TrackEvent.NoteSaveConfirmed)
+        dispatcher.scheduler.runCurrent()
+        val saved = dao.observeRecent().first().single()
+        assertEquals(id, saved.id)
+        assertEquals(6, saved.value)
+        assertEquals(listOf("flat"), saved.chips)
+        assertNull(saved.note)
+        assertTrue(dao.deleteByIdCalls.isEmpty())
+    }
+
     @Test
     fun `DeleteRequested sets pendingDelete without calling delete`() = runTest {
         val (viewModel, dao) = viewModel()
@@ -383,7 +443,7 @@ class TrackViewModelTest {
     // ---------------------------------------------------------------------
 
     @Test
-    fun `KeyTapped with no prior entries is treated as onset and opens the chip prompt when askChips is on`() = runTest {
+    fun `KeyTapped with no prior entries never opens a chip prompt even when askChips is on`() = runTest {
         val settingsDao = FakeTrackSettingsDao(TrackSettings(askChips = true))
         val (viewModel, dao) = viewModel(settingsDao = settingsDao)
 
@@ -391,10 +451,8 @@ class TrackViewModelTest {
         dispatcher.scheduler.runCurrent()
 
         val insertedId = dao.insertCalls.single().id
-        val prompt = viewModel.uiState.value.onsetChipPrompt
-        assertNotNull(prompt)
-        assertEquals(insertedId, prompt!!.entryId)
-        assertTrue(prompt.selected.isEmpty())
+        assertNotNull(dao.insertCalls.single { it.id == insertedId })
+        assertNull(viewModel.uiState.value.onsetChipPrompt)
     }
 
     @Test
@@ -418,7 +476,7 @@ class TrackViewModelTest {
 
         assertEquals(2, entries.insertCalls.size)
         assertEquals(9 * hour, entries.insertCalls.last().ts)
-        assertNotNull(fixture.viewModel.uiState.value.onsetChipPrompt)
+        assertNull(fixture.viewModel.uiState.value.onsetChipPrompt)
     }
 
     @Test
@@ -444,7 +502,7 @@ class TrackViewModelTest {
         viewModel.onEvent(TrackEvent.KeyTapped(4))
         dispatcher.scheduler.runCurrent()
 
-        assertNotNull(viewModel.uiState.value.onsetChipPrompt)
+        assertNull(viewModel.uiState.value.onsetChipPrompt)
     }
 
     @Test
@@ -495,51 +553,38 @@ class TrackViewModelTest {
     }
 
     @Test
-    fun `OnsetChipToggled adds and removes chips, Submit persists them and clears the prompt`() = runTest {
+    fun `parked onset chip events never reveal a prompt or persist chips`() = runTest {
         val settingsDao = FakeTrackSettingsDao(TrackSettings(askChips = true))
         val (viewModel, dao) = viewModel(settingsDao = settingsDao)
 
         viewModel.onEvent(TrackEvent.KeyTapped(7))
         dispatcher.scheduler.runCurrent()
-        val insertedId = dao.insertCalls.single().id
-
         viewModel.onEvent(TrackEvent.OnsetChipToggled("flat"))
         viewModel.onEvent(TrackEvent.OnsetChipToggled("wired"))
-        viewModel.onEvent(TrackEvent.OnsetChipToggled("flat")) // toggled back off
-        assertEquals(setOf("wired"), viewModel.uiState.value.onsetChipPrompt!!.selected)
+        viewModel.onEvent(TrackEvent.OnsetChipsSubmitted)
+        viewModel.onEvent(TrackEvent.OnsetChipsSkipped)
+        dispatcher.scheduler.runCurrent()
 
+        assertNull(viewModel.uiState.value.onsetChipPrompt)
+        assertTrue(dao.updateChipsCalls.isEmpty())
+    }
+
+    @Test
+    fun `parked empty onset submit performs no chip write`() = runTest {
+        val settingsDao = FakeTrackSettingsDao(TrackSettings(askChips = true))
+        val (viewModel, dao) = viewModel(settingsDao = settingsDao)
+
+        viewModel.onEvent(TrackEvent.KeyTapped(7))
+        dispatcher.scheduler.runCurrent()
         viewModel.onEvent(TrackEvent.OnsetChipsSubmitted)
         dispatcher.scheduler.runCurrent()
 
         assertNull(viewModel.uiState.value.onsetChipPrompt)
-        // A chips-only targeted update (not a full-row EntryDao.update) - see EntryDao.kt
-        // doc comment: OnsetChipPromptState is frozen to entryId only, so Submit must
-        // never risk overwriting other columns from a possibly-stale full-row snapshot.
-        val (updatedId, updatedChips) = dao.updateChipsCalls.single()
-        assertEquals(insertedId, updatedId)
-        assertEquals(listOf("wired"), updatedChips)
-        assertEquals(0, dao.updateCalls.size)
+        assertTrue(dao.updateChipsCalls.isEmpty())
     }
 
     @Test
-    fun `OnsetChipsSubmitted with an empty selection still calls updateChips, per the frozen behavior`() = runTest {
-        val settingsDao = FakeTrackSettingsDao(TrackSettings(askChips = true))
-        val (viewModel, dao) = viewModel(settingsDao = settingsDao)
-
-        viewModel.onEvent(TrackEvent.KeyTapped(7))
-        dispatcher.scheduler.runCurrent()
-        val insertedId = dao.insertCalls.single().id
-
-        viewModel.onEvent(TrackEvent.OnsetChipsSubmitted)
-        dispatcher.scheduler.runCurrent()
-
-        val (updatedId, updatedChips) = dao.updateChipsCalls.single()
-        assertEquals(insertedId, updatedId)
-        assertTrue(updatedChips.isEmpty())
-    }
-
-    @Test
-    fun `OnsetChipsSkipped clears the prompt with no DAO update call`() = runTest {
+    fun `parked onset skip performs no chip write`() = runTest {
         val settingsDao = FakeTrackSettingsDao(TrackSettings(askChips = true))
         val (viewModel, dao) = viewModel(settingsDao = settingsDao)
 
@@ -553,6 +598,21 @@ class TrackViewModelTest {
         assertNull(viewModel.uiState.value.onsetChipPrompt)
         assertEquals(0, dao.updateCalls.size)
         assertEquals(0, dao.updateChipsCalls.size)
+    }
+
+    @Test
+    fun `parked onset submit never attempts a failing chip write`() = runTest {
+        val (vm, dao) = viewModel(settingsDao = FakeTrackSettingsDao(TrackSettings(askChips = true)))
+        vm.onEvent(TrackEvent.KeyTapped(7))
+        dispatcher.scheduler.runCurrent()
+        vm.onEvent(TrackEvent.OnsetChipToggled("flat"))
+        dao.updateChipsError = IllegalStateException("disk")
+        vm.onEvent(TrackEvent.OnsetChipsSubmitted)
+        vm.onEvent(TrackEvent.OnsetChipsSubmitted)
+        dispatcher.scheduler.runCurrent()
+
+        assertNull(vm.uiState.value.onsetChipPrompt)
+        assertTrue(dao.updateChipsCalls.isEmpty())
     }
 
     // ---------------------------------------------------------------------
@@ -592,6 +652,34 @@ class TrackViewModelTest {
         assertEquals("Asleep at 6", viewModel.uiState.value.toast)
         assertNotNull(viewModel.uiState.value.openSleepInterval)
         assertEquals(fixedNow, viewModel.uiState.value.openSleepInterval!!.startTs)
+    }
+
+    // R-3: capture failures retain the saved rating and disclose a partial armed result.
+    @Test
+    fun `ordinary capture insert failure is caught with recoverable status`() = runTest {
+        val (vm, dao) = viewModel()
+        dao.insertError = IllegalStateException("disk")
+        vm.onEvent(TrackEvent.KeyTapped(6))
+        dispatcher.scheduler.runCurrent()
+        assertTrue(dao.insertCalls.isEmpty())
+        assertEquals("Could not save that entry. Please try again.", vm.uiState.value.toast)
+        assertNull(vm.uiState.value.transientReadout)
+    }
+
+    @Test
+    fun `armed sleep side effect failure preserves one saved rating and reports partial outcome`() = runTest {
+        val sleepDao = FakeSleepDao().also { it.insertError = IllegalStateException("sleep disk") }
+        val (vm, entryDao) = viewModel(
+            sleepDao = sleepDao,
+            settingsDao = FakeTrackSettingsDao(TrackSettings(sleepIntroShown = true))
+        )
+        vm.onEvent(TrackEvent.ArmSleep)
+        dispatcher.scheduler.runCurrent()
+        vm.onEvent(TrackEvent.KeyTapped(6))
+        dispatcher.scheduler.runCurrent()
+        assertEquals(1, entryDao.insertCalls.size)
+        assertEquals(EntryKind.SLEEP, entryDao.insertCalls.single().kind)
+        assertEquals("Your rating was saved, but sleep tracking could not be updated.", vm.uiState.value.toast)
     }
 
     @Test
@@ -701,6 +789,41 @@ class TrackViewModelTest {
         assertEquals(0, markerDao.insertCalls.size)
         assertNull(viewModel.uiState.value.toast)
         assertFalse(viewModel.uiState.value.markerOpen)
+    }
+
+    // R-1/R-3: marker limits and failed writes are non-destructive and retryable.
+    @Test
+    fun `oversized marker stays editable and failed marker write stays open`() = runTest {
+        val (vm, _, _, markerDao) = viewModel()
+        vm.onEvent(TrackEvent.MarkerToggled)
+        vm.onEvent(TrackEvent.MarkerDraftChanged("x".repeat(4_001)))
+        vm.onEvent(TrackEvent.MarkerSaveConfirmed)
+        assertTrue(vm.uiState.value.markerOpen)
+        assertNotNull(vm.uiState.value.markerError)
+        assertTrue(markerDao.insertCalls.isEmpty())
+
+        vm.onEvent(TrackEvent.MarkerDraftChanged("keep this draft"))
+        markerDao.insertError = IllegalStateException("disk")
+        vm.onEvent(TrackEvent.MarkerSaveConfirmed)
+        dispatcher.scheduler.runCurrent()
+        assertTrue(vm.uiState.value.markerOpen)
+        assertEquals("keep this draft", vm.uiState.value.markerDraft)
+        assertNotNull(vm.uiState.value.markerError)
+    }
+
+    @Test
+    fun `delayed marker submit inserts once and preserves a later typed draft`() = runTest {
+        val (vm, _, _, markerDao) = viewModel()
+        vm.onEvent(TrackEvent.MarkerToggled)
+        vm.onEvent(TrackEvent.MarkerDraftChanged("first"))
+        vm.onEvent(TrackEvent.MarkerSaveConfirmed)
+        vm.onEvent(TrackEvent.MarkerSaveConfirmed)
+        vm.onEvent(TrackEvent.MarkerDraftChanged("later"))
+        dispatcher.scheduler.runCurrent()
+        assertEquals(1, markerDao.insertCalls.size)
+        assertEquals("first", markerDao.insertCalls.single().text)
+        assertTrue(vm.uiState.value.markerOpen)
+        assertEquals("later", vm.uiState.value.markerDraft)
     }
 
     @Test

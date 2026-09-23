@@ -75,7 +75,7 @@ class SafetyContentTest {
     }
 
     @Test
-    fun crisisResourceCopyIsExactlyAsVerifiedOn2026_08_05() {
+    fun crisisResourceCopyIsExactlyAsVerifiedOn2026_09_17() {
         assertEquals(
             "988 — United States and Canada",
             SafetyCopy.LIFELINE_NAME
@@ -84,9 +84,10 @@ class SafetyContentTest {
         assertEquals("Text 988", SafetyCopy.LIFELINE_TEXT)
         assertEquals(
             "Calling or texting 988 reaches the 988 Suicide & Crisis Lifeline in the " +
-                "United States and the 9-8-8 Suicide Crisis Helpline in Canada. Free and " +
+                "United States and the 9-8-8 Suicide Crisis Helpline in Canada. Calls are free and " +
                 "confidential, 24 hours a day, every day. In Canada it is available in " +
-                "English and French. For TTY in the United States, use your preferred " +
+                "English and French; texts beyond your mobile plan's allowance may incur " +
+                "carrier charges. For TTY in the United States, use your preferred " +
                 "relay service or dial 711 then 988.",
             SafetyCopy.LIFELINE_DETAIL
         )
@@ -104,7 +105,10 @@ class SafetyContentTest {
                 "button for it here, so it cannot be dialled by accident.",
             SafetyCopy.EMERGENCY
         )
-        assertEquals("These numbers were checked on 5 August 2026.", SafetyCopy.VERIFIED_ON)
+        // R-7: operator coverage was rechecked on 17 September 2026.
+        assertEquals("These numbers were checked on 17 September 2026.", SafetyCopy.VERIFIED_ON)
+        assertTrue(SafetyCopy.LIFELINE_DETAIL.contains("texts beyond your mobile plan's allowance"))
+        assertTrue(SafetyCopy.LIFELINE_DETAIL.contains("carrier charges"))
         assertEquals("https://findahelpline.com", FIND_A_HELPLINE_URL)
     }
 

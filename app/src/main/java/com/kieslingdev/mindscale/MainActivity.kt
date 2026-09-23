@@ -5,12 +5,16 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.core.view.WindowCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.CreationExtras
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.compose.runtime.getValue
+import com.kieslingdev.mindscale.data.ThemeMode
 import com.kieslingdev.mindscale.breathing.BreathingViewModel
 import com.kieslingdev.mindscale.breathing.SystemBreathingClock
 import com.kieslingdev.mindscale.log.LogViewModel
@@ -134,6 +138,17 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             val settingsState by settingsViewModel.uiState.collectAsStateWithLifecycle()
+            val useDarkSystemBars = when (settingsState.settings.themeMode) {
+                ThemeMode.SYSTEM -> isSystemInDarkTheme()
+                ThemeMode.LIGHT -> false
+                ThemeMode.DARK -> true
+            }
+            LaunchedEffect(useDarkSystemBars) {
+                WindowCompat.getInsetsController(window, window.decorView).apply {
+                    isAppearanceLightStatusBars = !useDarkSystemBars
+                    isAppearanceLightNavigationBars = !useDarkSystemBars
+                }
+            }
             MindScaleTheme(themeMode = settingsState.settings.themeMode) {
                 MindScaleApp(
                     trackViewModel = trackViewModel,

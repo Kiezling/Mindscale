@@ -43,7 +43,7 @@ class TrackSettingsDaoTest {
         assertFalse(settings.paused)
         assertEquals(0L, settings.checkinAt)
         assertFalse(settings.sleepIntroShown)
-        assertEquals(ThemeMode.SYSTEM, settings.themeMode)
+        assertEquals(ThemeMode.LIGHT, settings.themeMode)
         assertEquals(HourFormat.TWELVE, settings.hourFormat)
         assertEquals(DEFAULT_ONSET_CHIPS, settings.onsetChips)
         assertFalse(settings.hideNotes)

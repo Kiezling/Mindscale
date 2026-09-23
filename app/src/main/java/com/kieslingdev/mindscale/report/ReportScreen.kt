@@ -8,30 +8,35 @@ import android.os.Build
 import android.os.PersistableBundle
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kieslingdev.mindscale.insights.InsightRange
 import com.kieslingdev.mindscale.ui.components.MsCard
@@ -43,6 +48,9 @@ import com.kieslingdev.mindscale.ui.theme.ms
 import java.io.OutputStreamWriter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+
+// Below this width, two metric columns leave too little room for values such as intensity-hours.
+private val ReportMetricsSingleColumnWidth = 320.dp
 
 @Composable
 fun ReportRoute(
@@ -185,23 +193,95 @@ fun ReportScreen(
             }
         }
         uiState.report?.let { report ->
-            item(key = "report_text:${report.generatedAt}:${report.range}") {
-                MsCard(contentPadding = MsSpacing.lg) {
-                    SelectionContainer {
-                        Text(
-                            report.text,
-                            style = MaterialTheme.typography.bodyMedium,
-                            // The one deliberate refusal of Instrument Sans in the app. This is a
-                            // fixed-width document whose alignment carries meaning, it is
-                            // selectable, and it is the exact byte sequence Copy, Share and Save
-                            // hand out. A proportional face would misrepresent what the user is
-                            // about to send (D-10).
-                            fontFamily = FontFamily.Monospace,
-                            color = MaterialTheme.ms.inkPrimary,
-                            modifier = Modifier.fillMaxWidth().testTag("report_text")
-                        )
+            val presentation = report.presentation
+            item(key = "report_overview:${report.generatedAt}:${report.range}") {
+                Column(verticalArrangement = Arrangement.spacedBy(MsSpacing.sm)) {
+                    MsEyebrow("Selected dates")
+                    Text(
+                        presentation.rangeText,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.ms.inkPrimary,
+                        modifier = Modifier.testTag("report_dates")
+                    )
+                    presentation.name?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
+                    MsCard(contentPadding = MsSpacing.mdPlus) {
+                        BoxWithConstraints(Modifier.fillMaxWidth()) {
+                            val columns = if (maxWidth < ReportMetricsSingleColumnWidth || LocalDensity.current.fontScale >= 1.5f) 1 else 2
+                            Column(verticalArrangement = Arrangement.spacedBy(MsSpacing.md)) {
+                                presentation.metrics.chunked(columns).forEach { metrics ->
+                                    Row(horizontalArrangement = Arrangement.spacedBy(MsSpacing.md)) {
+                                        metrics.forEach { metric ->
+                                            Column(Modifier.weight(1f)) {
+                                                Text(metric.label, style = MaterialTheme.typography.labelMedium,
+                                                    color = MaterialTheme.ms.inkSecondary)
+                                                Text(metric.value, style = MaterialTheme.typography.titleMedium,
+                                                    color = MaterialTheme.ms.inkPrimary)
+                                            }
+                                        }
+                                        if (metrics.size < columns) Spacer(Modifier.weight(1f))
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
+            }
+            item(key = "report_course") {
+                ReportSection("Recorded course", "report_course") {
+                    if (presentation.ratings.isEmpty()) {
+                        Text("No ratings were recorded in this window.")
+                    } else {
+                        Text("Latest ${presentation.ratings.size} of ${presentation.ratingCount} ratings · 0–10",
+                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.ms.inkSecondary)
+                        presentation.ratings.forEach { rating ->
+                            Row(verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(MsSpacing.sm)) {
+                                Text(rating.time, style = MaterialTheme.typography.bodySmall,
+                                    modifier = Modifier.weight(1.5f))
+                                LinearProgressIndicator(
+                                    progress = { rating.value / 10f },
+                                    modifier = Modifier.weight(1f),
+                                    drawStopIndicator = {}
+                                )
+                                Text("${rating.value}/10", style = MaterialTheme.typography.labelMedium)
+                            }
+                        }
+                    }
+                }
+            }
+            item(key = "report_episodes") {
+                ReportSection("Episodes and starts", "report_episodes") {
+                    Text(presentation.episodeDetail, style = MaterialTheme.typography.bodyMedium)
+                    Text(presentation.onsetDetail, style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+            item(key = "report_events") {
+                ReportSection("Events marked", "report_events") {
+                    if (presentation.events.isEmpty()) Text("No events were marked in this window.")
+                    else presentation.events.forEach { Text(it, style = MaterialTheme.typography.bodyMedium) }
+                    if (presentation.omittedEvents > 0) Text("${presentation.omittedEvents} additional marked events not shown.",
+                        style = MaterialTheme.typography.bodySmall)
+                }
+            }
+            item(key = "report_sleep") {
+                ReportSection("Sleep", "report_sleep") {
+                    Text(presentation.sleepDetail, style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+            if (presentation.scores.isNotEmpty()) item(key = "report_scores") {
+                ReportSection("Externally obtained totals", "report_scores") {
+                    presentation.scores.forEach { Text(it, style = MaterialTheme.typography.bodyMedium) }
+                    if (presentation.omittedScores > 0) Text("${presentation.omittedScores} additional totals not shown.",
+                        style = MaterialTheme.typography.bodySmall)
+                    Text("MindScale did not administer or calculate these totals.",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.ms.inkSecondary)
+                }
+            }
+            item(key = "report_context") {
+                Text(presentation.context + " This is a record summary, not a clinical assessment. Review the underlying records.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.ms.inkSecondary,
+                    modifier = Modifier.testTag("report_context"))
             }
             uiState.pendingDocument?.takeIf { it.launchToken == null }?.let { pendingDocument ->
                 item(key = "retained_report_document") {
@@ -263,6 +343,20 @@ fun ReportScreen(
                     color = MaterialTheme.ms.goldText,
                     modifier = Modifier.testTag("report_message").semantics { liveRegion = LiveRegionMode.Polite }
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ReportSection(title: String, tag: String, content: @Composable () -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(MsSpacing.sm), modifier = Modifier.testTag(tag)) {
+        MsEyebrow(title)
+        MsCard(contentPadding = MsSpacing.mdPlus) {
+            Column(verticalArrangement = Arrangement.spacedBy(MsSpacing.sm), modifier = Modifier.fillMaxWidth()) {
+                CompositionLocalProvider(LocalContentColor provides MaterialTheme.ms.inkSecondary) {
+                    content()
+                }
             }
         }
     }

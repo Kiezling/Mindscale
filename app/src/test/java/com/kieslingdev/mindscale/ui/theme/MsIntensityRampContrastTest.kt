@@ -100,9 +100,8 @@ class MsIntensityRampContrastTest {
      * D-4, finding 2, and the decision's actual cause.
      *
      * The prototype's light ramp runs pale to dark, so its relative luminance **descends**.
-     * [IntensityRampTest] has asserted a monotonically non-decreasing light ramp since Phase 1, it
-     * is a pre-existing file, and D-1 forbids editing it. So the design's light direction is not
-     * available to this phase, whatever its merits.
+     * R-10 authorizes the shipped light ramp to follow that direction so higher intensity carries
+     * more visual weight against the light background.
      */
     @Test
     fun theDesignsLightRampDescendsInLuminanceAndWouldFailThePreExistingRampTest() {
@@ -199,13 +198,28 @@ class MsIntensityRampContrastTest {
         }
     }
 
+    /** R-10: increasing intensity must increase contrast against the page background in both themes. */
+    @Test
+    fun contrastAgainstBackgroundIncreasesWithIntensityInBothThemes() {
+        listOf(false to LightBg, true to DarkBg).forEach { (dark, bg) ->
+            val contrasts = (1..10).map { value -> ratio(intensityColor(value, dark), bg) }
+            for (i in 1 until contrasts.size) {
+                assertTrue(
+                    "R-10: expected contrast($i) >= contrast(${i}) for dark=$dark",
+                    contrasts[i] >= contrasts[i - 1]
+                )
+            }
+        }
+    }
+
     /** The anchor figures D-4's adopted table records. `lerp` returns the anchors exactly at the ends. */
     @Test
     fun theAdoptedAnchorsMeasureWhatTheSpecRecords() {
-        assertEquals(7.26, round2(ratio(intensityColor(1, isDark = false), LightCard)), 0.001)
-        assertEquals(7.02, round2(ratio(intensityColor(1, isDark = false), LightBg)), 0.001)
-        assertEquals(3.15, round2(ratio(intensityColor(10, isDark = false), LightCard)), 0.001)
-        assertEquals(3.05, round2(ratio(intensityColor(10, isDark = false), LightBg)), 0.001)
+        // R-10 reverses the light mapping while preserving the two exact endpoint colors.
+        assertEquals(3.15, round2(ratio(intensityColor(1, isDark = false), LightCard)), 0.001)
+        assertEquals(3.05, round2(ratio(intensityColor(1, isDark = false), LightBg)), 0.001)
+        assertEquals(7.26, round2(ratio(intensityColor(10, isDark = false), LightCard)), 0.001)
+        assertEquals(7.02, round2(ratio(intensityColor(10, isDark = false), LightBg)), 0.001)
 
         assertEquals(3.74, round2(ratio(intensityColor(1, isDark = true), DarkCard)), 0.001)
         assertEquals(4.00, round2(ratio(intensityColor(1, isDark = true), DarkBg)), 0.001)
@@ -214,13 +228,14 @@ class MsIntensityRampContrastTest {
     }
 
     /**
-     * One rule for both themes: intensity 10 is painted **the theme's own gold** — the same colour
-     * as the armed pad ring, the header rule, the day headers and the episode peak. The slate-blue
-     * was the last non-brand hue in the app and it is gone.
+     * The dark intensity-10 anchor is **the theme's own gold** — the same colour as the armed pad
+     * ring, the header rule, the day headers and the episode peak. R-10 keeps the light ramp's same
+     * two endpoint colors but places its gold anchor at intensity 1.
      */
     @Test
     fun theHighAnchorIsTheThemesOwnGoldInBothThemes() {
-        assertEquals(LightPalette.gold, intensityColor(10, isDark = false))
+        // R-10 moves the light gold endpoint to intensity 1; intensity 10 remains the brown endpoint.
+        assertEquals(Color(0xFF6E5220), intensityColor(10, isDark = false))
         assertEquals(DarkPalette.gold, intensityColor(10, isDark = true))
     }
 
@@ -255,15 +270,15 @@ class MsIntensityRampContrastTest {
      */
     @Test
     fun theRampCannotClearTheFloorAgainstEveryCategoryAndTheExemptionIsDeliberate() {
-        assertEquals(5.21, round2(ratio(intensityColor(1, isDark = false), LightSleepBand)), 0.001)
-        assertEquals(2.26, round2(ratio(intensityColor(10, isDark = false), LightSleepBand)), 0.001)
+        assertEquals(2.26, round2(ratio(intensityColor(1, isDark = false), LightSleepBand)), 0.001)
+        assertEquals(5.21, round2(ratio(intensityColor(10, isDark = false), LightSleepBand)), 0.001)
         assertEquals(3.33, round2(ratio(intensityColor(1, isDark = true), DarkSleepBand)), 0.001)
         assertEquals(7.15, round2(ratio(intensityColor(10, isDark = true), DarkSleepBand)), 0.001)
 
         assertTrue(
-            "if light intensity 10 now clears 3:1 against the asleep band, D-6's exemption is " +
+            "if light intensity 1 now clears 3:1 against the asleep band, D-6's exemption is " +
                 "no longer needed and should be removed rather than this test relaxed",
-            ratio(intensityColor(10, isDark = false), LightSleepBand) < AA_NON_TEXT
+            ratio(intensityColor(1, isDark = false), LightSleepBand) < AA_NON_TEXT
         )
     }
 }

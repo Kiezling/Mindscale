@@ -1,6 +1,7 @@
 package com.kieslingdev.mindscale.log
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -38,6 +40,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.kieslingdev.mindscale.data.EntryKind
 import com.kieslingdev.mindscale.data.HourFormat
+import com.kieslingdev.mindscale.notes.RichNoteCodec
+import com.kieslingdev.mindscale.track.band
 import com.kieslingdev.mindscale.settings.vocabularyForEntry
 import com.kieslingdev.mindscale.ui.components.MsActionTone
 import com.kieslingdev.mindscale.ui.components.MsCard
@@ -46,8 +50,12 @@ import com.kieslingdev.mindscale.ui.components.MsDialog
 import com.kieslingdev.mindscale.ui.components.MsEyebrow
 import com.kieslingdev.mindscale.ui.components.MsHairline
 import com.kieslingdev.mindscale.ui.components.MsTextAction
+import com.kieslingdev.mindscale.ui.components.MsDateTimeFields
+import com.kieslingdev.mindscale.ui.components.RichNoteEditor
+import com.kieslingdev.mindscale.ui.components.richNoteAnnotatedString
 import com.kieslingdev.mindscale.ui.components.MsUppercaseText
 import com.kieslingdev.mindscale.ui.theme.MsSpacing
+import com.kieslingdev.mindscale.ui.theme.MsShapes
 import com.kieslingdev.mindscale.ui.theme.ms
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import java.time.Instant
@@ -65,6 +73,9 @@ private val FilterDateFormatter = DateTimeFormatter.ofPattern("MMM d, yyyy")
 
 /** The row's `grid-template-columns:34px 1fr auto`, line 269. */
 private val RowNumeralColumnWidth = 34.dp
+
+/** Matches Track Recent Logs' rating circle for visual parity. */
+private val RowRatingDotSize = 42.dp
 
 /** The note preview's and inline panels' indent, lines 288 and 291: `46px`, clearing the numeral. */
 private val RowContentIndent = 46.dp
@@ -162,6 +173,7 @@ fun LogScreen(
                         item = item,
                         editDraft = uiState.editDraft?.takeIf { item is LogItem.Rating && it.entryId == item.id },
                         noteDraft = uiState.noteDraft?.takeIf { item is LogItem.Rating && it.entryId == item.id },
+                        eventDraft = uiState.eventDraft?.takeIf { item is LogItem.Event && it.markerId == item.id },
                         settings = uiState.settings,
                         onEvent = onEvent
                     )
@@ -393,6 +405,7 @@ private fun LogItemRow(
     item: LogItem,
     editDraft: LogEditDraft?,
     noteDraft: LogNoteDraft?,
+    eventDraft: LogEventDraft?,
     settings: com.kieslingdev.mindscale.data.TrackSettings,
     onEvent: (LogEvent) -> Unit
 ) {
@@ -404,24 +417,27 @@ private fun LogItemRow(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(MsSpacing.mdPlus)
         ) {
-            Text(
-                text = when (item) {
-                    is LogItem.Rating -> item.entry.value.toString()
-                    is LogItem.Sleep -> "—"
-                    is LogItem.Event -> "×"
-                },
-                style = MaterialTheme.typography.titleLarge,
-                // The design recedes the sleep em-dash to `rgba(ink,.28)` and a zero rating to
-                // `rgba(ink,.4)`; both measure below the 4.5:1 text floor, so this uses the
-                // faintest compliant level instead (D-12).
-                color = when {
-                    item is LogItem.Event -> palette.goldText
-                    item is LogItem.Sleep -> palette.inkQuaternary
-                    item is LogItem.Rating && item.entry.value == 0 -> palette.inkQuaternary
-                    else -> palette.inkPrimary
-                },
-                modifier = Modifier.widthIn(min = RowNumeralColumnWidth)
-            )
+            if (item is LogItem.Rating) {
+                Box(
+                    modifier = Modifier.size(RowRatingDotSize).border(
+                        MsSpacing.hairline, palette.gold.copy(alpha = 0.5f), MsShapes.circle
+                    ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        item.entry.value.toString(),
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = if (item.entry.value == 0) palette.inkQuaternary else palette.inkPrimary
+                    )
+                }
+            } else {
+                Text(
+                    text = if (item is LogItem.Sleep) "—" else "×",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = if (item is LogItem.Sleep) palette.inkQuaternary else palette.goldText,
+                    modifier = Modifier.widthIn(min = RowNumeralColumnWidth)
+                )
+            }
             Column(
                 modifier = Modifier.weight(1f)
                     .semantics(mergeDescendants = true) {
@@ -431,9 +447,16 @@ private fun LogItemRow(
             ) {
                 Text(
                     formatTime(item.timestamp, settings.hourFormat),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = palette.inkSecondary
+                    style = if (item is LogItem.Rating) MaterialTheme.typography.titleSmall else MaterialTheme.typography.bodySmall,
+                    color = if (item is LogItem.Rating) palette.inkPrimary else palette.inkSecondary
                 )
+                if (item is LogItem.Rating) {
+                    MsUppercaseText(
+                        text = band(item.entry.value),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = palette.inkQuaternary
+                    )
+                }
                 val meta = itemMeta(item)
                 if (meta.isNotBlank()) {
                     Text(
@@ -442,6 +465,16 @@ private fun LogItemRow(
                         color = palette.inkQuaternary,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
+                    )
+                }
+                if (item is LogItem.Rating && !settings.hideNotes && !item.entry.note.isNullOrBlank()) {
+                    Text(
+                        richNoteAnnotatedString(item.entry.note.orEmpty()),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = palette.inkTertiary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.testTag("log_note_${item.id}")
                     )
                 }
             }
@@ -471,6 +504,14 @@ private fun LogItemRow(
                     }
                 )
             }
+            if (item is LogItem.Event) {
+                MsTextAction(
+                    text = "Edit",
+                    onClick = { onEvent(LogEvent.EventEditToggled(item.id)) },
+                    tone = MsActionTone.Muted,
+                    modifier = Modifier.semantics { contentDescription = "Edit event" }
+                )
+            }
             MsTextAction(
                 text = "Delete",
                 onClick = { onEvent(LogEvent.DeleteRequested(item)) },
@@ -478,24 +519,18 @@ private fun LogItemRow(
                 modifier = Modifier.semantics { contentDescription = "Delete ${deleteType(item)}" }
             )
         }
-        if (item is LogItem.Rating && !settings.hideNotes && !item.entry.note.isNullOrBlank()) {
-            Text(
-                item.entry.note.orEmpty(),
-                style = MaterialTheme.typography.bodySmall,
-                color = palette.inkTertiary,
-                modifier = Modifier
-                    .padding(start = RowContentIndent, bottom = MsSpacing.sm)
-                    .testTag("log_note_${item.id}")
-            )
-        }
         if (editDraft != null) {
             InlineEditPanel(
                 editDraft,
                 vocabularyForEntry(settings, editDraft.chips),
-                onEvent
+                onEvent,
+                settings.hourFormat
             )
         }
-        if (noteDraft != null) InlineNotePanel(noteDraft, onEvent)
+        if (noteDraft != null && item is LogItem.Rating) {
+            InlineNotePanel(noteDraft, !item.entry.note.isNullOrBlank(), onEvent)
+        }
+        if (eventDraft != null) InlineEventPanel(eventDraft, settings.hourFormat, onEvent)
     }
 }
 
@@ -503,7 +538,8 @@ private fun LogItemRow(
 private fun InlineEditPanel(
     draft: LogEditDraft,
     vocabulary: List<String>,
-    onEvent: (LogEvent) -> Unit
+    onEvent: (LogEvent) -> Unit,
+    hourFormat: HourFormat
 ) {
     Column(
         modifier = Modifier.fillMaxWidth()
@@ -524,53 +560,103 @@ private fun InlineEditPanel(
                 )
             }
         }
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(MsSpacing.xs),
-            verticalArrangement = Arrangement.spacedBy(MsSpacing.xs)
-        ) {
-            vocabulary.forEach { chip ->
-                MsChip(
-                    text = chip,
-                    selected = chip in draft.chips,
-                    onClick = { onEvent(LogEvent.EditChipToggled(chip)) },
-                    modifier = Modifier.testTag("log_edit_chip_$chip")
-                )
-            }
-        }
-        OutlinedTextField(
-            value = draft.timestampText,
-            onValueChange = { onEvent(LogEvent.EditTimestampTextChanged(it)) },
-            label = { Text("Time (yyyy-MM-dd HH:mm)") },
-            supportingText = draft.error?.let { { Text(it) } },
-            isError = draft.error != null,
-            shape = MaterialTheme.shapes.small,
-            modifier = Modifier.fillMaxWidth().testTag("log_edit_timestamp")
+        val date = draft.timestampText.substringBefore(' ')
+        val time = draft.timestampText.substringAfter(' ', "00:00")
+        MsDateTimeFields(
+            dateText = date,
+            timeText = time,
+            onDateChanged = { onEvent(LogEvent.EditTimestampTextChanged("$it $time")) },
+            onTimeChanged = { onEvent(LogEvent.EditTimestampTextChanged("$date $it")) },
+            hourFormat = hourFormat,
+            tagPrefix = "log_edit",
+            modifier = Modifier.fillMaxWidth()
         )
+        draft.error?.let { Text(it, color = MaterialTheme.ms.danger) }
     }
 }
 
 @Composable
-private fun InlineNotePanel(draft: LogNoteDraft, onEvent: (LogEvent) -> Unit) {
+private fun InlineNotePanel(draft: LogNoteDraft, hasExistingNote: Boolean, onEvent: (LogEvent) -> Unit) {
     Column(
         modifier = Modifier.fillMaxWidth()
             .padding(start = RowContentIndent, bottom = MsSpacing.mdPlus)
             .testTag("log_inline_note_${draft.entryId}"),
         verticalArrangement = Arrangement.spacedBy(MsSpacing.sm)
     ) {
-        OutlinedTextField(
+        RichNoteEditor(
             value = draft.text,
             onValueChange = { onEvent(LogEvent.NoteTextChanged(it)) },
-            label = { Text("Note") },
-            minLines = 3,
-            shape = MaterialTheme.shapes.small,
-            modifier = Modifier.fillMaxWidth().testTag("log_note_field")
+            isError = draft.error != null,
+            supportingText = draft.error,
+            modifier = Modifier.testTag("log_note_field")
         )
+        if (hasExistingNote) {
+            MsTextAction(
+                text = "Delete note",
+                onClick = { onEvent(LogEvent.NoteDeleteRequested) },
+                tone = MsActionTone.Muted,
+                modifier = Modifier.testTag("log_delete_note")
+            )
+            Text(
+                "Deletes only the note when you save. The rating stays in your log.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.ms.inkTertiary
+            )
+        }
         FlowRow(horizontalArrangement = Arrangement.spacedBy(MsSpacing.sm)) {
             MsTextAction(text = "Save", onClick = { onEvent(LogEvent.NoteSaved) })
             MsTextAction(
                 text = "Cancel",
                 onClick = { onEvent(LogEvent.NoteCancelled) },
                 tone = MsActionTone.Muted
+            )
+        }
+    }
+}
+
+@Composable
+private fun InlineEventPanel(draft: LogEventDraft, hourFormat: HourFormat, onEvent: (LogEvent) -> Unit) {
+    Column(
+        modifier = Modifier.fillMaxWidth()
+            .padding(start = RowContentIndent, bottom = MsSpacing.mdPlus)
+            .testTag("log_inline_event_${draft.markerId}"),
+        verticalArrangement = Arrangement.spacedBy(MsSpacing.sm)
+    ) {
+        OutlinedTextField(
+            value = draft.text,
+            onValueChange = { onEvent(LogEvent.EventTextChanged(it)) },
+            label = { Text("Event") },
+            enabled = !draft.isSaving,
+            isError = draft.error != null,
+            modifier = Modifier.fillMaxWidth().testTag("log_event_text")
+        )
+        val date = draft.timestampText.substringBefore(' ')
+        val time = draft.timestampText.substringAfter(' ', "00:00")
+        MsDateTimeFields(
+            dateText = date,
+            timeText = time,
+            onDateChanged = { onEvent(LogEvent.EventTimestampChanged("$it $time")) },
+            onTimeChanged = { onEvent(LogEvent.EventTimestampChanged("$date $it")) },
+            hourFormat = hourFormat,
+            enabled = !draft.isSaving,
+            tagPrefix = "log_event",
+            modifier = Modifier.fillMaxWidth()
+        )
+        draft.error?.let { Text(it, color = MaterialTheme.ms.danger) }
+        if (draft.isSaving) Text("Saving", color = MaterialTheme.ms.inkTertiary)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(MsSpacing.sm)) {
+            MsTextAction(
+                text = "Save",
+                onClick = { onEvent(LogEvent.EventSaveRequested) },
+                enabled = !draft.isSaving,
+                modifier = Modifier.testTag("log_event_save")
+            )
+            MsTextAction(
+                text = "Cancel",
+                onClick = { onEvent(LogEvent.EventEditCancelled) },
+                enabled = !draft.isSaving,
+                tone = MsActionTone.Muted,
+                modifier = Modifier.testTag("log_event_cancel")
             )
         }
     }
@@ -608,9 +694,8 @@ private fun itemMeta(item: LogItem): String = when (item) {
         when (item.entry.kind) {
             EntryKind.SLEEP -> add("went to sleep")
             EntryKind.WAKE -> add("woke up")
-            null -> if (item.entry.value == 0) add("ended")
+            null -> Unit
         }
-        if (item.entry.chips.isNotEmpty()) add(item.entry.chips.joinToString(" · "))
     }.joinToString(" · ")
     is LogItem.Sleep -> if (item.interval.endTs == null) "sleeping now" else "slept ${formatSleepDuration(item.interval)}"
     is LogItem.Event -> item.marker.text
@@ -618,10 +703,13 @@ private fun itemMeta(item: LogItem): String = when (item) {
 
 private fun itemDescription(item: LogItem, hourFormat: HourFormat, hideNotes: Boolean): String = when (item) {
     is LogItem.Rating -> buildString {
-        append("Rating ${item.entry.value}, ${formatTime(item.timestamp, hourFormat)}")
+        append("Rating ${item.entry.value}, ${band(item.entry.value)}, ${formatTime(item.timestamp, hourFormat)}")
         val meta = itemMeta(item)
         if (meta.isNotBlank()) append(", $meta")
-        if (!hideNotes) item.entry.note?.takeIf { it.isNotBlank() }?.let { append(", note $it") }
+        if (!hideNotes) item.entry.note
+            ?.let(RichNoteCodec::plainText)
+            ?.takeIf { it.isNotBlank() }
+            ?.let { append(", note $it") }
     }
     is LogItem.Sleep -> "Sleep interval, ${formatTime(item.timestamp, hourFormat)}, ${itemMeta(item)}"
     is LogItem.Event -> "Event, ${formatTime(item.timestamp, hourFormat)}, ${item.marker.text}"

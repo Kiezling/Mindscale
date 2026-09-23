@@ -1,10 +1,13 @@
 package com.kieslingdev.mindscale.log
 
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performTextReplacement
+import androidx.compose.ui.semantics.SemanticsProperties
 import com.kieslingdev.mindscale.data.Entry
 import com.kieslingdev.mindscale.data.EntryKind
 import com.kieslingdev.mindscale.data.Marker
@@ -50,7 +53,8 @@ class LogScreenTest {
         setContent(LogUiState(days = groupLogItems(items, zone), recordCount = items.size, hasAnyRecords = true))
 
         composeTestRule.onNodeWithText("6").assertExists()
-        composeTestRule.onNodeWithText("went to sleep · flat").assertExists()
+        composeTestRule.onNodeWithText(com.kieslingdev.mindscale.track.band(6)).assertExists()
+        composeTestRule.onNodeWithText("went to sleep").assertExists()
         composeTestRule.onNodeWithText("Still there at bedtime.").assertExists()
         composeTestRule.onNodeWithText("0").assertExists()
         composeTestRule.onNodeWithText("ended").assertExists()
@@ -59,7 +63,36 @@ class LogScreenTest {
     }
 
     @Test
-    fun inlineEditPanel_rendersFrozenControls_andEmitsImmediateEditEvents() {
+    fun zeroRatingShowsAndAnnouncesEndedExactlyOnce() {
+        val entry = Entry(id = 77, ts = baseTs, value = 0)
+        setContent(
+            LogUiState(
+                days = groupLogItems(listOf(LogItem.Rating(entry)), zone),
+                recordCount = 1,
+                hasAnyRecords = true
+            )
+        )
+
+        assertEquals(
+            1,
+            composeTestRule.onAllNodesWithText("ended", useUnmergedTree = true)
+                .fetchSemanticsNodes().size
+        )
+        val zeroRatingDescription = SemanticsMatcher("zero rating says ended once") { node ->
+            node.config.getOrNull(SemanticsProperties.ContentDescription)?.any { description ->
+                description.startsWith("Rating 0, ended, ") &&
+                    description.split("ended").size == 2
+            } == true
+        }
+        assertEquals(
+            1,
+            composeTestRule.onAllNodes(zeroRatingDescription, useUnmergedTree = true)
+                .fetchSemanticsNodes().size
+        )
+    }
+
+    @Test
+    fun inlineEditPanel_usesPickerButtons_andCancelDoesNotEmitTimestampChanges() {
         val entry = Entry(id = 1, ts = baseTs, value = 5, chips = listOf("wired"))
         val days = groupLogItems(listOf(LogItem.Rating(entry)), zone)
         val events = mutableListOf<LogEvent>()
@@ -75,17 +108,18 @@ class LogScreenTest {
         )
         composeTestRule.onNodeWithTag("log_inline_edit_1").assertExists()
         composeTestRule.onNodeWithTag("log_edit_value_10").performClick()
-        composeTestRule.onNodeWithTag("log_edit_chip_wired").performClick()
-        composeTestRule.onNodeWithTag("log_edit_timestamp").performTextReplacement("2026-08-03 08:00")
+        composeTestRule.onNodeWithTag("log_edit_date").performClick()
+        composeTestRule.onNodeWithText("Cancel").performClick()
+        composeTestRule.onNodeWithTag("log_edit_time").performClick()
+        composeTestRule.onNodeWithText("Cancel").performClick()
 
         assertEquals(LogEvent.EditValueSelected(10), events[0])
-        assertEquals(LogEvent.EditChipToggled("wired"), events[1])
-        assertEquals(LogEvent.EditTimestampTextChanged("2026-08-03 08:00"), events.last())
+        assertEquals(1, events.size)
     }
 
     @Test
     fun inlineNotePanel_rendersFrozenControls_andEmitsSaveCancel() {
-        val entry = Entry(id = 1, ts = baseTs, value = 5)
+        val entry = Entry(id = 1, ts = baseTs, value = 5, note = "saved")
         val events = mutableListOf<LogEvent>()
         setContent(
             LogUiState(
@@ -97,10 +131,31 @@ class LogScreenTest {
             events
         )
         composeTestRule.onNodeWithTag("log_inline_note_1").assertExists()
+        composeTestRule.onNodeWithTag("log_delete_note").performClick()
         composeTestRule.onNodeWithText("Save").performClick()
         composeTestRule.onNodeWithText("Cancel").performClick()
 
-        assertEquals(listOf(LogEvent.NoteSaved, LogEvent.NoteCancelled), events)
+        assertEquals(listOf(LogEvent.NoteDeleteRequested, LogEvent.NoteSaved, LogEvent.NoteCancelled), events)
+    }
+
+    @Test
+    fun eventRowOpensEditorWithTextAndSharedDateTimeControls() {
+        val marker = Marker(id = 7, ts = baseTs, text = "Travel")
+        val events = mutableListOf<LogEvent>()
+        setContent(LogUiState(
+            days = groupLogItems(listOf(LogItem.Event(marker)), zone),
+            recordCount = 1,
+            hasAnyRecords = true,
+            eventDraft = LogEventDraft(marker.id, marker.text, formatEditTimestamp(marker.ts, zone))
+        ), events)
+
+        composeTestRule.onNodeWithTag("log_inline_event_7").assertExists()
+        composeTestRule.onNodeWithTag("log_event_text").assertExists()
+        composeTestRule.onNodeWithTag("log_event_date").assertExists()
+        composeTestRule.onNodeWithTag("log_event_time").assertExists()
+        composeTestRule.onNodeWithTag("log_event_save").performClick()
+        composeTestRule.onNodeWithTag("log_event_cancel").performClick()
+        assertEquals(listOf(LogEvent.EventSaveRequested, LogEvent.EventEditCancelled), events)
     }
 
     @Test

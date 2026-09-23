@@ -73,11 +73,44 @@ class InsightsScreenTest {
         setContent(state)
 
         composeTestRule.onNodeWithTag("insights_summary").assertExists()
+        composeTestRule.onNodeWithTag("insights_active_dates").assertExists()
         composeTestRule.onNode(
             SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("Episodes, 1"))
         ).assertExists()
-        composeTestRule.onNodeWithTag("insights_screen").performScrollToNode(hasText("Each episode"))
-        composeTestRule.onNodeWithText("Each episode").assertExists()
+        composeTestRule.onNode(
+            SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("Median peak, 5/10"))
+        ).assertExists()
+        composeTestRule.onNodeWithTag("insights_screen")
+            .performScrollToNode(hasTestTag("insights_episodes_toggle"))
+        composeTestRule.onNodeWithTag("insights_episodes_toggle").assertExists()
+    }
+
+    @Test
+    fun secondaryInsightSectionsAreCollapsedUntilTheirNamedExpandersAreOpened() {
+        val state = InsightsUiState(
+            loading = false,
+            snapshot = snapshot(listOf(entry(1, 0, 5), entry(2, 2 * HOUR, 0)))
+        )
+        setContent(state, expandSecondary = false)
+
+        composeTestRule.onNodeWithTag("insights_screen")
+            .performScrollToNode(hasTestTag("insights_day_by_day_toggle"))
+        composeTestRule.onNodeWithTag("insights_day_by_day_toggle").assertExists()
+        composeTestRule.onNodeWithTag("raster_chart").assertDoesNotExist()
+        composeTestRule.onNodeWithTag("insights_screen")
+            .performScrollToNode(hasTestTag("insights_episodes_toggle"))
+        composeTestRule.onNodeWithTag("insights_episodes_toggle").assertExists()
+
+        composeTestRule.onNodeWithTag("insights_screen")
+            .performScrollToNode(hasTestTag("insights_day_by_day_toggle"))
+        composeTestRule.onNodeWithTag("insights_day_by_day_toggle").performClick()
+        composeTestRule.onNodeWithTag("insights_screen").performScrollToNode(hasTestTag("raster_chart"))
+        composeTestRule.onNodeWithTag("raster_chart").assertExists()
+        composeTestRule.onNodeWithTag("insights_screen")
+            .performScrollToNode(hasTestTag("insights_more_details_toggle"))
+        composeTestRule.onNodeWithTag("insights_more_details_toggle").performClick()
+        composeTestRule.onNodeWithTag("insights_screen").performScrollToNode(hasTestTag("insights_episodes_toggle"))
+        composeTestRule.onNodeWithTag("insights_episodes_toggle").performClick()
     }
 
     @Test
@@ -146,7 +179,7 @@ class InsightsScreenTest {
     }
 
     @Test
-    fun entryChartReadoutShowsChipsAndEventButHonorsHiddenNotes() {
+    fun entryChartReadoutHidesParkedChipsAndHonorsHiddenNotes() {
         val selected = HOUR
         val state = InsightsUiState(
             loading = false,
@@ -161,7 +194,7 @@ class InsightsScreenTest {
         )
         setContent(state)
 
-        composeTestRule.onNodeWithText("work", substring = true).assertExists()
+        composeTestRule.onNodeWithText("work", substring = true).assertDoesNotExist()
         composeTestRule.onNodeWithText("event: dose change", substring = true).assertExists()
         composeTestRule.onNodeWithText("private note", substring = true).assertDoesNotExist()
     }
@@ -273,7 +306,7 @@ class InsightsScreenTest {
     }
 
     @Test
-    fun onsetTimeCountsRefuseSparseRangeWithoutRenderingHours() {
+    fun onsetTimeCountsRenderSparseRangeWithAllHours() {
         val state = InsightsUiState(
             loading = false,
             snapshot = snapshot(episodeRows(listOf(0L, 2 * HOUR, 4 * HOUR, 6 * HOUR, 8 * HOUR)))
@@ -281,13 +314,32 @@ class InsightsScreenTest {
         setContent(state)
 
         composeTestRule.onNodeWithTag("insights_screen")
-            .performScrollToNode(hasTestTag("onset_time_refusal"))
-        composeTestRule.onNodeWithText(
-            "Needs 1 more recorded start in this range before this chart is shown. " +
-                "There are 5 starts to count by hour."
-        ).assertExists()
-        composeTestRule.onNodeWithTag("onset_time_bars").assertDoesNotExist()
-        composeTestRule.onNodeWithText("Select an hour to read its exact count.").assertDoesNotExist()
+            .performScrollToNode(hasTestTag("onset_time_bars"))
+        (0 until 24).forEach { composeTestRule.onNodeWithTag("onset_time_hour_$it").assertExists() }
+        composeTestRule.onNodeWithText("Select an hour to read its exact count.").assertExists()
+    }
+
+    @Test
+    fun onsetTimeBarsRemainAvailableWithZeroRecordedStarts() {
+        val state = InsightsUiState(loading = false, snapshot = snapshot(listOf(entry(1, 0, 0))))
+        setContent(state)
+        composeTestRule.onNodeWithTag("insights_screen")
+            .performScrollToNode(hasTestTag("onset_time_bars"))
+        (0 until 24).forEach { hour ->
+            composeTestRule.onNodeWithTag("onset_time_hour_$hour").assertExists()
+        }
+    }
+
+    @Test
+    fun onsetTimeBarsRemainAvailableWithOneRecordedStart() {
+        val state = InsightsUiState(loading = false,
+            snapshot = snapshot(listOf(entry(1, 0, 5), entry(2, HOUR, 0))))
+        setContent(state)
+        composeTestRule.onNodeWithTag("insights_screen")
+            .performScrollToNode(hasTestTag("onset_time_bars"))
+        (0 until 24).forEach { hour ->
+            composeTestRule.onNodeWithTag("onset_time_hour_$hour").assertExists()
+        }
     }
 
     @Test
@@ -488,6 +540,7 @@ class InsightsScreenTest {
 
     private fun setContent(
         state: InsightsUiState,
+        expandSecondary: Boolean = true,
         onRangeSelected: (InsightRange) -> Unit = {},
         onExplore: (Long) -> Unit = {},
         onEarlierHour: () -> Boolean = { true },
@@ -522,6 +575,23 @@ class InsightsScreenTest {
                     zoneId = ZoneOffset.UTC
                 )
             }
+        }
+        // Existing interaction tests exercise the disclosed content. The product still starts
+        // closed; the explicit test above pins that default independently.
+        if (expandSecondary && state.snapshot?.hasEntries == true) {
+            composeTestRule.onNodeWithTag("insights_screen")
+                .performScrollToNode(hasTestTag("insights_day_by_day_toggle"))
+            composeTestRule.onNodeWithTag("insights_day_by_day_toggle").performClick()
+            composeTestRule.onNodeWithTag("insights_screen")
+                .performScrollToNode(hasTestTag("insights_more_details_toggle"))
+            composeTestRule.onNodeWithTag("insights_more_details_toggle").performClick()
+            if (state.snapshot.recentEpisodes.isNotEmpty()) {
+                composeTestRule.onNodeWithTag("insights_screen")
+                    .performScrollToNode(hasTestTag("insights_episodes_toggle"))
+                composeTestRule.onNodeWithTag("insights_episodes_toggle").performClick()
+            }
+            composeTestRule.onNodeWithTag("insights_screen")
+                .performScrollToNode(hasTestTag("insight_range_ONE_DAY"))
         }
     }
 

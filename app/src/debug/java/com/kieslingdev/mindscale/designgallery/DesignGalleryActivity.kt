@@ -21,10 +21,9 @@ import com.kieslingdev.mindscale.ui.theme.MsSpacing
 /**
  * The debug-only design gallery (`docs/specs/SPEC-visual-foundation.md`, D-21).
  *
- * This class exists only in the debug source set. It is not in the release manifest, not in the
- * release APK, and not reachable from `MainActivity` — the visual-only rule forbids adding a
- * navigation destination to the shipping app, so the gallery is a second launcher icon on debug
- * installs instead of a screen inside MindScale.
+ * This class exists only in the debug source set. It is not in the release manifest or release
+ * APK, and is not reachable from `MainActivity` — the visual-only rule forbids adding a navigation
+ * destination to the shipping app. Developers can launch it explicitly by activity component.
  *
  * It holds no `ViewModel`, opens no database, and reads nothing the user recorded.
  */

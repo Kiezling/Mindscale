@@ -1,11 +1,18 @@
 package com.kieslingdev.mindscale.report
 
+import android.content.Context
+import android.graphics.Bitmap
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertWidthIsAtLeast
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -15,11 +22,19 @@ import androidx.compose.ui.unit.dp
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.compose.ui.graphics.asAndroidBitmap
+import com.kieslingdev.mindscale.data.DataSnapshot
+import com.kieslingdev.mindscale.data.Entry
 import com.kieslingdev.mindscale.data.ExternalInstrument
 import com.kieslingdev.mindscale.data.MindScaleDatabase
+import com.kieslingdev.mindscale.data.Marker
+import com.kieslingdev.mindscale.data.ThemeMode
+import com.kieslingdev.mindscale.data.TrackSettings
+import com.kieslingdev.mindscale.data.UserProfile
 import com.kieslingdev.mindscale.insights.InsightRange
 import com.kieslingdev.mindscale.insights.InsightsUiState
 import com.kieslingdev.mindscale.ui.theme.MindScaleTheme
+import com.kieslingdev.mindscale.ui.theme.ms
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -28,6 +43,10 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.io.File
+import java.io.FileOutputStream
+import java.time.Instant
+import java.time.ZoneOffset
 
 /**
  * The geometry `docs/specs/SPEC-remaining-screens-visual.md` freezes for Profile and Report,
@@ -90,22 +109,29 @@ class ProfileReportVisualTest {
         }
     }
 
-    private fun setReport(state: ReportProfileUiState, fontScale: Float = 1f) {
+    private fun setReport(state: ReportProfileUiState, fontScale: Float = 1f, themeMode: ThemeMode = ThemeMode.SYSTEM) {
         composeTestRule.setContent {
             val density = LocalDensity.current
             CompositionLocalProvider(
                 LocalDensity provides Density(density.density, fontScale)
             ) {
-                MindScaleTheme {
-                    ReportScreen(
-                        uiState = state,
-                        onRangeSelected = {},
-                        onCopy = {},
-                        onShare = {},
-                        onSave = {},
-                        onDiscardPendingSave = {},
-                        onRetry = {}
-                    )
+                MindScaleTheme(themeMode) {
+                    Surface(
+                        modifier = Modifier.fillMaxSize(),
+                        color = MaterialTheme.ms.bg,
+                        contentColor = MaterialTheme.ms.inkPrimary
+                    ) {
+                        ReportScreen(
+                            uiState = state,
+                            onRangeSelected = {},
+                            onCopy = {},
+                            onShare = {},
+                            onSave = {},
+                            onDiscardPendingSave = {},
+                            onRetry = {},
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
                 }
             }
         }
@@ -113,6 +139,46 @@ class ProfileReportVisualTest {
 
     private fun bounds(tag: String): Rect =
         composeTestRule.onNodeWithTag(tag).fetchSemanticsNode().boundsInRoot
+
+    private fun capturePopulatedReport(themeMode: ThemeMode, fontScale: Float, suffix: String) {
+        val at = Instant.parse("2026-08-04T12:00:00Z")
+        val day = Instant.parse("2026-08-04T00:00:00Z").toEpochMilli()
+        val report = buildClinicianReport(
+            DataSnapshot(
+                entries = listOf(Entry(1, day + 1_000, 5), Entry(2, day + 3_601_000, 0)),
+                sleeps = emptyList(),
+                markers = listOf(Marker(1, day + 2_000, "Meeting")),
+                settings = TrackSettings(),
+                profile = UserProfile(displayName = "Ada Example")
+            ),
+            InsightRange.THIRTY_DAYS,
+            at,
+            ZoneOffset.UTC
+        )
+        setReport(ReportProfileUiState(loading = false, report = report), fontScale, themeMode)
+        composeTestRule.waitForIdle()
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        File(context.getExternalFilesDir(null), "report-sample.txt").writeText(report.text, Charsets.UTF_8)
+        val file = File(context.getExternalFilesDir(null), "report-$suffix.png")
+        FileOutputStream(file).use { output ->
+            composeTestRule.onNodeWithTag("report_screen").captureToImage().asAndroidBitmap()
+                .compress(Bitmap.CompressFormat.PNG, 100, output)
+        }
+        assertTrue(file.length() > 0)
+        composeTestRule.onNodeWithTag("report_screen").performScrollToNode(hasTestTag("report_course"))
+        composeTestRule.waitForIdle()
+        val courseFile = File(context.getExternalFilesDir(null), "report-$suffix-course.png")
+        FileOutputStream(courseFile).use { output ->
+            composeTestRule.onNodeWithTag("report_screen").captureToImage().asAndroidBitmap()
+                .compress(Bitmap.CompressFormat.PNG, 100, output)
+        }
+        assertTrue(courseFile.length() > 0)
+    }
+
+    @Test fun populatedReportLight100Screenshot() = capturePopulatedReport(ThemeMode.LIGHT, 1f, "light-100")
+    @Test fun populatedReportDark100Screenshot() = capturePopulatedReport(ThemeMode.DARK, 1f, "dark-100")
+    @Test fun populatedReportLight200Screenshot() = capturePopulatedReport(ThemeMode.LIGHT, 2f, "light-200")
+    @Test fun populatedReportDark200Screenshot() = capturePopulatedReport(ThemeMode.DARK, 2f, "dark-200")
 
     // ── Invariant 11: Profile's two navigation rows stay above the fold ──────
 
@@ -212,8 +278,8 @@ class ProfileReportVisualTest {
         setProfile(ReportProfileUiState(), fontScale = 2f)
 
         composeTestRule.onNodeWithTag("profile_screen")
-            .performScrollToNode(hasTestTag("profile_name_save"))
-        composeTestRule.onNodeWithTag("profile_name_save").assertHeightIsAtLeast(48.dp)
+            .performScrollToNode(hasTestTag("profile_name"))
+        composeTestRule.onNodeWithTag("profile_name").assertHeightIsAtLeast(48.dp)
     }
 
     // ── Report ───────────────────────────────────────────────────────────────

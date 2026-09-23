@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kieslingdev.mindscale.data.BackupPayload
 import com.kieslingdev.mindscale.data.DataControlDao
+import com.kieslingdev.mindscale.data.DataSnapshot
 import com.kieslingdev.mindscale.data.DEFAULT_ONSET_CHIPS
 import com.kieslingdev.mindscale.data.HourFormat
 import com.kieslingdev.mindscale.data.HoldDuration
@@ -49,7 +50,9 @@ data class PendingDocument(
     val sleepCount: Int,
     val markerCount: Int,
     val safetyPlanItemCount: Int,
-    val breathingSessionCount: Int
+    val breathingSessionCount: Int,
+    val snapshot: DataSnapshot? = null,
+    val warning: String? = null
 )
 
 data class EraseConfirmation(
@@ -57,7 +60,15 @@ data class EraseConfirmation(
     val sleepCount: Int,
     val markerCount: Int,
     val safetyPlanItemCount: Int,
-    val breathingSessionCount: Int
+    val breathingSessionCount: Int,
+    val snapshot: DataSnapshot
+)
+
+private data class PreparedExport(
+    val snapshot: DataSnapshot,
+    val now: Instant,
+    val contents: String,
+    val restorable: Boolean
 )
 
 /** A validated, previewed import awaiting explicit confirmation (Phase 12, D-7). */
@@ -74,6 +85,7 @@ data class SettingsUiState(
     val anchorError: String? = null,
     val chipError: String? = null,
     val pendingDocument: PendingDocument? = null,
+    val documentLaunchPending: Boolean = false,
     val retryDocument: PendingDocument? = null,
     val preparingExport: Boolean = false,
     val eraseConfirmation: EraseConfirmation? = null,
@@ -262,27 +274,55 @@ class SettingsViewModel(
         _uiState.update { it.copy(preparingExport = true, message = null) }
         viewModelScope.launch {
             try {
-                val snapshot = dataControlDao.snapshot()
-                val now = nowProvider()
-                val contents = if (kind == ExportKind.RECORDS) {
-                    encodeRecordsCsv(snapshot)
-                } else {
-                    encodeBackup(snapshot, now)
+                val prepared = try {
+                    withContext(ioContext) {
+                        val snapshot = dataControlDao.snapshot()
+                        val now = nowProvider()
+                        val contents = if (kind == ExportKind.RECORDS) {
+                            encodeRecordsCsv(snapshot)
+                        } else {
+                            encodeBackup(snapshot, now)
+                        }
+                        val restorable = kind == ExportKind.RECORDS || run {
+                            when (val bounded = readBoundedUtf8(contents.byteInputStream())) {
+                                is ParseResult.Rejected -> false
+                                is ParseResult.Ok -> parseBackup(bounded.value, now, zoneProvider()) is ParseResult.Ok
+                            }
+                        }
+                        PreparedExport(snapshot, now, contents, restorable)
+                    }
+                } catch (error: CsvExportException) {
+                    _uiState.update { it.copy(preparingExport = false, message = error.message) }
+                    return@launch
+                }
+                if (kind == ExportKind.ERASE_BACKUP && !prepared.restorable) {
+                    _uiState.update {
+                        it.copy(
+                            preparingExport = false,
+                            message = "Could not prepare a restorable backup. Your data was not changed."
+                        )
+                    }
+                    return@launch
                 }
                 _uiState.update {
                     it.copy(
                         preparingExport = false,
                         pendingDocument = PendingDocument(
                             kind = kind,
-                            filename = if (kind == ExportKind.RECORDS) recordsFilename(now) else backupFilename(now),
-                            contents = contents,
-                            entryCount = snapshot.entries.size,
-                            sleepCount = snapshot.sleeps.size,
-                            markerCount = snapshot.markers.size,
-                            safetyPlanItemCount = snapshot.safetyPlan.size,
-                            breathingSessionCount = snapshot.breathingSessions.size
+                            filename = if (kind == ExportKind.RECORDS) recordsFilename(prepared.now) else backupFilename(prepared.now),
+                            contents = prepared.contents,
+                            entryCount = prepared.snapshot.entries.size,
+                            sleepCount = prepared.snapshot.sleeps.size,
+                            markerCount = prepared.snapshot.markers.size,
+                            safetyPlanItemCount = prepared.snapshot.safetyPlan.size,
+                            breathingSessionCount = prepared.snapshot.breathingSessions.size,
+                            snapshot = if (kind == ExportKind.ERASE_BACKUP) prepared.snapshot else null,
+                            warning = if (!prepared.restorable) {
+                                "This JSON export contains data this version cannot restore. Keep it for recovery outside this version."
+                            } else null
                         ),
-                        retryDocument = null
+                        retryDocument = null,
+                        documentLaunchPending = true
                     )
                 }
             } catch (error: Throwable) {
@@ -292,14 +332,18 @@ class SettingsViewModel(
         }
     }
 
+    /** Consume the picker request while retaining the prepared bytes for its result callback. */
+    fun documentLaunchHandled() = _uiState.update { it.copy(documentLaunchPending = false) }
+
     fun documentPickerCanceled() {
-        _uiState.update { it.copy(pendingDocument = null) }
+        _uiState.update { it.copy(pendingDocument = null, documentLaunchPending = false) }
     }
 
     fun documentWriteFailed() {
         _uiState.update {
             it.copy(
                 pendingDocument = null,
+                documentLaunchPending = false,
                 retryDocument = it.pendingDocument,
                 message = "Could not write that file. Please retry."
             )
@@ -309,7 +353,12 @@ class SettingsViewModel(
     fun retryDocumentWrite() {
         _uiState.update { state ->
             state.retryDocument?.let { document ->
-                state.copy(pendingDocument = document, retryDocument = null, message = null)
+                state.copy(
+                    pendingDocument = document,
+                    documentLaunchPending = true,
+                    retryDocument = null,
+                    message = null
+                )
             } ?: state
         }
     }
@@ -317,32 +366,46 @@ class SettingsViewModel(
     fun documentWriteSucceeded() {
         val document = _uiState.value.pendingDocument ?: return
         if (document.kind == ExportKind.ERASE_BACKUP) {
+            val exportedSnapshot = document.snapshot ?: return
             _uiState.update {
                 it.copy(
                     pendingDocument = null,
+                    documentLaunchPending = false,
                     retryDocument = null,
                     eraseConfirmation = EraseConfirmation(
                         document.entryCount,
                         document.sleepCount,
                         document.markerCount,
                         document.safetyPlanItemCount,
-                        document.breathingSessionCount
+                        document.breathingSessionCount,
+                        exportedSnapshot
                     ),
-                    message = "Backup saved"
+                    message = document.warning ?: "Backup saved"
                 )
             }
         } else {
-            _uiState.update { it.copy(pendingDocument = null, retryDocument = null, message = "Export saved") }
+            _uiState.update {
+                it.copy(
+                    pendingDocument = null,
+                    documentLaunchPending = false,
+                    retryDocument = null,
+                    message = document.warning ?: "Export saved"
+                )
+            }
         }
     }
 
     fun cancelErase() = _uiState.update { it.copy(eraseConfirmation = null) }
 
     fun confirmErase() {
-        if (_uiState.value.eraseConfirmation == null) return
+        val expected = _uiState.value.eraseConfirmation?.snapshot ?: return
+        _uiState.update { it.copy(eraseConfirmation = null) }
         viewModelScope.launch {
             try {
-                dataControlDao.eraseEverythingAndResetSettings()
+                if (!dataControlDao.eraseIfUnchanged(expected)) {
+                    showMessage("Your data changed after the backup. Export again before erasing.")
+                    return@launch
+                }
             } catch (error: Throwable) {
                 if (error is CancellationException) throw error
                 showMessage("Could not erase the data. Nothing was partially deleted.")
@@ -356,6 +419,7 @@ class SettingsViewModel(
                     anchorDraft = AnchorDraft(),
                     chipDraft = defaultChipDraft(),
                     pendingDocument = null,
+                    documentLaunchPending = false,
                     retryDocument = null,
                     preparingExport = false,
                     eraseConfirmation = null,
@@ -537,6 +601,7 @@ class SettingsViewModel(
                 anchorError = null,
                 chipError = null,
                 pendingDocument = null,
+                documentLaunchPending = false,
                 retryDocument = null,
                 eraseConfirmation = null,
                 message = ImportMessages.restored(

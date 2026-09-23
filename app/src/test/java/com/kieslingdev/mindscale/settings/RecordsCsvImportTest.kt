@@ -8,6 +8,8 @@ import com.kieslingdev.mindscale.data.EntryKind
 import com.kieslingdev.mindscale.data.Marker
 import com.kieslingdev.mindscale.data.SleepInterval
 import com.kieslingdev.mindscale.data.TrackSettings
+import com.kieslingdev.mindscale.data.RecordSnapshot
+import com.kieslingdev.mindscale.data.RecordsPayload
 import java.time.Instant
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -219,5 +221,19 @@ class RecordsCsvImportTest {
         assertEquals(ImportMessages.UNSTORABLE_VALUE, rejection(csv("marker,$ts,,,,,,\" padded \"")))
         // A note may hold TAB, LF, and CR because Track stores multi-line note text.
         assertTrue(parse(csv("rating,$ts,,3,,,\"a\tb\nc\",")) is ParseResult.Ok)
+    }
+
+    /** R-2: interval natural keys include record kind. */
+    @Test
+    fun sleepAndBreathingWithMatchingBoundsAreNotDuplicates() {
+        val start = ts.toEpochMilli()
+        val end = ts.plusSeconds(60).toEpochMilli()
+        val payload = RecordsPayload(
+            entries = emptyList(),
+            sleeps = listOf(SleepInterval(startTs = start, endTs = end)),
+            markers = emptyList(),
+            breathingSessions = listOf(BreathingSession(startedAt = start, endedAt = end))
+        )
+        assertTrue(checkRecordConflicts(payload, RecordSnapshot(emptyList(), emptyList(), emptyList())) is ParseResult.Ok)
     }
 }

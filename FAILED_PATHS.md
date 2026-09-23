@@ -1,5 +1,19 @@
 # MindScale failed paths and active workarounds
 
+## 2026-09-23 — Sleeping emulator and typed picker test monitors
+
+- Scope: API36 instrumented verification of Track/backup polish.
+- Evidence: initial Compose tests reported no hierarchies; screenshot was black and `dumpsys power` showed `mWakefulness=Asleep`. Wake/dismiss-keyguard and `svc power stayon true` restored testing. Rerun affected cases; do not mistake this for an app rendering defect.
+- An action-only `IntentFilter` does not match document intents carrying MIME types. Use an `Instrumentation.ActivityMonitor` callback to capture the actual intent, assert its action/MIME payload and return the intended synthetic result.
+- Active preventive steps: wake and verify the isolated emulator before suites; pin `ANDROID_SERIAL` so tests never touch personal-phone data.
+
+## 2026-09-23 — Synthetic large-font and screenshot verification pitfalls
+
+- Scope: owner-feedback UI verification on the isolated API 36 emulator.
+- Evidence: a Compose `LocalDensity` override enlarged the parent while the platform note dialog retained the device font size; screenshots taken immediately at Compose idleness could catch the dialog's window animation. Dark report fixtures also inherited black content text without a themed Surface. Narrow/large-font lazy lists disposed offscreen raster and range nodes.
+- Workaround: verify dialogs with actual `adb -s emulator-5554 shell settings put system font_scale 2.0`, restore 1.0 afterward, allow the platform window animation to finish before capture, give fixtures themed background/content colors, and scroll to a lazy node before asserting or touching it. Report section body colors are now explicit. Gradle removes app external files at connected-run completion, so copy synthetic PNG evidence during the run.
+- Status: active verification guidance; final owner-feedback evidence is in `docs/reviews/2026-09-23-owner-feedback.md`.
+
 Read the headings at session start and the full entry only when it overlaps the current task. Keep resolved history concise; mark entries superseded instead of silently deleting useful evidence.
 
 ## 2026-07-21 — Incorrect C:-based MindScale project root
@@ -72,3 +86,35 @@ Read the headings at session start and the full entry only when it overlaps the 
 - Reproduced 2026-08-05 by bisection, with negative controls. One standalone `/` token in the inline text is a necessary condition: a full markdown body containing `` `ACTION_DIAL` / `ACTION_SENDTO` / `ACTION_VIEW` `` was blocked, and the byte-identical body with those two slashes changed to the word `and` passed. It is not sufficient on its own — that same slash line passed when paired with each individual section, with 1,800 characters of benign filler, and with a markdown link. Ruled out as causes: apostrophes and here-string quote state, non-ASCII characters (em dash, emoji), total command length, markdown tables and pipe characters, and the words `erase`/`deleted`. Two bodies that each passed alone were blocked when concatenated, so the guard is a heuristic over the whole command rather than a single-token match. The exact sufficient condition was not isolated after seventeen probes and is not worth further spend; it lives in a closed harness component that can change.
 - Decision/workaround: do not pass a long body inline. Write it to a file with the Write tool, then reference it: `gh pr create ... --body-file <path>`. This is how PR #10 was actually created after the inline attempt was blocked. The same applies to any long prose argument: `git commit -F <file>` rather than `-m`. That is not hypothetical — the commit recording this very entry was itself rejected, because its message described the forward-slash finding using a bare slash, and it went through unchanged once moved to a file.
 - Status: active. Recognize the message, switch to a file, and move on. Do not attempt to defeat the guard by rewording, escaping, splitting, or encoding the text, and do not weaken or disable the repository hooks in response — they are a different mechanism and were not involved.
+
+## 2026-09-17 — Saved API 36 AVD clone ran out of space during connected install
+
+- Scope: Phase 19 `connectedDebugAndroidTest` environment.
+- What failed: the read-only clone of saved `MindScale_API_36` had 267 MiB free under `/data`; the
+  installer requested internal-only storage and failed before any app test ran.
+- Decision/workaround: create an independent API 36 AVD under ignored `build/review/avd`, using the
+  installed API 36 image and a command-scoped `ANDROID_AVD_HOME`, separate userdata, 1080x2424
+  display, and 420 dpi. Preserve the saved AVD; do not use `-wipe-data` against it and do not
+  install an SDK to work around this environmental failure.
+- Status: active environmental workaround; final Phase 19 connected suite passed 273/273 on the
+  independent AVD. The saved AVD was not wiped or modified.
+
+## 2026-09-17 — RichNoteEditor can roll back rapid local input on delayed StateFlow echoes
+
+- Scope: formatted-note editing with a delayed ViewModel/StateFlow round trip.
+- What failed: rapid typing and style changes could be overwritten by an older emitted value; a
+  manual `A calmer day` entry lost a letter and its formatting.
+- Decision/workaround: retain a pending-emission acknowledgement queue, pruning acknowledged
+  prefixes, and preserve the composed `TextFieldValue` while the state echo catches up. The
+  regression `collapsedBoldStylesEverySequentiallyTypedCharacter` and a repeated manual entry
+  pass cover the fix.
+- Status: resolved; do not replace local composition state with every delayed upstream echo.
+
+## 2026-09-17 — Native NumberPicker UI tests need a dialog-root Espresso target
+
+- Scope: `MsDateTimeFields` wheel tests using platform `NumberPicker` through `AndroidView`.
+- What failed: an Espresso action scoped to the base activity can wait forever for focus after a
+  picker dialog takes ownership of the window.
+- Decision/workaround: scope Espresso interactions to the active dialog root before operating the
+  native wheel. Do not use the base activity root as a focus proxy for a dialog-owned picker.
+- Status: active test-harness rule.

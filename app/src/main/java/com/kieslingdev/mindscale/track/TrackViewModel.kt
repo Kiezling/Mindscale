@@ -14,6 +14,8 @@ import com.kieslingdev.mindscale.data.SleepCaptureOutcome
 import com.kieslingdev.mindscale.data.SleepDao
 import com.kieslingdev.mindscale.data.TrackSettings
 import com.kieslingdev.mindscale.data.TrackSettingsDao
+import com.kieslingdev.mindscale.settings.MAX_MARKER_CODE_POINTS
+import com.kieslingdev.mindscale.settings.MAX_NOTE_CODE_POINTS
 import java.time.DateTimeException
 import java.time.Instant
 import java.time.LocalDate
@@ -37,8 +39,8 @@ private const val TOAST_DURATION_MILLIS = 2_200L
 private const val CHECKIN_MIN_ENTRIES = 40
 private const val CHECKIN_COOLDOWN_MILLIS = 60L * 24 * 60 * 60 * 1000
 
-private const val INVALID_TIMESTAMP_ERROR = "Use yyyy-MM-dd and HH:mm."
-private const val FUTURE_TIMESTAMP_ERROR = "Timestamp cannot be in the future."
+private const val INVALID_TIMESTAMP_ERROR = "Choose a date and time that is not in the future."
+private const val FUTURE_TIMESTAMP_ERROR = INVALID_TIMESTAMP_ERROR
 private const val RESTORE_FAILED = "The unfinished dialog could not be restored."
 private const val RECORD_CHECK_FAILED = "Could not check that record. Please try again."
 private const val ENTRY_SAVE_FAILED = "Could not save that entry. Please try again."
@@ -53,6 +55,9 @@ private const val SLEEP_ARMED_TOAST = "Now tap how you felt going to sleep"
 private const val WAKE_ARMED_TOAST = "Now tap how you feel waking up"
 private const val NO_SLEEP_OPEN_TOAST = "No sleep was open"
 private const val MARKER_SAVED_TOAST = "Event marked"
+private const val MARKER_INVALID = "Use at most 4,000 characters and only ordinary text, tabs, and line breaks."
+private const val NOTE_INVALID = "Use at most 4,000 characters and only ordinary text, tabs, and line breaks."
+private const val ONSET_CHIPS_FAILED = "Could not save those chips. Please try again."
 
 private const val MARKER_OPEN_KEY = "track.markerOpen"
 private const val MARKER_DRAFT_KEY = "track.markerDraft"
@@ -160,6 +165,7 @@ class TrackViewModel(
             TrackEvent.EditCancelled -> cancelActiveModal(TrackModalState.Edit::class.java)
             is TrackEvent.NoteRequested -> handleNoteRequested(event.entry)
             is TrackEvent.NoteTextChanged -> handleNoteTextChanged(event.text)
+            TrackEvent.NoteDeleteRequested -> handleNoteTextChanged("")
             TrackEvent.NoteSaveConfirmed -> handleNoteSaveConfirmed()
             TrackEvent.NoteCancelled -> cancelActiveModal(TrackModalState.Note::class.java)
             is TrackEvent.DeleteRequested -> handleDeleteRequested(event.entry)
@@ -171,13 +177,14 @@ class TrackViewModel(
             TrackEvent.ToggleHelp -> _uiState.update { it.copy(helpOpen = !it.helpOpen) }
             TrackEvent.ArmSleep -> handleArm(EntryKind.SLEEP, SLEEP_ARMED_TOAST)
             TrackEvent.ArmWake -> handleArm(EntryKind.WAKE, WAKE_ARMED_TOAST)
-            is TrackEvent.OnsetChipToggled -> handleOnsetChipToggled(event.chip)
-            TrackEvent.OnsetChipsSubmitted -> handleOnsetChipsSubmitted()
-            TrackEvent.OnsetChipsSkipped -> handleOnsetChipsSkipped()
+            // S-3 parks onset tagging. Stale callbacks must not expose a prompt or write chips.
+            is TrackEvent.OnsetChipToggled -> Unit
+            TrackEvent.OnsetChipsSubmitted -> Unit
+            TrackEvent.OnsetChipsSkipped -> Unit
             TrackEvent.MarkerToggled -> handleMarkerToggled()
             is TrackEvent.MarkerDraftChanged -> updateMarkerState(draft = event.text)
             TrackEvent.MarkerSaveConfirmed -> handleMarkerSaveConfirmed()
-            TrackEvent.MarkerCancelled -> updateMarkerState(open = false, draft = "")
+            TrackEvent.MarkerCancelled -> handleMarkerCancelled()
             TrackEvent.CheckinStillUseful -> handleCheckinStillUseful()
             TrackEvent.CheckinPauseRequested -> handleCheckinPauseRequested()
             TrackEvent.ResumeTracking -> handleResumeTracking()
@@ -212,7 +219,15 @@ class TrackViewModel(
                 } else state
             }
         }
-        viewModelScope.launch { performCapture(value, now, armed) }
+        viewModelScope.launch {
+            try {
+                performCapture(value, now, armed)
+            } catch (error: Throwable) {
+                if (error is CancellationException) throw error
+                _uiState.update { it.copy(transientReadout = null) }
+                setToast(ENTRY_SAVE_FAILED)
+            }
+        }
     }
 
     private fun handleKeyLongPressed(value: Int) {
@@ -312,7 +327,17 @@ class TrackViewModel(
             performOrdinaryCapture(value, ts)
         } else {
             entryDao.insert(Entry(ts = ts, value = value, kind = armed))
-            performArmedSideEffect(value, ts, armed)
+            try {
+                performArmedSideEffect(value, ts, armed)
+            } catch (error: Throwable) {
+                if (error is CancellationException) throw error
+                setToast(ENTRY_PARTIAL_SLEEP_FAILED)
+                try {
+                    refreshOpenSleepInterval()
+                } catch (refreshError: Throwable) {
+                    if (refreshError is CancellationException) throw refreshError
+                }
+            }
         }
     }
 
@@ -322,21 +347,12 @@ class TrackViewModel(
             when {
                 !result.settingsAvailable -> setToast("Settings are unavailable. Your rating was saved.")
                 !result.classificationAvailable ->
-                    setToast("Your rating was saved, but the onset prompt is unavailable.")
-                result.promptEnabled -> _uiState.update {
-                    it.copy(onsetChipPrompt = OnsetChipPromptState(entryId = result.entryId))
-                }
+                    setToast("Your rating was saved, but episode classification is unavailable.")
             }
             return
         }
 
-        val priorEntry = entryDao.mostRecentAtOrBefore(ts)
-        val isOnset = value > 0 && (priorEntry == null || priorEntry.value == 0)
-        val insertedId = entryDao.insert(Entry(ts = ts, value = value))
-        val settings = settingsDao.observe().first()
-        if (settings.askChips && isOnset) {
-            _uiState.update { it.copy(onsetChipPrompt = OnsetChipPromptState(insertedId)) }
-        }
+        entryDao.insert(Entry(ts = ts, value = value))
     }
 
     private suspend fun performArmedSideEffect(value: Int, ts: Long, armed: EntryKind) {
@@ -505,6 +521,10 @@ class TrackViewModel(
         if (modal.isSaving || modal.validation == RecordValidation.Checking ||
             modal.validation == RecordValidation.ReadFailed
         ) return
+        if (!isAllowedLongText(modal.draft.text, requireTrimmed = false)) {
+            replaceActiveModal(modal.copy(mutationError = NOTE_INVALID), persist = false)
+            return
+        }
         val saving = modal.copy(isSaving = true, mutationError = null)
         replaceActiveModal(saving, persist = false)
         viewModelScope.launch {
@@ -823,6 +843,7 @@ class TrackViewModel(
     }
 
     private fun handleOnsetChipToggled(chip: String) {
+        if (_uiState.value.onsetChipSaving) return
         _uiState.update { state ->
             val prompt = state.onsetChipPrompt ?: return@update state
             val selected = if (chip in prompt.selected) prompt.selected - chip else prompt.selected + chip
@@ -832,8 +853,22 @@ class TrackViewModel(
 
     private fun handleOnsetChipsSubmitted() {
         val prompt = _uiState.value.onsetChipPrompt ?: return
-        _uiState.update { it.copy(onsetChipPrompt = null) }
-        viewModelScope.launch { entryDao.updateChips(prompt.entryId, prompt.selected.toList()) }
+        if (_uiState.value.onsetChipSaving) return
+        _uiState.update { it.copy(onsetChipSaving = true) }
+        viewModelScope.launch {
+            try {
+                entryDao.updateChips(prompt.entryId, prompt.selected.toList())
+                if (_uiState.value.onsetChipPrompt == prompt) {
+                    _uiState.update { it.copy(onsetChipPrompt = null, onsetChipSaving = false) }
+                } else {
+                    _uiState.update { it.copy(onsetChipSaving = false) }
+                }
+            } catch (error: Throwable) {
+                if (error is CancellationException) throw error
+                _uiState.update { it.copy(onsetChipSaving = false) }
+                if (_uiState.value.onsetChipPrompt == prompt) setToast(ONSET_CHIPS_FAILED)
+            }
+        }
     }
 
     private fun handleOnsetChipsSkipped() {
@@ -841,19 +876,45 @@ class TrackViewModel(
     }
 
     private fun handleMarkerSaveConfirmed() {
+        if (_uiState.value.markerSaving) return
         val text = _uiState.value.markerDraft.trim()
-        updateMarkerState(open = false, draft = "")
-        if (text.isNotEmpty()) {
-            val ts = nowProvider()
-            viewModelScope.launch {
+        if (text.isEmpty()) {
+            updateMarkerState(open = false, draft = "")
+            return
+        }
+        if (!isAllowedLongText(text, requireTrimmed = true)) {
+            _uiState.update { it.copy(markerError = MARKER_INVALID) }
+            return
+        }
+        val ts = nowProvider()
+        val submittedDraft = _uiState.value.markerDraft
+        _uiState.update { it.copy(markerSaving = true, markerError = null) }
+        viewModelScope.launch {
+            try {
                 markerDao.insert(Marker(ts = ts, text = text))
+                if (_uiState.value.markerDraft == submittedDraft) {
+                    updateMarkerState(open = false, draft = "")
+                    _uiState.update { it.copy(markerSaving = false) }
+                } else {
+                    _uiState.update { it.copy(markerSaving = false) }
+                }
                 setToast(MARKER_SAVED_TOAST)
+            } catch (error: Throwable) {
+                if (error is CancellationException) throw error
+                _uiState.update { state ->
+                    state.copy(
+                        markerSaving = false,
+                        markerError = if (state.markerDraft == submittedDraft) {
+                            "Could not save that event. Please try again."
+                        } else state.markerError
+                    )
+                }
             }
         }
     }
 
     private fun handleMarkerToggled() {
-        if (_uiState.value.activeModal != null) return
+        if (_uiState.value.activeModal != null || _uiState.value.markerSaving) return
         val open = !_uiState.value.markerOpen
         updateMarkerState(open = open, draft = "")
     }
@@ -864,7 +925,23 @@ class TrackViewModel(
     ) {
         savedStateHandle[MARKER_OPEN_KEY] = open
         savedStateHandle[MARKER_DRAFT_KEY] = draft
-        _uiState.update { it.copy(markerOpen = open, markerDraft = draft) }
+        _uiState.update { it.copy(markerOpen = open, markerDraft = draft, markerError = null) }
+    }
+
+    private fun handleMarkerCancelled() {
+        if (_uiState.value.markerSaving) return
+        updateMarkerState(open = false, draft = "")
+    }
+
+    private fun isAllowedLongText(text: String, requireTrimmed: Boolean): Boolean {
+        if (text.isBlank()) return true
+        if (requireTrimmed && text != text.trim()) return false
+        val maxCodePoints = if (requireTrimmed) MAX_MARKER_CODE_POINTS else MAX_NOTE_CODE_POINTS
+        if (text.codePointCount(0, text.length) > maxCodePoints) return false
+        return text.none { c ->
+            c == '\uFEFF' || c.code == 0x7F ||
+                (c.code < 0x20 && c != '\t' && c != '\n' && c != '\r')
+        }
     }
 
     private fun handleCheckinStillUseful() {

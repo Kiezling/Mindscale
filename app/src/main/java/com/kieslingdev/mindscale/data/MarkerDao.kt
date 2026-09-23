@@ -21,6 +21,12 @@ interface MarkerDao {
     @Query("SELECT COUNT(*) FROM markers")
     fun observeCount(): Flow<Int>
 
+    @Query("SELECT * FROM markers WHERE id = :id LIMIT 1")
+    suspend fun getById(id: Long): Marker?
+
+    @Query("UPDATE markers SET ts = :timestamp, text = :text WHERE id = :id")
+    suspend fun updateEditableFields(id: Long, timestamp: Long, text: String): Int
+
     @Query("DELETE FROM markers WHERE id = :id")
     suspend fun deleteById(id: Long): Int
 }

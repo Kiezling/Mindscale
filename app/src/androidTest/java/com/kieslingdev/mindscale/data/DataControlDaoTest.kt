@@ -7,6 +7,7 @@ import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -75,10 +76,32 @@ class DataControlDaoTest {
         assertEquals(0, snapshot.entries.size)
         assertEquals(0, snapshot.sleeps.size)
         assertEquals(0, snapshot.markers.size)
-        assertEquals(ThemeMode.SYSTEM, snapshot.settings.themeMode)
+        assertEquals(ThemeMode.LIGHT, snapshot.settings.themeMode)
         assertEquals(HoldDuration.SIXTEEN, snapshot.settings.holdDuration)
         assertFalse(snapshot.settings.paused)
         assertEquals("", snapshot.profile.displayName)
         assertEquals(0, snapshot.externalScores.size)
+    }
+
+    /** R-1: a confirmation for an older export must refuse after any intervening write. */
+    @Test
+    fun eraseIfUnchangedRefusesStaleSnapshotAndPreservesNewData() = runBlocking {
+        database.entryDao().insert(Entry(ts = 10, value = 1))
+        val exported = database.dataControlDao().snapshot()
+        database.markerDao().insert(Marker(ts = 20, text = "new"))
+
+        assertFalse(database.dataControlDao().eraseIfUnchanged(exported))
+        val current = database.dataControlDao().snapshot()
+        assertEquals(1, current.entries.size)
+        assertEquals("new", current.markers.single().text)
+    }
+
+    @Test
+    fun eraseIfUnchangedErasesTheExportedSnapshot() = runBlocking {
+        database.entryDao().insert(Entry(ts = 10, value = 1))
+        val exported = database.dataControlDao().snapshot()
+
+        assertTrue(database.dataControlDao().eraseIfUnchanged(exported))
+        assertEquals(0, database.dataControlDao().snapshot().entries.size)
     }
 }

@@ -29,8 +29,7 @@ object BreathingCopy {
         "Through the nose, following the circle. Out for a little longer than in. " +
             "Stop whenever you like."
 
-    const val NO_CLAIM =
-        "MindScale makes no claim about what this does. It is a circle that keeps a pace."
+    const val NO_CLAIM = "MindScale makes no claim about what this does."
 
     /**
      * The second sentence is the honest disclosure of the one gap in D-6: a session that is

@@ -20,6 +20,7 @@ import com.kieslingdev.mindscale.insights.deriveInsights
 import java.time.Instant
 import java.time.ZoneOffset
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -155,6 +156,43 @@ class ReportProfileViewModelTest {
     }
 
     @Test
+    fun deferredNameWriteSavesTheLatestDraftWithoutASecondFocusEvent() = runTest {
+        val profile = FakeProfileDao()
+        val gate = CompletableDeferred<Unit>()
+        profile.beforeConditionalUpdateSuspend = { gate.await() }
+        val vm = viewModel(profile)
+        dispatcher.scheduler.runCurrent()
+
+        vm.updateNameDraft("First")
+        vm.saveName()
+        dispatcher.scheduler.runCurrent()
+        vm.updateNameDraft("Latest")
+        gate.complete(Unit)
+        dispatcher.scheduler.runCurrent()
+
+        assertEquals("Latest", profile.profile.value.displayName)
+        assertEquals("Latest", vm.uiState.value.nameDraft)
+        assertFalse(vm.uiState.value.nameDirty)
+        assertEquals("Name saved.", vm.uiState.value.message)
+    }
+
+    @Test
+    fun nameWriteFailureRetainsTheDraftAndRetryMessage() = runTest {
+        val profile = FakeProfileDao()
+        profile.nameWriteFailure = IllegalStateException("write failed")
+        val vm = viewModel(profile)
+        dispatcher.scheduler.runCurrent()
+
+        vm.updateNameDraft("Ada")
+        vm.saveName()
+        dispatcher.scheduler.runCurrent()
+
+        assertTrue(vm.uiState.value.nameDirty)
+        assertEquals("Ada", vm.uiState.value.nameDraft)
+        assertEquals("Could not save the name. Your draft is still here.", vm.uiState.value.message)
+    }
+
+    @Test
     fun retainedSaveIsExplicitWhenReportChangesAndCanBeDiscarded() = runTest {
         val profile = FakeProfileDao()
         val vm = viewModel(profile)
@@ -175,6 +213,57 @@ class ReportProfileViewModelTest {
         vm.discardPendingDocument()
         vm.requestSaveDocument()
         assertEquals(vm.uiState.value.report?.text, vm.uiState.value.pendingDocument?.text)
+    }
+
+    /** R-5: edits made while report generation is suspended survive publication. */
+    @Test
+    fun suspendedReportPublicationKeepsNameScoreEditorAndPendingDelete() = runTest {
+        val reportDispatcher = StandardTestDispatcher()
+        val profile = FakeProfileDao()
+        val score = ExternalScore(
+            id = 41,
+            instrument = ExternalInstrument.PHQ_8,
+            total = 8,
+            assessedEpochDay = java.time.LocalDate.of(2026, 8, 3).toEpochDay(),
+            enteredAt = 1
+        )
+        profile.scores.value = listOf(score)
+        val snapshot = deriveInsights(
+            rows = emptyList(),
+            hold = TrackSettings().holdDuration,
+            now = now,
+            zoneId = ZoneOffset.UTC,
+            range = InsightRange.THIRTY_DAYS
+        )
+        val vm = ReportProfileViewModel(
+            profileDao = profile,
+            dataControlDao = FakeDataControlDao(profile),
+            insightsState = MutableStateFlow(
+                InsightsUiState(loading = false, range = InsightRange.THIRTY_DAYS, snapshot = snapshot)
+            ),
+            nowProvider = { now },
+            zoneProvider = { ZoneOffset.UTC },
+            computationDispatcher = reportDispatcher
+        )
+        dispatcher.scheduler.runCurrent()
+
+        vm.updateNameDraft("Typed during report")
+        vm.editScore(41)
+        vm.selectInstrument(ExternalInstrument.GAD_7)
+        vm.updateScoreDate("2026-08-02")
+        vm.updateScoreTotal("6")
+        vm.requestDeleteScore(41)
+
+        reportDispatcher.scheduler.runCurrent()
+        dispatcher.scheduler.runCurrent()
+
+        assertEquals("Typed during report", vm.uiState.value.nameDraft)
+        assertTrue(vm.uiState.value.nameDirty)
+        assertEquals(ExternalInstrument.GAD_7, vm.uiState.value.scoreInstrument)
+        assertEquals("2026-08-02", vm.uiState.value.scoreDateDraft)
+        assertEquals("6", vm.uiState.value.scoreTotalDraft)
+        assertEquals(41L, vm.uiState.value.editingScoreId)
+        assertEquals(41L, vm.uiState.value.pendingDeleteScoreId)
     }
 
     @Test
@@ -234,6 +323,8 @@ private class FakeProfileDao : ProfileDao {
     val stats = MutableStateFlow(ProfileStats(null, 0, 0, 0))
     private var nextId = 1L
     var beforeConditionalUpdate: (() -> Unit)? = null
+    var beforeConditionalUpdateSuspend: (suspend () -> Unit)? = null
+    var nameWriteFailure: Throwable? = null
 
     override fun observeProfile(): Flow<UserProfile> = profile
     override fun observeScores(): Flow<List<ExternalScore>> = scores
@@ -243,6 +334,8 @@ private class FakeProfileDao : ProfileDao {
         return 1
     }
     override suspend fun setDisplayNameIfUnchanged(displayName: String, expectedDisplayName: String): Int {
+        nameWriteFailure?.let { throw it }
+        beforeConditionalUpdateSuspend?.also { beforeConditionalUpdateSuspend = null }?.invoke()
         beforeConditionalUpdate?.also { beforeConditionalUpdate = null }?.invoke()
         if (profile.value.displayName != expectedDisplayName) return 0
         profile.value = UserProfile(displayName = displayName)

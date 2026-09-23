@@ -69,10 +69,12 @@ private data class RatingKey(
     val kind: EntryKind?
 )
 
+private data class IntervalKey(val kind: String, val start: Long, val end: Long?)
+
 private fun Entry.key() = RatingKey(ts, value, chips, note, kind)
-private fun SleepInterval.key() = startTs to endTs
+private fun SleepInterval.key() = IntervalKey("sleep", startTs, endTs)
 private fun Marker.key() = ts to text
-private fun BreathingSession.key() = startedAt to endedAt
+private fun BreathingSession.key() = IntervalKey("breathing", startedAt, endedAt)
 
 /**
  * Refuses in-file duplicates, records that already exist, overlapping sleep periods, and

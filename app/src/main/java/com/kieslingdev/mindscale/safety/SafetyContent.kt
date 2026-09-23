@@ -11,7 +11,7 @@ import com.kieslingdev.mindscale.data.SafetyPlanStep
  * one character of what this card says or the order in which it says it (D-11,
  * Invariant 1). MindScale does not assess risk and must not appear to.
  *
- * **Every crisis number and coverage claim below was verified on 2026-08-05** from the
+ * **Every crisis number and coverage claim below was verified on 2026-09-17** from the
  * operator's own site or the funding agency — not carried forward from memory. Before
  * changing any of it, re-verify from the sources listed in the spec and update
  * [SafetyCopy.VERIFIED_ON] in the same edit.
@@ -33,9 +33,10 @@ object SafetyCopy {
     const val LIFELINE_TEXT = "Text 988"
     const val LIFELINE_DETAIL =
         "Calling or texting 988 reaches the 988 Suicide & Crisis Lifeline in the United " +
-            "States and the 9-8-8 Suicide Crisis Helpline in Canada. Free and " +
+            "States and the 9-8-8 Suicide Crisis Helpline in Canada. Calls are free and " +
             "confidential, 24 hours a day, every day. In Canada it is available in " +
-            "English and French. For TTY in the United States, use your preferred relay " +
+            "English and French; texts beyond your mobile plan's allowance may incur " +
+            "carrier charges. For TTY in the United States, use your preferred relay " +
             "service or dial 711 then 988."
 
     const val ELSEWHERE_NAME = "Anywhere else"
@@ -50,7 +51,7 @@ object SafetyCopy {
             "fastest route. In the United States and Canada that is 911. There is no " +
             "button for it here, so it cannot be dialled by accident."
 
-    const val VERIFIED_ON = "These numbers were checked on 5 August 2026."
+    const val VERIFIED_ON = "These numbers were checked on 17 September 2026."
 
     const val PLAN_HEADING = "Your plan"
     const val PLAN_INTRO =

@@ -35,11 +35,20 @@ Phases 15 through 18 each inherited the visual-only rule frozen as `SPEC-visual-
 the phases change how the app looks and nothing about how it works. All four are merged, so that
 rule has done its job and the user retired it on 2026-08-06. It does **not** extend to Phase 19.
 
-Phase 19 — the closing form-and-function pass over what the four visual phases recorded as
-unfinished. Its backlog is the union of the user's own defect list and the "Not met" acceptance
-criteria, "Honest gaps", and "Accepted consequences" paragraphs of the four visual specs; those
-lists are the input and are not re-derived. Behaviour may change, but under a narrower rule that
-replaces D-1: every behavioural change needs a frozen decision recorded before the edit, and a
-pre-existing test file may be modified only where a frozen decision authorises that exact edit,
-with the diff naming the decision. Anywhere else a broken test is still evidence of an accidental
-behaviour change and is still a defect. Needs its own spec frozen before any application-code edit.
+Phase 19 readiness work is governed by the frozen `docs/specs/SPEC-release-readiness.md` and is
+tracked in `PROJECT_STATE.md`; this backlog does not duplicate its active repairs or release gates.
+The following work is explicitly deferred until after that readiness pass and a separately scoped
+decision:
+
+- [ ] Use the completed measurement in
+  `docs/reviews/2026-09-17-performance.md` to decide whether long-history derivation cost warrants
+  a separately specified optimization. Keep the existing bounded model and descriptive semantics
+  unless a new spec freezes a change.
+- [ ] Decide whether to correct the Settings `SETTINGS` header wrapping into `SETTING` and `S` at
+  200% font. This is a cosmetic accessibility follow-up; preserve the current reachable privacy
+  content and wait for a separately scoped visual decision.
+- [ ] Revisit additional personal improvements beyond the 2026-09-17 walkthrough only when the
+  user supplies them. The supplied simplification work is now active in `PROJECT_STATE.md`.
+- [ ] Consider reintroducing onset tags only after a separate product decision about discoverable
+  customization and entry capture. The simplification pass parks their UI and preserves stored
+  chips/settings plus backup/import support; do not silently delete or reactivate them.

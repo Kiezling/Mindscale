@@ -1,5 +1,8 @@
 package com.kieslingdev.mindscale
 
+import android.app.Activity
+import android.app.Instrumentation
+import android.content.Intent
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasTestTag
@@ -16,12 +19,69 @@ import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
 import androidx.test.espresso.Espresso.pressBack
-import androidx.test.espresso.Espresso.closeSoftKeyboard
+import androidx.test.platform.app.InstrumentationRegistry
+import java.util.concurrent.atomic.AtomicReference
+import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
 class NavigationTest {
     @get:Rule val composeTestRule = createAndroidComposeRule<MainActivity>()
+
+    @Test
+    fun trackImportShortcutUsesJsonPickerAndCancelLeavesDataUntouched() {
+        assertCanceledBackupShortcut("track_import_logs", Intent.ACTION_OPEN_DOCUMENT)
+    }
+
+    @Test
+    fun trackExportShortcutUsesJsonPickerOnceAcrossRecreation() {
+        assertCanceledBackupShortcut("track_export_logs", Intent.ACTION_CREATE_DOCUMENT)
+    }
+
+    private fun assertCanceledBackupShortcut(tag: String, action: String) {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val launchedIntent = AtomicReference<Intent?>()
+        val monitor = object : Instrumentation.ActivityMonitor() {
+            override fun onStartActivity(intent: Intent): Instrumentation.ActivityResult? {
+                if (intent.action != action) return null
+                launchedIntent.set(intent)
+                return Instrumentation.ActivityResult(Activity.RESULT_CANCELED, null)
+            }
+        }
+        val database = (composeTestRule.activity.application as MindScaleApplication).container.database
+        val before = runBlocking { database.dataControlDao().snapshot() }
+        instrumentation.addMonitor(monitor)
+        try {
+            composeTestRule.onNodeWithTag("track_screen")
+                .performScrollToNode(hasTestTag(tag))
+            composeTestRule.onNodeWithTag(tag).performClick()
+            composeTestRule.waitUntil(timeoutMillis = 10_000) { monitor.hits >= 1 }
+            val intent = requireNotNull(launchedIntent.get())
+            if (action == Intent.ACTION_OPEN_DOCUMENT) {
+                assertEquals("*/*", intent.type)
+                assertTrue(intent.getStringArrayExtra(Intent.EXTRA_MIME_TYPES)
+                    ?.contentEquals(arrayOf("application/json")) == true)
+            } else {
+                assertEquals("application/json", intent.type)
+            }
+            composeTestRule.onNodeWithTag("settings_screen").assertExists()
+            composeTestRule.onNodeWithTag("settings_screen")
+                .performScrollToNode(hasTestTag(if (action == Intent.ACTION_OPEN_DOCUMENT) "import_backup" else "export_backup"))
+
+            // The result is canceled by the monitor. A route recreation cannot request
+            // the same picker again, and merely tapping the shortcut never writes Room.
+            composeTestRule.activityRule.scenario.recreate()
+            composeTestRule.waitForIdle()
+            assertEquals(1, monitor.hits)
+            assertEquals(before, runBlocking { database.dataControlDao().snapshot() })
+            composeTestRule.onNodeWithTag("overlay_back").performClick()
+            composeTestRule.onNodeWithTag("track_screen").assertExists()
+        } finally {
+            instrumentation.removeMonitor(monitor)
+        }
+    }
 
     @Test
     fun trackLaunches_logOpens_andBackReturnsToTrack() {
@@ -65,6 +125,21 @@ class NavigationTest {
         composeTestRule.onNodeWithTag("main_navigation").assertDoesNotExist()
 
         pressBack()
+
+        composeTestRule.onNodeWithTag("numpad_key_1").assertExists()
+    }
+
+    /** R-4: the breathing screen's idle Close uses the route callback to leave the overlay. */
+    @Test
+    fun pacedBreathingIdleCloseReturnsToTrack() {
+        composeTestRule.onNodeWithTag("track_screen")
+            .performScrollToNode(hasTestTag("breathing_link"))
+        composeTestRule.onNodeWithTag("breathing_link").performClick()
+        composeTestRule.onNodeWithTag("breathing_screen").assertExists()
+
+        composeTestRule.onNodeWithTag("breathing_close")
+            .performScrollTo()
+            .performClick()
 
         composeTestRule.onNodeWithTag("numpad_key_1").assertExists()
     }
@@ -150,21 +225,19 @@ class NavigationTest {
     }
 
     @Test
-    fun backdateDialogRawDraft_survivesActivityRecreation() {
+    fun backdateDialog_survivesActivityRecreationWithItsPickerControls() {
         composeTestRule.onNodeWithTag("numpad_key_7").performTouchInput { longClick() }
-        composeTestRule.onNodeWithTag("track_dialog_date").performTextReplacement("2026-0")
-        composeTestRule.onNodeWithTag("track_dialog_time").performTextReplacement("1")
 
         composeTestRule.activityRule.scenario.recreate()
 
         composeTestRule.onNodeWithText("Backdate entry").assertExists()
-        composeTestRule.onNodeWithTag("track_dialog_date").assertTextContains("2026-0")
-        composeTestRule.onNodeWithTag("track_dialog_time").assertTextContains("1")
+        composeTestRule.onNodeWithTag("track_dialog_date").assertExists()
+        composeTestRule.onNodeWithTag("track_dialog_time").assertExists()
         pressBack()
     }
 
     @Test
-    fun editAndNoteDialogRawDrafts_surviveActivityRecreation() {
+    fun editAndNoteDialogs_surviveActivityRecreation() {
         composeTestRule.onNodeWithTag("numpad_key_8").performClick()
         val editAction = hasContentDescription("Edit entry with value 8")
         composeTestRule.waitUntil(timeoutMillis = 5_000) {
@@ -175,15 +248,12 @@ class NavigationTest {
             editAction,
             useUnmergedTree = true
         ).onFirst().performScrollTo().performClick()
-        composeTestRule.onNodeWithTag("track_dialog_date").performTextReplacement("2026-0")
-        composeTestRule.onNodeWithTag("track_dialog_time").performTextReplacement("1")
 
         composeTestRule.activityRule.scenario.recreate()
 
         composeTestRule.onNodeWithText("Edit entry").assertExists()
-        composeTestRule.onNodeWithTag("track_dialog_date").assertTextContains("2026-0")
-        composeTestRule.onNodeWithTag("track_dialog_time").assertTextContains("1")
-        closeSoftKeyboard()
+        composeTestRule.onNodeWithTag("track_dialog_date").assertExists()
+        composeTestRule.onNodeWithTag("track_dialog_time").assertExists()
         pressBack()
         composeTestRule.waitUntil(timeoutMillis = 5_000) {
             composeTestRule.onAllNodesWithTag("track_dialog_date")
@@ -270,6 +340,7 @@ class NavigationTest {
     fun holdSettingIsReachableAndPersistsAcrossRecreation() {
         composeTestRule.onNodeWithTag("profile_action").performClick()
         composeTestRule.onNodeWithTag("profile_open_settings").performClick()
+        composeTestRule.onNodeWithText("Tracking preferences").performClick()
         composeTestRule.onNodeWithText("An entry ends after").performScrollTo()
         composeTestRule.onNodeWithText("24h").performClick()
         composeTestRule.onNodeWithContentDescription("24h, selected").assertExists()

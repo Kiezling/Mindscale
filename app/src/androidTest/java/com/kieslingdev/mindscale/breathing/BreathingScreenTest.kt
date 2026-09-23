@@ -51,9 +51,9 @@ class BreathingScreenTest {
 
     @After fun tearDown() = database.close()
 
-    private fun render() {
+    private fun render(onClose: () -> Unit = {}) {
         composeTestRule.setContent {
-            MindScaleTheme { BreathingRoute(viewModel) }
+            MindScaleTheme { BreathingRoute(viewModel, onClose = onClose) }
         }
     }
 
@@ -112,6 +112,30 @@ class BreathingScreenTest {
         composeTestRule.waitForIdle()
 
         assertEquals(0, runBlocking { database.breathingSessionDao().count() })
+    }
+
+    /** R-4: idle/finished Close navigates; active Stop remains on the finished view. */
+    @Test
+    fun closeNavigatesOnlyFromIdleOrFinished() {
+        var closeCount = 0
+        render { closeCount++ }
+
+        composeTestRule.onNodeWithText(BreathingCopy.CLOSE).performClick()
+        composeTestRule.waitForIdle()
+        assertEquals(1, closeCount)
+        assertEquals(0, runBlocking { database.breathingSessionDao().count() })
+
+        composeTestRule.onNodeWithTag("breathing_length_1").performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithText(BreathingCopy.STOP).performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithText(BreathingCopy.DONE).assertIsDisplayed()
+        composeTestRule.onNodeWithText(BreathingCopy.CLOSE).performClick()
+        composeTestRule.waitForIdle()
+
+        assertEquals(2, closeCount)
+        assertEquals(1, runBlocking { database.breathingSessionDao().count() })
+        composeTestRule.onNodeWithText(BreathingCopy.DONE).assertIsDisplayed()
     }
 
     /** The pacing signal for anyone who is not watching the circle. */

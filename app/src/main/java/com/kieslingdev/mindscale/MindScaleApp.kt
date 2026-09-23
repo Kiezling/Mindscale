@@ -25,12 +25,14 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.em
 import com.kieslingdev.mindscale.ui.components.MsCircularHeaderButton
 import com.kieslingdev.mindscale.ui.components.MsEyebrow
 import com.kieslingdev.mindscale.ui.components.MsHairline
@@ -168,6 +170,14 @@ fun MindScaleApp(
                 onOpenSettings = ::openSettings,
                 onOpenSafety = { openOverlay(AppDestination.SAFETY) },
                 onOpenBreathing = { openOverlay(AppDestination.BREATHING) },
+                onImportLogs = {
+                    openSettings(SettingsFocus.DATA)
+                    settingsViewModel.requestBackupRestore()
+                },
+                onExportLogs = {
+                    openSettings(SettingsFocus.DATA)
+                    settingsViewModel.requestBackup()
+                },
                 modifier = Modifier.padding(innerPadding)
             )
             AppDestination.LOG -> LogRoute(logViewModel, Modifier.padding(innerPadding))
@@ -199,6 +209,7 @@ fun MindScaleApp(
             )
             AppDestination.BREATHING -> BreathingRoute(
                 breathingViewModel,
+                onClose = ::navigateBack,
                 modifier = Modifier
                     .padding(innerPadding)
                     // The pacer has no top bar, so `BreathingCopy.TOP_BAR_TITLE` would otherwise
@@ -227,12 +238,60 @@ fun MindScaleApp(
  * changing entry points is a navigation change (D-1).
  */
 @Composable
-private fun MindScaleHeader(
+internal fun MindScaleHeader(
     isRoot: Boolean,
     title: String,
     onBack: () -> Unit,
     onOpenProfile: () -> Unit
 ) {
+    // At large font scales a tracked title is wider than either side action. Give every
+    // destination title its own centred row instead of allowing the centre cell to collide
+    // with Track/Profile or an overlay's Back control.
+    if (LocalDensity.current.fontScale >= 1.5f) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(MaterialTheme.ms.bg)
+                .windowInsetsPadding(WindowInsets.statusBars)
+                .padding(horizontal = MsSpacing.mdPlus, vertical = MsSpacing.sm),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(MsSpacing.sm)
+        ) {
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                    if (isRoot) {
+                        MsEyebrow(title)
+                    } else {
+                        MsCircularHeaderButton(
+                            label = "‹",
+                            onClick = onBack,
+                            modifier = Modifier
+                                .testTag("overlay_back")
+                                .semantics { contentDescription = "Back" }
+                        )
+                    }
+                }
+                Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
+                    if (isRoot) {
+                        MsTextAction(
+                            text = "Profile",
+                            onClick = onOpenProfile,
+                            modifier = Modifier
+                                .testTag("profile_action")
+                                .semantics { contentDescription = "Open Profile" }
+                        )
+                    }
+                }
+            }
+            MsWordmark(
+                if (isRoot) "MindScale" else title,
+                modifier = Modifier.testTag("header_wordmark"),
+                sizeScale = if (isRoot) 1.12f else 1f
+            )
+            MsHeaderRule()
+        }
+        return
+    }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -243,7 +302,7 @@ private fun MindScaleHeader(
     ) {
         Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
             if (isRoot) {
-                MsEyebrow("MindScale")
+                MsEyebrow(title)
             } else {
                 MsCircularHeaderButton(
                     label = "‹",
@@ -259,7 +318,11 @@ private fun MindScaleHeader(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(MsSpacing.sm)
         ) {
-            MsWordmark(title)
+            MsWordmark(
+                if (isRoot) "MindScale" else title,
+                modifier = Modifier.testTag("header_wordmark"),
+                sizeScale = if (isRoot) 1.12f else 1f
+            )
             MsHeaderRule()
         }
         Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
@@ -356,11 +419,14 @@ private fun NavigationTab(
         // Deliberately unbounded lines. At 200% font `INSIGHTS` is wider than a third of the
         // screen, and a single-line label clipped its last glyph at the edge. Wrapping is not
         // pretty at that scale, but D-23 requires reflow without clipping and a label that has
-        // lost a letter is worse than one that has taken two lines.
+        // lost a letter is worse than one that has taken two lines. At large font scales, remove
+        // tracking first so the label retains its requested font size before it must reflow.
         MsUppercaseText(
             text = label,
             style = MaterialTheme.typography.labelLarge.copy(
-                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                letterSpacing = if (LocalDensity.current.fontScale >= 1.5f) 0.em
+                else MaterialTheme.typography.labelLarge.letterSpacing
             ),
             color = if (selected) palette.goldText else palette.inkQuaternary,
             textAlign = TextAlign.Center

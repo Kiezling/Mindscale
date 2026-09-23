@@ -11,20 +11,28 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.ImeAction
 import com.kieslingdev.mindscale.ui.components.MsActionTone
 import com.kieslingdev.mindscale.ui.components.MsCard
 import com.kieslingdev.mindscale.ui.components.MsChip
@@ -55,6 +63,9 @@ fun ProfileRoute(
     onOpenSafety: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    DisposableEffect(viewModel) {
+        onDispose { viewModel.saveName(false) }
+    }
     ProfileScreen(uiState, viewModel, onOpenReport, onOpenSettings, modifier, onOpenSafety)
 }
 
@@ -68,41 +79,57 @@ fun ProfileScreen(
     onOpenSafety: () -> Unit = {}
 ) {
     val pendingDelete = uiState.pendingDeleteScoreId?.let { id -> uiState.scores.firstOrNull { it.id == id } }
+    val focusManager = LocalFocusManager.current
     LazyColumn(
         modifier = modifier.testTag("profile_screen"),
         contentPadding = androidx.compose.foundation.layout.PaddingValues(MsSpacing.lgPlus),
         verticalArrangement = Arrangement.spacedBy(MsSpacing.lgPlus)
     ) {
         item(key = "identity") {
-            ProfileSection("Your profile") {
+    ProfileSection("Your profile") {
+                var nameWasFocused by remember { mutableStateOf(false) }
                 MsFieldSelectionColors {
                     OutlinedTextField(
                         value = uiState.nameDraft,
                         onValueChange = viewModel::updateNameDraft,
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(onDone = {
+                            focusManager.clearFocus()
+                            viewModel.saveName(false)
+                        }),
                         label = { Text("Display name (optional)") },
                         supportingText = { Text("Stored only on this device. Exports you create can contain your name.") },
                         singleLine = true,
                         colors = msFieldColors(),
-                        modifier = Modifier.fillMaxWidth().testTag("profile_name")
+                        modifier = Modifier.fillMaxWidth()
+                            .onFocusChanged { state ->
+                                if (state.isFocused) nameWasFocused = true
+                                else if (nameWasFocused && uiState.nameDirty) viewModel.saveName(false)
+                            }
+                            .testTag("profile_name")
                     )
                 }
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(MsSpacing.sm),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    MsTextAction(
-                        text = "Save name",
-                        onClick = { viewModel.saveName(false) },
-                        enabled = uiState.nameDirty,
-                        modifier = Modifier.testTag("profile_name_save")
+                if (uiState.message != null) {
+                    Text(
+                        if (uiState.message == "Name saved.") "Saved" else uiState.message ?: "Saving…",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.ms.inkQuaternary,
+                        modifier = Modifier.testTag("profile_name_status")
                     )
-                    if (uiState.nameConflict) {
+                }
+                if (uiState.nameConflict) {
                         MsTextAction(
                             text = "Replace saved name",
                             onClick = { viewModel.saveName(true) },
                             modifier = Modifier.testTag("profile_name_replace")
                         )
-                    }
+                }
+                if (uiState.message == "Could not save the name. Your draft is still here.") {
+                    MsTextAction(
+                        text = "Retry",
+                        onClick = { viewModel.saveName(false) },
+                        modifier = Modifier.testTag("profile_name_retry")
+                    )
                 }
             }
         }

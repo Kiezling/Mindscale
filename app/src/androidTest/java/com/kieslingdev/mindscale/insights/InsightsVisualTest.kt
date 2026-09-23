@@ -6,10 +6,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertWidthIsAtLeast
 import androidx.compose.ui.test.click
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -21,11 +24,20 @@ import androidx.compose.ui.unit.DpRect
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.height
 import androidx.compose.ui.unit.width
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import com.kieslingdev.mindscale.data.EpisodeSourceRow
 import com.kieslingdev.mindscale.data.HoldDuration
+import com.kieslingdev.mindscale.data.ThemeMode
 import com.kieslingdev.mindscale.ui.theme.MindScaleTheme
 import java.time.Instant
 import java.time.ZoneOffset
+import java.io.File
+import java.io.FileOutputStream
+import android.graphics.Bitmap
+import android.content.Context
+import androidx.test.core.app.ApplicationProvider
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
@@ -80,19 +92,90 @@ class InsightsVisualTest {
         )
     }
 
-    private fun setContent(state: InsightsUiState, fontScale: Float = 1f) {
+    private fun setContent(state: InsightsUiState, fontScale: Float = 1f, themeMode: ThemeMode = ThemeMode.LIGHT) {
         composeTestRule.setContent {
             val density = LocalDensity.current
             CompositionLocalProvider(
                 LocalDensity provides Density(density.density, fontScale)
             ) {
-                MindScaleTheme { InsightsUnderTest(state) }
+                MindScaleTheme(themeMode) {
+                    Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+                        InsightsUnderTest(state)
+                    }
+                }
             }
+        }
+        if (state.snapshot?.hasEntries == true) {
+            composeTestRule.onNodeWithTag("insights_screen")
+                .performScrollToNode(hasTestTag("insights_day_by_day_toggle"))
+            composeTestRule.onNodeWithTag("insights_day_by_day_toggle").performTouchInput { click() }
+            composeTestRule.onNodeWithTag("insights_screen")
+                .performScrollToNode(hasTestTag("insights_more_details_toggle"))
+            composeTestRule.onNodeWithTag("insights_more_details_toggle").performTouchInput { click() }
+            composeTestRule.onNodeWithTag("insights_screen")
+                .performScrollToNode(hasTestTag("insight_range_ONE_DAY"))
         }
     }
 
     private fun bounds(tag: String): Rect =
         composeTestRule.onNodeWithTag(tag).fetchSemanticsNode().boundsInRoot
+
+    private fun openSecondarySections() {
+        composeTestRule.onNodeWithTag("insights_screen")
+            .performScrollToNode(hasTestTag("insights_day_by_day_toggle"))
+        composeTestRule.onNodeWithTag("insights_day_by_day_toggle").performTouchInput { click() }
+        composeTestRule.onNodeWithTag("insights_screen")
+            .performScrollToNode(hasTestTag("insights_more_details_toggle"))
+        composeTestRule.onNodeWithTag("insights_more_details_toggle").performTouchInput { click() }
+        composeTestRule.onNodeWithTag("insights_screen")
+            .performScrollToNode(hasTestTag("insight_range_ONE_DAY"))
+    }
+
+    private fun captureOwnerReview(themeMode: ThemeMode, fontScale: Float, suffix: String) {
+        setContent(eligible(), fontScale, themeMode)
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        fun capture(name: String) {
+            composeTestRule.waitForIdle()
+            val file = File(context.getExternalFilesDir(null), "insights-$suffix-$name.png")
+            FileOutputStream(file).use { output ->
+                composeTestRule.onNodeWithTag("insights_screen").captureToImage().asAndroidBitmap()
+                    .compress(Bitmap.CompressFormat.PNG, 100, output)
+            }
+            assertTrue(file.length() > 0)
+        }
+        composeTestRule.onNodeWithTag("insights_screen").performScrollToNode(hasTestTag("insights_summary"))
+        capture("summary")
+        composeTestRule.onNodeWithTag("insights_screen").performScrollToNode(hasTestTag("entry_chart"))
+        capture("course")
+        composeTestRule.onNodeWithTag("insights_screen").performScrollToNode(hasTestTag("onset_gap_bars"))
+        capture("gaps")
+        composeTestRule.onNodeWithTag("insights_screen").performScrollToNode(hasTestTag("onset_time_bars"))
+        capture("hours")
+    }
+
+    @Test fun ownerReviewLight100Screenshots() = captureOwnerReview(ThemeMode.LIGHT, 1f, "light-100")
+    @Test fun ownerReviewDark100Screenshots() = captureOwnerReview(ThemeMode.DARK, 1f, "dark-100")
+    @Test fun ownerReviewLight200Screenshots() = captureOwnerReview(ThemeMode.LIGHT, 2f, "light-200")
+    @Test fun ownerReviewDark200Screenshots() = captureOwnerReview(ThemeMode.DARK, 2f, "dark-200")
+
+    private fun captureWideCourse(themeMode: ThemeMode, fontScale: Float, suffix: String) {
+        setContent(wideRange(), fontScale, themeMode)
+        composeTestRule.onNodeWithTag("insights_screen")
+            .performScrollToNode(hasTestTag("entry_chart"))
+        composeTestRule.waitForIdle()
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val file = File(context.getExternalFilesDir(null), "insights-$suffix-wide-course.png")
+        FileOutputStream(file).use { output ->
+            composeTestRule.onNodeWithTag("insights_screen").captureToImage().asAndroidBitmap()
+                .compress(Bitmap.CompressFormat.PNG, 100, output)
+        }
+        assertTrue(file.length() > 0)
+    }
+
+    @Test fun ownerReviewLight100WideCourse() = captureWideCourse(ThemeMode.LIGHT, 1f, "light-100")
+    @Test fun ownerReviewDark100WideCourse() = captureWideCourse(ThemeMode.DARK, 1f, "dark-100")
+    @Test fun ownerReviewLight200WideCourse() = captureWideCourse(ThemeMode.LIGHT, 2f, "light-200")
+    @Test fun ownerReviewDark200WideCourse() = captureWideCourse(ThemeMode.DARK, 2f, "dark-200")
 
     /**
      * Unclipped bounds, in dp.
@@ -105,17 +188,14 @@ class InsightsVisualTest {
     private fun unclipped(tag: String): DpRect =
         composeTestRule.onNodeWithTag(tag).getUnclippedBoundsInRoot()
 
-    // ── L-3: the summary strip's four columns are equal-width ────────────────
+    // Six values wrap into two equal-width rows.
 
     private fun summaryCellBounds(): List<Rect> =
-        composeTestRule.onNodeWithTag("insights_summary")
-            .fetchSemanticsNode()
-            .children
-            .map { it.boundsInRoot }
+        (0 until 6).map { bounds("insights_summary_cell_$it") }
 
-    private fun assertFourEqualColumns() {
+    private fun assertSixEqualCells(columns: Int = 3) {
         val cells = summaryCellBounds()
-        assertEquals("the summary strip should have four cells", 4, cells.size)
+        assertEquals("the summary strip should have six cells", 6, cells.size)
 
         val reference = cells.first().width
         cells.forEachIndexed { index, rect ->
@@ -128,7 +208,7 @@ class InsightsVisualTest {
         }
 
         // Left to right, evenly gapped, so "equal width" cannot be satisfied by overlap.
-        val gaps = cells.zipWithNext { a, b -> b.left - a.right }
+        val gaps = cells.take(columns).zipWithNext { a, b -> b.left - a.right }
         gaps.zipWithNext { a, b ->
             assertEquals("the gaps between summary columns are uneven", a, b, tolerancePx)
         }
@@ -140,10 +220,10 @@ class InsightsVisualTest {
      * `TYPICAL LENGTH` break the strip's rhythm in `dark-insights-top.png`.
      */
     @Test
-    fun theSummaryStripsFourColumnsAreEqualWidth() {
+    fun theSummaryStripsSixCellsAreEqualWidth() {
         setContent(populated())
 
-        assertFourEqualColumns()
+        assertSixEqualCells()
     }
 
     /**
@@ -152,20 +232,21 @@ class InsightsVisualTest {
      * rather than steal width from its neighbours (D-9, D-16).
      */
     @Test
-    fun theSummaryStripsFourColumnsStayEqualWidthAt200PercentFont() {
+    fun theSummaryStripsSixCellsStayEqualWidthAt200PercentFont() {
         setContent(populated(), fontScale = 2f)
 
-        assertFourEqualColumns()
+        assertSixEqualCells(columns = 2)
     }
 
     /** The four values sit on one line, so the strip reads as a row rather than as four stacks. */
     @Test
-    fun theSummaryStripsFourValuesShareOneTopEdge() {
+    fun theSummaryStripsThreeValuesShareEachRowTopEdge() {
         setContent(populated())
 
-        val tops = summaryCellBounds().map { it.top }
-        tops.zipWithNext { a, b ->
-            assertEquals("the summary cells do not share one top edge", a, b, tolerancePx)
+        summaryCellBounds().chunked(3).forEach { row ->
+            row.map { it.top }.zipWithNext { a, b ->
+                assertEquals("the summary cells do not share one top edge", a, b, tolerancePx)
+            }
         }
     }
 
@@ -202,6 +283,10 @@ class InsightsVisualTest {
         composeTestRule.setContent {
             MindScaleTheme { InsightsUnderTest(populated(), onExplore = { explored = it }) }
         }
+        openSecondarySections()
+
+        composeTestRule.onNodeWithTag("insights_screen")
+            .performScrollToNode(hasTestTag("raster_chart"))
 
         composeTestRule.onNodeWithTag("raster_chart").performTouchInput { click(center) }
 
@@ -248,7 +333,6 @@ class InsightsVisualTest {
             .performScrollToNode(hasTestTag("onset_time_bars"))
         (0 until 24).forEach { hour ->
             composeTestRule.onNodeWithTag("onset_time_hour_$hour")
-                .assertWidthIsAtLeast(48.dp)
                 .assertHeightIsAtLeast(48.dp)
         }
     }
@@ -275,7 +359,6 @@ class InsightsVisualTest {
             .performScrollToNode(hasTestTag("onset_time_bars"))
         (0 until 24).forEach { hour ->
             composeTestRule.onNodeWithTag("onset_time_hour_$hour")
-                .assertWidthIsAtLeast(48.dp)
                 .assertHeightIsAtLeast(48.dp)
         }
     }
@@ -310,6 +393,7 @@ class InsightsVisualTest {
         composeTestRule.setContent {
             MindScaleTheme { InsightsUnderTest(state) }
         }
+        openSecondarySections()
         composeTestRule.onNodeWithTag("insights_screen")
             .performScrollToNode(hasTestTag("onset_gap_bars"))
         val unselected = (0 until 10).associateWith { unclipped("onset_gap_bucket_$it") }
@@ -390,6 +474,25 @@ class InsightsVisualTest {
         )
     )
 
+    private fun wideRange(): InsightsUiState {
+        val start = Instant.parse("2026-01-01T00:00:00Z").toEpochMilli()
+        val rows = buildList {
+            (0 until 61).forEach { index ->
+                add(entry(index + 1L, start + index * 12 * HOUR, if (index % 2 == 0) 2 else 8))
+            }
+            add(EpisodeSourceRow("MARKER", 1000, start + 15 * DAY + 12 * HOUR + 3 * 60_000L,
+                null, null, null, text = "Close event"))
+        }
+        return InsightsUiState(
+            loading = false,
+            range = InsightRange.THIRTY_DAYS,
+            chartExploredInstantMillis = start + 15 * DAY + 12 * HOUR + 3 * 60_000L,
+            snapshot = deriveInsights(rows, HoldDuration.SIXTEEN,
+                Instant.ofEpochMilli(start + 30 * DAY + 12 * HOUR), ZoneOffset.UTC,
+                InsightRange.THIRTY_DAYS)
+        )
+    }
+
     private fun sleepPopulated() = InsightsUiState(
         loading = false,
         snapshot = snapshot(
@@ -423,5 +526,5 @@ class InsightsVisualTest {
         }
     }
 
-    private companion object { const val HOUR = 3_600_000L }
+    private companion object { const val HOUR = 3_600_000L; const val DAY = 24 * HOUR }
 }

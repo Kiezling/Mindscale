@@ -9,15 +9,21 @@ import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertWidthIsAtLeast
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Density
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalDensity
 import androidx.test.espresso.Espresso.pressBack
 import com.kieslingdev.mindscale.breathing.BreathingCopy
+import com.kieslingdev.mindscale.ui.theme.MindScaleTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -214,5 +220,50 @@ class MindScaleChromeTest {
         composeTestRule.onNodeWithTag("safety_screen").assertExists()
         composeTestRule.onNodeWithTag("overlay_back").assertExists()
         composeTestRule.onNodeWithTag("main_navigation").assertDoesNotExist()
+    }
+}
+
+/** S-1: at 200% font Track's wordmark receives a separate centred row. */
+class MindScaleHeaderGeometryTest {
+    @get:Rule val composeTestRule = createComposeRule()
+
+    @Test
+    fun largeFontTrackWordmarkIsCenteredBelowTheSideActions() {
+        composeTestRule.setContent {
+            val density = LocalDensity.current
+            CompositionLocalProvider(LocalDensity provides Density(density.density, 2f)) {
+                MindScaleTheme {
+                    MindScaleHeader(isRoot = true, title = "Track", onBack = {}, onOpenProfile = {})
+                }
+            }
+        }
+
+        val root = composeTestRule.onRoot().fetchSemanticsNode().boundsInRoot
+        val wordmark = composeTestRule.onNodeWithTag("header_wordmark").fetchSemanticsNode().boundsInRoot
+        val profile = composeTestRule.onNodeWithTag("profile_action").fetchSemanticsNode().boundsInRoot
+        val track = composeTestRule.onNodeWithText("Track").fetchSemanticsNode().boundsInRoot
+
+        assertTrue(kotlin.math.abs(wordmark.center.x - root.center.x) < 1f)
+        assertTrue(wordmark.top >= maxOf(track.bottom, profile.bottom))
+    }
+
+    @Test
+    fun largeFontOverlayTitleUsesTheFullWidthRowBelowBack() {
+        composeTestRule.setContent {
+            val density = LocalDensity.current
+            CompositionLocalProvider(LocalDensity provides Density(density.density, 2f)) {
+                MindScaleTheme {
+                    MindScaleHeader(isRoot = false, title = "Settings", onBack = {}, onOpenProfile = {})
+                }
+            }
+        }
+
+        val root = composeTestRule.onRoot().fetchSemanticsNode().boundsInRoot
+        val title = composeTestRule.onNodeWithTag("header_wordmark").fetchSemanticsNode().boundsInRoot
+        val back = composeTestRule.onNodeWithTag("overlay_back").fetchSemanticsNode().boundsInRoot
+
+        assertTrue(kotlin.math.abs(title.center.x - root.center.x) < 1f)
+        assertTrue(title.top >= back.bottom)
+        assertTrue(title.width > back.width * 2f)
     }
 }

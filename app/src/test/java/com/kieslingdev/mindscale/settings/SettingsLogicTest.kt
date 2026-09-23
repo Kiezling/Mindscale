@@ -22,6 +22,14 @@ class SettingsLogicTest {
         assertTrue(normalizeOnsetWords("x".repeat(33)) is ValidationResult.Invalid)
     }
 
+    /** R-2: custom words cannot enter the pipe-delimited legacy CSV representation. */
+    @Test
+    fun normalizeOnsetWords_rejectsPipeAndControlCharacters() {
+        assertTrue(normalizeOnsetWords("wired|restless") is ValidationResult.Invalid)
+        assertTrue(normalizeOnsetWords("wired\t restless") is ValidationResult.Invalid)
+        assertTrue(normalizeOnsetWords("wired\uFEFF") is ValidationResult.Invalid)
+    }
+
     @Test
     fun anchorsMapToFrozenRangesAndZeroHasNone() {
         val settings = TrackSettings(anchor2 = "low", anchor5 = "middle", anchor8 = "high")

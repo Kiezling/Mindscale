@@ -12,9 +12,14 @@ class FakeMarkerDao : MarkerDao {
     private val markersFlow = MutableStateFlow<List<Marker>>(emptyList())
     val insertCalls = mutableListOf<Marker>()
     val deleteByIdCalls = mutableListOf<Long>()
+    val updateEditableFieldsCalls = mutableListOf<Long>()
+    var insertError: Throwable? = null
+    var updateError: Throwable? = null
+    var updateResult: Int? = null
     var deleteByIdError: Throwable? = null
 
     override suspend fun insert(marker: Marker): Long {
+        insertError?.let { throw it }
         val id = nextId++
         val stored = marker.copy(id = id)
         insertCalls += stored
@@ -29,6 +34,17 @@ class FakeMarkerDao : MarkerDao {
         }
 
     override fun observeCount(): Flow<Int> = markersFlow.map { it.size }
+
+    override suspend fun getById(id: Long): Marker? = markersFlow.value.firstOrNull { it.id == id }
+
+    override suspend fun updateEditableFields(id: Long, timestamp: Long, text: String): Int {
+        updateEditableFieldsCalls += id
+        updateError?.let { throw it }
+        updateResult?.let { return it }
+        if (markersFlow.value.none { it.id == id }) return 0
+        markersFlow.value = markersFlow.value.map { if (it.id == id) it.copy(ts = timestamp, text = text) else it }
+        return 1
+    }
 
     override suspend fun deleteById(id: Long): Int {
         deleteByIdCalls += id

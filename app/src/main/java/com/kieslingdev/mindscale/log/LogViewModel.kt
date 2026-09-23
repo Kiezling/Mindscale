@@ -8,6 +8,7 @@ import com.kieslingdev.mindscale.data.EntryDao
 import com.kieslingdev.mindscale.data.MarkerDao
 import com.kieslingdev.mindscale.data.SleepDao
 import com.kieslingdev.mindscale.data.TrackSettingsDao
+import com.kieslingdev.mindscale.notes.RichNoteCodec
 import java.time.LocalDate
 import java.time.ZoneId
 import kotlinx.coroutines.CancellationException
@@ -29,12 +30,18 @@ private const val EDIT_TIMESTAMP_KEY = "log.editTimestamp"
 private const val EDIT_CHIPS_KEY = "log.editChips"
 private const val NOTE_ID_KEY = "log.noteId"
 private const val NOTE_TEXT_KEY = "log.noteText"
+private const val EVENT_ID_KEY = "log.eventId"
+private const val EVENT_TEXT_KEY = "log.eventText"
+private const val EVENT_TIMESTAMP_KEY = "log.eventTimestamp"
 private const val INVALID_RANGE = "From must be on or before To."
-private const val INVALID_TIMESTAMP = "Use yyyy-MM-dd HH:mm and do not enter a future time."
+private const val INVALID_TIMESTAMP = "Choose a date and time that is not in the future."
 private const val MISSING_RECORD = "That record no longer exists"
 private const val UPDATE_FAILED = "Could not update that rating. Please try again."
 private const val NOTE_FAILED = "Could not save that note. Please try again."
+private const val NOTE_INVALID = "Use at most 4,000 characters and only ordinary text, tabs, and line breaks."
 private const val DELETE_FAILED = "Could not delete that record. Please try again."
+private const val EVENT_INVALID = "Use 1–4,000 characters of ordinary text and a time that is not in the future."
+private const val EVENT_FAILED = "Could not update that event. Please try again."
 
 private sealed interface LogQueryResult {
     data class Success(val items: List<LogItem>) : LogQueryResult
@@ -63,7 +70,8 @@ class LogViewModel(
             appliedFilter = initialFilter,
             pendingFilter = initialFilter,
             editDraft = restoredEditDraft(),
-            noteDraft = restoredNoteDraft()
+            noteDraft = restoredNoteDraft(),
+            eventDraft = restoredEventDraft()
         )
     )
     val uiState: StateFlow<LogUiState> = _uiState.asStateFlow()
@@ -126,6 +134,12 @@ class LogViewModel(
             is LogEvent.NoteTextChanged -> updateNoteText(event.text)
             LogEvent.NoteSaved -> saveNote()
             LogEvent.NoteCancelled -> setNoteDraft(null)
+            LogEvent.NoteDeleteRequested -> updateNoteText("")
+            is LogEvent.EventEditToggled -> toggleEventEdit(event.markerId)
+            is LogEvent.EventTextChanged -> updateEventDraft { it.copy(text = event.text, error = null) }
+            is LogEvent.EventTimestampChanged -> updateEventDraft { it.copy(timestampText = event.text, error = null) }
+            LogEvent.EventSaveRequested -> saveEvent()
+            LogEvent.EventEditCancelled -> if (_uiState.value.eventDraft?.isSaving != true) setEventDraft(null)
             is LogEvent.DeleteRequested -> requestDelete(event.item)
             LogEvent.DeleteConfirmed -> confirmDelete()
             LogEvent.DeleteCancelled -> _uiState.update { it.copy(deleteTarget = null) }
@@ -157,6 +171,7 @@ class LogViewModel(
     private fun findEntry(id: Long): Entry? = allEntries().firstOrNull { it.id == id }
 
     private fun toggleEdit(entryId: Long) {
+        if (_uiState.value.eventDraft?.isSaving == true) return
         val current = _uiState.value.editDraft
         if (current?.entryId == entryId) {
             setEditDraft(null)
@@ -164,6 +179,7 @@ class LogViewModel(
         }
         val entry = findEntry(entryId) ?: return showMissing()
         setNoteDraft(null)
+        setEventDraft(null)
         setEditDraft(
             LogEditDraft(
                 entryId = entry.id,
@@ -177,7 +193,7 @@ class LogViewModel(
     private fun updateEditValue(value: Int) {
         require(value in 0..10)
         val draft = _uiState.value.editDraft ?: return
-        val ts = parseEditTimestamp(draft.timestampText, zoneProvider()) ?: return
+        val ts = validEditTimestampOrMarkError(draft) ?: return
         val updated = draft.copy(value = value)
         setEditDraft(updated)
         persistEdit(updated, ts, closeOnSuccess = true)
@@ -185,7 +201,7 @@ class LogViewModel(
 
     private fun updateEditChip(chip: String) {
         val draft = _uiState.value.editDraft ?: return
-        val ts = parseEditTimestamp(draft.timestampText, zoneProvider()) ?: return
+        val ts = validEditTimestampOrMarkError(draft) ?: return
         val chips = if (chip in draft.chips) draft.chips - chip else draft.chips + chip
         val updated = draft.copy(chips = chips)
         setEditDraft(updated)
@@ -208,6 +224,11 @@ class LogViewModel(
     ) {
         viewModelScope.launch {
             try {
+                if (timestamp > nowProvider()) {
+                    val current = _uiState.value.editDraft
+                    if (current?.entryId == draft.entryId) setEditDraft(current.copy(error = INVALID_TIMESTAMP))
+                    return@launch
+                }
                 val changed = entryDao.updateEditableFields(
                     draft.entryId,
                     timestamp,
@@ -227,6 +248,7 @@ class LogViewModel(
     }
 
     private fun toggleNote(entryId: Long) {
+        if (_uiState.value.eventDraft?.isSaving == true) return
         val current = _uiState.value.noteDraft
         if (current?.entryId == entryId) {
             setNoteDraft(null)
@@ -234,19 +256,82 @@ class LogViewModel(
         }
         val entry = findEntry(entryId) ?: return showMissing()
         setEditDraft(null)
+        setEventDraft(null)
         setNoteDraft(LogNoteDraft(entry.id, entry.note.orEmpty()))
+    }
+
+    private fun toggleEventEdit(markerId: Long) {
+        val current = _uiState.value.eventDraft
+        if (current?.isSaving == true) return
+        if (current?.markerId == markerId) {
+            setEventDraft(null)
+            return
+        }
+        val marker = _uiState.value.days.flatMap { it.items }
+            .filterIsInstance<LogItem.Event>().firstOrNull { it.id == markerId }?.marker
+            ?: return showMissing()
+        setEditDraft(null)
+        setNoteDraft(null)
+        setEventDraft(LogEventDraft(marker.id, marker.text, formatEditTimestamp(marker.ts, zoneProvider())))
+    }
+
+    private fun updateEventDraft(change: (LogEventDraft) -> LogEventDraft) {
+        val draft = _uiState.value.eventDraft ?: return
+        if (!draft.isSaving) setEventDraft(change(draft))
+    }
+
+    private fun saveEvent() {
+        val draft = _uiState.value.eventDraft ?: return
+        if (draft.isSaving) return
+        val timestamp = parseEditTimestamp(draft.timestampText, zoneProvider())
+        val text = draft.text.trim()
+        if (timestamp == null || timestamp > nowProvider() || text.isBlank() ||
+            !isAllowedLongText(text)
+        ) {
+            setEventDraft(draft.copy(error = EVENT_INVALID))
+            return
+        }
+        setEventDraft(draft.copy(isSaving = true, error = null))
+        viewModelScope.launch {
+            try {
+                val exists = markerDao.getById(draft.markerId)
+                if (exists == null) {
+                    showMissing()
+                    return@launch
+                }
+                if (timestamp > nowProvider()) {
+                    setEventDraft(draft.copy(error = EVENT_INVALID))
+                    return@launch
+                }
+                val changed = markerDao.updateEditableFields(draft.markerId, timestamp, text)
+                if (changed == 0) showMissing() else setEventDraft(null)
+            } catch (error: Throwable) {
+                if (error is CancellationException) throw error
+                setEventDraft(draft.copy(error = EVENT_FAILED))
+            }
+        }
     }
 
     private fun updateNoteText(text: String) {
         val draft = _uiState.value.noteDraft ?: return
-        setNoteDraft(draft.copy(text = text))
+        setNoteDraft(draft.copy(text = text, error = null))
     }
 
     private fun saveNote() {
         val draft = _uiState.value.noteDraft ?: return
+        if (!isAllowedLongText(draft.text)) {
+            setNoteDraft(draft.copy(error = NOTE_INVALID))
+            return
+        }
         viewModelScope.launch {
             try {
-                if (entryDao.updateNote(draft.entryId, draft.text.trim().ifBlank { null }) == 0) {
+                val decoded = RichNoteCodec.plainText(draft.text)
+                val persisted = when {
+                    decoded.isBlank() -> null
+                    draft.text.startsWith("[[MindScale note v1]]\n") -> draft.text
+                    else -> draft.text.trim()
+                }
+                if (entryDao.updateNote(draft.entryId, persisted) == 0) {
                     showMissing()
                 } else if (_uiState.value.noteDraft == draft) {
                     setNoteDraft(null)
@@ -259,6 +344,7 @@ class LogViewModel(
     }
 
     private fun requestDelete(item: LogItem) {
+        if (_uiState.value.eventDraft?.isSaving == true) return
         val description = when (item) {
             is LogItem.Rating -> "rating ${item.entry.value}"
             is LogItem.Sleep -> "sleep interval"
@@ -334,9 +420,48 @@ class LogViewModel(
         return LogNoteDraft(id, savedStateHandle[NOTE_TEXT_KEY] ?: "")
     }
 
+    private fun setEventDraft(draft: LogEventDraft?) {
+        if (draft == null) {
+            savedStateHandle.remove<Long>(EVENT_ID_KEY)
+            savedStateHandle.remove<String>(EVENT_TEXT_KEY)
+            savedStateHandle.remove<String>(EVENT_TIMESTAMP_KEY)
+        } else {
+            savedStateHandle[EVENT_ID_KEY] = draft.markerId
+            savedStateHandle[EVENT_TEXT_KEY] = draft.text
+            savedStateHandle[EVENT_TIMESTAMP_KEY] = draft.timestampText
+        }
+        _uiState.update { it.copy(eventDraft = draft) }
+    }
+
+    private fun restoredEventDraft(): LogEventDraft? {
+        val id = savedStateHandle.get<Long>(EVENT_ID_KEY) ?: return null
+        val text = savedStateHandle.get<String>(EVENT_TEXT_KEY) ?: return null
+        val timestamp = savedStateHandle.get<String>(EVENT_TIMESTAMP_KEY) ?: return null
+        return LogEventDraft(id, text, timestamp)
+    }
+
+    private fun validEditTimestampOrMarkError(draft: LogEditDraft): Long? {
+        val parsed = parseEditTimestamp(draft.timestampText, zoneProvider())
+        if (parsed == null || parsed > nowProvider()) {
+            if (_uiState.value.editDraft == draft) setEditDraft(draft.copy(error = INVALID_TIMESTAMP))
+            return null
+        }
+        return parsed
+    }
+
+    private fun isAllowedLongText(text: String): Boolean {
+        if (text.isBlank()) return true
+        if (text.codePointCount(0, text.length) > 4_000) return false
+        return text.none { c ->
+            c == '\uFEFF' || c.code == 0x7F ||
+                (c.code < 0x20 && c != '\t' && c != '\n' && c != '\r')
+        }
+    }
+
     private fun showMissing() {
         setEditDraft(null)
         setNoteDraft(null)
+        setEventDraft(null)
         _uiState.update { it.copy(deleteTarget = null, message = MISSING_RECORD) }
     }
 }

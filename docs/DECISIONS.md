@@ -2,6 +2,14 @@
 
 Record stable decisions that should survive chat resets and model/provider changes. Keep entries short; link to a spec when one exists. If a decision changes, add a superseding entry instead of rewriting history.
 
+## D-019 — Owner-feedback presentation and targeted edits
+
+- Date: 2026-09-23.
+- Decision: Delete note clears a draft and Save persists null through the note-only update; event edits retain identity through a timestamp/text update. No schema change.
+- Insights distinguishes median episode peak from median episode duration. Screen-space chart easing is display-only and bounded to real contiguous intervals; nearest rendered targets replace event-priority snapping, with rating-first ties. Hourly counts are visible even with zero or one start, without changing onset/DST definitions.
+- The clinician summary shares a structured factual presentation with its brief text export; discrete recent-rating bars show exact values and explicitly identify the subset. This supersedes older presentation-only restrictions within the owner-feedback scope, while preserving analytical and privacy invariants.
+- Source: `docs/specs/SPEC-owner-feedback-2026-09-20.md`; verification: `docs/reviews/2026-09-23-owner-feedback.md`.
+
 ## D-001 — Native Android baseline
 
 - Date: 2026-07-21
@@ -258,3 +266,42 @@ and the name → actions → detail order is now pinned by an assertion rather t
 overdue.** It is a content change to a safety feature and does not belong in a visual phase. It
 remains `PROJECT_STATE.md` "Next tasks" item 2, and it is the highest-value next task in the
 repository.
+
+## 2026-09-17 — Phase 19 correctness and private beta
+
+The user delegated completion of the existing product and deferred the forgotten personal
+improvement list. `docs/specs/SPEC-release-readiness.md` freezes the bounded repair decisions:
+restore-compatible export-first erase with a transactional snapshot guard; exact CSV record
+identity; validation on every affected edit path; recoverable capture failures; Safety retry;
+Breathing exit; Profile draft preservation; platform backup exclusion; dated safety information;
+offline privacy information; and light intensity increasing in contrast with its value.
+
+R-10 explicitly supersedes the old light-ramp direction constraint. It reverses the same two
+endpoint colors, retaining the minimum contrast, dark ramp, numeric semantics and interpolation.
+The older visual-only test immutability rule does not govern these authorized behavior repairs.
+
+The first distribution route is a private APK beta, as selected by the user. The existing
+debug-signed APK may be prepared for initial testing without changing signing configuration.
+Durable signing, version/update policy and broader distribution remain explicit release gates.
+Play account requirements and public policy hosting are conditional on the later Play route.
+No publication, signing-key creation, remote push or commit is authorized by this decision.
+Long-history optimization is deferred with measured evidence in
+`docs/reviews/2026-09-17-performance.md`; no algorithm rewrite is bundled into this repair pass.
+
+## 2026-09-17 — one launcher for the private beta
+
+The physical-phone APK opened the debug design gallery, and package inspection confirmed two
+MAIN/LAUNCHER activities with the gallery listed first. Release-readiness R-11 supersedes
+visual-foundation D-21's second launcher requirement: MainActivity is the only normal launcher.
+The gallery remains debug-only and available by explicit developer activity launch, outside
+product navigation. Updates preserve the existing app ID, signing identity and local data.
+
+## 2026-09-17 — simplify the everyday experience
+
+The owner's physical-phone walkthrough supersedes the former dense presentation with the
+bounded changes in `docs/specs/SPEC-simplification.md`. Settings and Insights use progressive
+disclosure; onset tags are parked in the UI without deleting existing data; entry editing uses
+calendar/wheel controls; formatted notes use a versioned string envelope with lossless existing
+JSON/CSV transport; Profile name autosaves; new installs default to Light. Existing saved theme
+choices and all recorded values remain intact. The 15-minute eased chart stroke is display-only
+and identified as such; it does not change held-state calculations, episode facts or reports.

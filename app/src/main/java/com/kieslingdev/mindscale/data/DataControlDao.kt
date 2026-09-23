@@ -250,4 +250,16 @@ interface DataControlDao {
         check(resetProfile(UserProfile()) == 1) { "Canonical profile row is missing" }
         return counts
     }
+
+    /**
+     * Erases only when the database still exactly matches the snapshot that was
+     * successfully exported. The comparison and deletion share one Room transaction,
+     * so a second confirmation cannot erase data written after the export.
+     */
+    @Transaction
+    suspend fun eraseIfUnchanged(expected: DataSnapshot): Boolean {
+        if (snapshot() != expected) return false
+        eraseEverythingAndResetSettings()
+        return true
+    }
 }

@@ -9,6 +9,7 @@ import com.kieslingdev.mindscale.data.SafetyPlanStep
 import com.kieslingdev.mindscale.data.allowsPhone
 import com.kieslingdev.mindscale.data.groupedByStep
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -62,9 +63,16 @@ class SafetyViewModel(
 
     private val _uiState = MutableStateFlow(SafetyUiState(editor = restoreEditor()))
     val uiState: StateFlow<SafetyUiState> = _uiState.asStateFlow()
+    private var observationJob: Job? = null
 
     init {
-        viewModelScope.launch {
+        observePlan()
+    }
+
+    /** Starts the one terminal observation owned by this ViewModel. */
+    private fun observePlan() {
+        observationJob?.cancel()
+        observationJob = viewModelScope.launch {
             planDao.observeAll()
                 .catch { error ->
                     if (error is CancellationException) throw error
@@ -105,7 +113,10 @@ class SafetyViewModel(
         _uiState.update { it.copy(editor = editor, message = null) }
     }
 
-    fun retry() = _uiState.update { it.copy(readError = null) }
+    fun retry() {
+        _uiState.update { it.copy(readError = null) }
+        observePlan()
+    }
 
     fun dismissMessage() = _uiState.update { it.copy(message = null) }
 

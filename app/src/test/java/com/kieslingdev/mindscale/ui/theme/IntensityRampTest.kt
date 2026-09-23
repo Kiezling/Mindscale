@@ -8,12 +8,12 @@ import org.junit.Test
 class IntensityRampTest {
 
     @Test
-    fun `light ramp luminance is monotonically non-decreasing from 0 to 10`() {
+    fun `light ramp luminance is monotonically non-increasing from 0 to 10`() {
         val luminances = (0..10).map { intensityColor(it, isDark = false).luminance() }
         for (i in 1 until luminances.size) {
             assertTrue(
-                "expected luminance($i) >= luminance(${i - 1}) but was ${luminances[i]} < ${luminances[i - 1]}",
-                luminances[i] >= luminances[i - 1]
+                "R-10: expected luminance($i) <= luminance(${i - 1}) but was ${luminances[i]} > ${luminances[i - 1]}",
+                luminances[i] <= luminances[i - 1]
             )
         }
     }

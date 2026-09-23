@@ -56,12 +56,17 @@ private val MinTarget = Modifier
 private val CircleSize = 224.dp
 
 @Composable
-fun BreathingRoute(viewModel: BreathingViewModel, modifier: Modifier = Modifier) {
+fun BreathingRoute(
+    viewModel: BreathingViewModel,
+    modifier: Modifier = Modifier,
+    onClose: () -> Unit = {}
+) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     BreathingScreen(
         uiState = uiState,
         onStart = viewModel::start,
         onStop = viewModel::stop,
+        onClose = onClose,
         modifier = modifier
     )
 }
@@ -83,7 +88,8 @@ fun BreathingScreen(
     uiState: BreathingUiState,
     onStart: (Int) -> Unit,
     onStop: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onClose: () -> Unit = {}
 ) {
     val running = uiState.stage as? BreathingStage.Running
     val view = LocalView.current
@@ -227,7 +233,7 @@ fun BreathingScreen(
         item(key = "close") {
             MsPillButton(
                 text = if (running != null) BreathingCopy.STOP else BreathingCopy.CLOSE,
-                onClick = onStop,
+                onClick = if (running != null) onStop else onClose,
                 modifier = MinTarget.testTag("breathing_close")
             )
         }

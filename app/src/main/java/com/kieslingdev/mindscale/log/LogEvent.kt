@@ -14,6 +14,12 @@ sealed interface LogEvent {
     data class NoteTextChanged(val text: String) : LogEvent
     data object NoteSaved : LogEvent
     data object NoteCancelled : LogEvent
+    data object NoteDeleteRequested : LogEvent
+    data class EventEditToggled(val markerId: Long) : LogEvent
+    data class EventTextChanged(val text: String) : LogEvent
+    data class EventTimestampChanged(val text: String) : LogEvent
+    data object EventSaveRequested : LogEvent
+    data object EventEditCancelled : LogEvent
     data class DeleteRequested(val item: LogItem) : LogEvent
     data object DeleteConfirmed : LogEvent
     data object DeleteCancelled : LogEvent

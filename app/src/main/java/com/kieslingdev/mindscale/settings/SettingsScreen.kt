@@ -22,6 +22,8 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -106,9 +108,10 @@ fun SettingsRoute(
         }
     }
 
-    val pending = uiState.pendingDocument
+    val pending = uiState.pendingDocument.takeIf { uiState.documentLaunchPending }
     LaunchedEffect(pending) {
         if (pending != null) {
+            viewModel.documentLaunchHandled()
             if (pending.kind == ExportKind.RECORDS) csvLauncher.launch(pending.filename)
             else jsonLauncher.launch(pending.filename)
         }
@@ -160,16 +163,19 @@ fun SettingsScreen(
     modifier: Modifier = Modifier
 ) {
     val listState = rememberLazyListState()
+    var trackingExpanded by rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
+    var dataExpanded by rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
+    var privacyExpanded by rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
     // The deep link's contract is "focus the anchors section" and "focus the data section", not
     // "scroll to item 4". The item list is unchanged in count and order by this phase, so the two
     // indices are unchanged too — but `SettingsVisualTest` now asserts the *behaviour* rather than
     // the number, so a later restructure moves the index and keeps the contract (D-8).
     LaunchedEffect(focus) {
-        listState.animateScrollToItem(when (focus) {
-            SettingsFocus.TOP -> 0
-            SettingsFocus.ANCHORS -> 4
-            SettingsFocus.DATA -> 12
-        })
+        when (focus) {
+            SettingsFocus.TOP -> Unit
+            SettingsFocus.ANCHORS -> trackingExpanded = true
+            SettingsFocus.DATA -> dataExpanded = true
+        }
     }
 
     LazyColumn(
@@ -188,6 +194,10 @@ fun SettingsScreen(
                 )
             }
         }
+        item(key = "tracking_section") {
+            ExpandableSection("Tracking preferences", trackingExpanded) { trackingExpanded = !trackingExpanded }
+        }
+        if (trackingExpanded) {
         item(key = "time") {
             SettingsSection("Time format") {
                 ChoiceRow(
@@ -243,37 +253,6 @@ fun SettingsScreen(
                 )
             }
         }
-        item(key = "onset_words") {
-            SettingsSection("What was happening") {
-                BodyText("Separate onset words with commas or new lines.")
-                MsFieldSelectionColors {
-                    OutlinedTextField(
-                        value = uiState.chipDraft,
-                        onValueChange = viewModel::updateChipDraft,
-                        label = { Text("Onset words") },
-                        minLines = 3,
-                        colors = msFieldColors(),
-                        modifier = Modifier.fillMaxWidth().testTag("onset_words")
-                    )
-                }
-                uiState.chipError?.let { ErrorText(it) }
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(MsSpacing.mdPlus),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    MsTextAction(
-                        text = "Save words",
-                        onClick = viewModel::saveOnsetWords,
-                        modifier = Modifier.testTag("save_onset_words")
-                    )
-                    MsTextAction(
-                        text = "Restore defaults",
-                        onClick = viewModel::restoreDefaultWords,
-                        tone = MsActionTone.Muted
-                    )
-                }
-            }
-        }
         item(key = "divider_before_preferences") { MsHairline() }
         item(key = "sleep") {
             SettingSwitch(
@@ -281,14 +260,6 @@ fun SettingsScreen(
                 "Show capture controls for falling asleep and waking up.",
                 uiState.settings.sleepOn,
                 viewModel::setSleepOn
-            )
-        }
-        item(key = "chips") {
-            SettingSwitch(
-                "Ask what was happening",
-                "Prompt for onset words after a symptom begins.",
-                uiState.settings.askChips,
-                viewModel::setAskChips
             )
         }
         item(key = "notes") {
@@ -315,7 +286,11 @@ fun SettingsScreen(
                 viewModel::setPaused
             )
         }
-        item(key = "divider_before_data") { MsHairline() }
+        }
+        item(key = "data_section") {
+            ExpandableSection("Data & backups", dataExpanded) { dataExpanded = !dataExpanded }
+        }
+        if (dataExpanded) {
         item(key = "data") {
             SettingsSection("Your data") {
                 BodyText("Exports stay local and go only to the document location you choose.")
@@ -396,6 +371,33 @@ fun SettingsScreen(
                     }
                 }
             }
+        }
+        }
+        item(key = "privacy_section") {
+            ExpandableSection("Privacy & product information", privacyExpanded) { privacyExpanded = !privacyExpanded }
+        }
+        if (privacyExpanded) {
+        item(key = "privacy_heading") {
+            MsEyebrow(
+                PrivacyContent.HEADING,
+                modifier = Modifier.testTag("privacy_product_info")
+            )
+        }
+        item(key = "privacy_local_storage") {
+            PrivacyParagraph(PrivacyContent.LOCAL_STORAGE, "privacy_local_storage")
+        }
+        item(key = "privacy_exports") {
+            PrivacyParagraph(PrivacyContent.EXPORTS, "privacy_exports")
+        }
+        item(key = "privacy_external_actions") {
+            PrivacyParagraph(PrivacyContent.EXTERNAL_ACTIONS, "privacy_external_actions")
+        }
+        item(key = "privacy_erase") {
+            PrivacyParagraph(PrivacyContent.ERASE, "privacy_erase")
+        }
+        item(key = "privacy_medical_disclaimer") {
+            PrivacyParagraph(PrivacyContent.MEDICAL_DISCLAIMER, "privacy_medical_disclaimer")
+        }
         }
         uiState.readError?.let { error ->
             item(key = "read_error") {
@@ -504,6 +506,36 @@ private fun SettingsSection(title: String, content: @Composable ColumnScope.() -
     Column(verticalArrangement = Arrangement.spacedBy(MsSpacing.md)) {
         MsEyebrow(title)
         content()
+    }
+}
+
+@Composable
+private fun ExpandableSection(title: String, expanded: Boolean, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = MsSpacing.minTouchTarget)
+            .clickable(onClick = onClick)
+            .semantics {
+                contentDescription = "$title, ${if (expanded) "expanded" else "collapsed"}"
+            }
+            .testTag("settings_section_${title.lowercase().replace(" ", "_").replace("&", "and")}"),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        MsEyebrow(title, modifier = Modifier.weight(1f))
+        Text(if (expanded) "−" else "+", style = MaterialTheme.typography.titleLarge)
+    }
+}
+
+@Composable
+private fun PrivacyParagraph(text: String, tag: String) {
+    MsCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag(tag),
+        contentPadding = MsSpacing.lg
+    ) {
+        BodyText(text)
     }
 }
 

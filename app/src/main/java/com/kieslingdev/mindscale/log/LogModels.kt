@@ -42,7 +42,15 @@ data class LogEditDraft(
     val error: String? = null
 )
 
-data class LogNoteDraft(val entryId: Long, val text: String)
+data class LogNoteDraft(val entryId: Long, val text: String, val error: String? = null)
+
+data class LogEventDraft(
+    val markerId: Long,
+    val text: String,
+    val timestampText: String,
+    val error: String? = null,
+    val isSaving: Boolean = false
+)
 
 data class LogDeleteTarget(
     val item: LogItem,
@@ -58,6 +66,7 @@ data class LogUiState(
     val filterError: String? = null,
     val editDraft: LogEditDraft? = null,
     val noteDraft: LogNoteDraft? = null,
+    val eventDraft: LogEventDraft? = null,
     val deleteTarget: LogDeleteTarget? = null,
     val message: String? = null,
     val readError: String? = null,

@@ -18,7 +18,7 @@ import org.junit.Test
 class DataExportTest {
     private val snapshot = DataSnapshot(
         entries = listOf(
-            Entry(2, 2_000, 7, listOf("work", "a|b"), "line 1\n\"quoted\"", EntryKind.WAKE)
+            Entry(2, 2_000, 7, listOf("work", "a-b"), "line 1\n\"quoted\"", EntryKind.WAKE)
         ),
         sleeps = listOf(SleepInterval(3, 1_000, 5_000)),
         markers = listOf(Marker(4, 3_000, "dose, changed")),
@@ -71,7 +71,7 @@ class DataExportTest {
         // not change a single byte of an export that carries none.
         assertEquals(
             "record_type,timestamp,end_timestamp,intensity,kind,chips,note,text\r\n" +
-                "rating,1970-01-01T00:00:02Z,,7,WAKE,work|a|b,\"line 1\n\"\"quoted\"\"\",\r\n" +
+                "rating,1970-01-01T00:00:02Z,,7,WAKE,work|a-b,\"line 1\n\"\"quoted\"\"\",\r\n" +
                 "sleep,1970-01-01T00:00:01Z,1970-01-01T00:00:05Z,,,,,\r\n" +
                 "marker,1970-01-01T00:00:03Z,,,,,,\"dose, changed\"\r\n",
             encodeRecordsCsv(snapshot)
@@ -102,5 +102,19 @@ class DataExportTest {
         val ids = Regex("\"breathingSessions\": \\[([\\s\\S]*?)\\]").find(encoded)!!.groupValues[1]
         val order = Regex("\"id\": (\\d+)").findAll(ids).map { it.groupValues[1].toInt() }.toList()
         assertEquals(listOf(3, 2, 1), order)
+    }
+
+    /** R-2: legacy pipe-containing chips are preserved in JSON but cannot be split by CSV. */
+    @Test
+    fun csvRefusesLegacyPipeContainingChipWithJsonAlternative() {
+        val legacy = snapshot.copy(entries = listOf(snapshot.entries.single().copy(chips = listOf("a|b"))))
+        val error = org.junit.Assert.assertThrows(CsvExportException::class.java) {
+            encodeRecordsCsv(legacy)
+        }
+        assertTrue(error.message!!.contains("JSON backup"))
+        val encoded = encodeBackup(legacy, Instant.parse("2026-08-03T12:34:56Z"))
+        assertTrue(encoded.contains("a|b"))
+        val restored = parseBackup(encoded, Instant.parse("2026-08-04T12:34:56Z"), java.time.ZoneOffset.UTC)
+        assertEquals(listOf("a|b"), (restored as ParseResult.Ok).value.entries.single().chips)
     }
 }

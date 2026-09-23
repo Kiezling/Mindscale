@@ -9,6 +9,7 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -23,6 +24,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.flow.first
 import org.junit.Assert.assertTrue
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -102,20 +104,35 @@ class ProfileReportScreenTest {
     }
 
     @Test
-    fun clinicianSummaryShowsPrivacyCopyExactDisclaimerRangeAndAccessibleActions() {
+    fun displayNameAutosavesOnImeDoneAndFocusExit() {
+        openProfile()
+        composeTestRule.onNodeWithTag("profile_name").performTextReplacement("Ada Done")
+        composeTestRule.onNodeWithTag("profile_name").performImeAction()
+        waitForStoredName("Ada Done")
+
+        composeTestRule.onNodeWithTag("profile_name").performTextReplacement("Grace Focus")
+        scrollTo("score_form")
+        // A chip is clickable but does not take text focus. Move to another editable field so
+        // this exercises the name field's actual focus-exit autosave path.
+        composeTestRule.onNodeWithTag("score_date").performClick()
+        waitForStoredName("Grace Focus")
+    }
+
+    @Test
+    fun clinicianSummaryShowsPrivacyConciseSectionsRangeAndAccessibleActions() {
         openProfile()
         composeTestRule.onNodeWithTag("profile_open_report").performClick()
         composeTestRule.onNodeWithTag("report_screen").assertExists()
         composeTestRule.onNodeWithText("Nothing leaves MindScale until you choose Copy, Share, or Save.", substring = true)
             .assertExists()
         composeTestRule.waitUntil(timeoutMillis = 5_000) {
-            composeTestRule.onAllNodes(hasTestTag("report_text")).fetchSemanticsNodes().isNotEmpty()
+            composeTestRule.onAllNodes(hasTestTag("report_dates")).fetchSemanticsNodes().isNotEmpty()
         }
-        val reportText = composeTestRule.onNodeWithTag("report_text").fetchSemanticsNode()
-            .config[SemanticsProperties.Text]
-            .joinToString(separator = "") { it.text }
-        assertTrue(reportText.contains("does not diagnose"))
-        assertTrue(reportText.contains("MindScale did not administer, calculate, or interpret PHQ-8 or GAD-7 totals."))
+        composeTestRule.onNodeWithTag("report_dates").assertExists()
+        listOf("report_course", "report_episodes", "report_events", "report_sleep", "report_context")
+            .forEach { scrollToReport(it); composeTestRule.onNodeWithTag(it).assertExists() }
+        composeTestRule.onNodeWithText("not a clinical assessment", substring = true).assertExists()
+        scrollToReport("report_range_THIRTY_DAYS")
         composeTestRule.onNodeWithTag("report_range_THIRTY_DAYS").assertIsSelected()
         composeTestRule.onNodeWithTag("report_range_NINETY_DAYS").performClick()
         composeTestRule.waitUntil(timeoutMillis = 5_000) {
@@ -142,5 +159,12 @@ class ProfileReportScreenTest {
 
     private fun scrollToReport(tag: String) {
         composeTestRule.onNodeWithTag("report_screen").performScrollToNode(hasTestTag(tag))
+    }
+
+    private fun waitForStoredName(expected: String) {
+        composeTestRule.waitUntil(timeoutMillis = 5_000) {
+            runBlocking { database.profileDao().observeProfile().first().displayName == expected }
+        }
+        assertEquals(expected, runBlocking { database.profileDao().observeProfile().first().displayName })
     }
 }

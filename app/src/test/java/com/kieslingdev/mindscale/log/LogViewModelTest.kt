@@ -20,6 +20,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
@@ -58,6 +59,85 @@ class LogViewModelTest {
 
         assertEquals(3, f.vm.uiState.value.recordCount)
         assertEquals(3, f.vm.uiState.value.days.single().items.size)
+    }
+
+    @Test
+    fun `event edit changes text and timestamp without changing id or other markers`() = runTest {
+        val f = fixture()
+        val id = f.markers.insert(Marker(ts = now - 120_000, text = "before"))
+        val otherId = f.markers.insert(Marker(ts = now - 60_000, text = "other"))
+        dispatcher.scheduler.runCurrent()
+
+        f.vm.onEvent(LogEvent.EventEditToggled(id))
+        f.vm.onEvent(LogEvent.EventTextChanged("after"))
+        f.vm.onEvent(LogEvent.EventTimestampChanged("2026-08-03 11:30"))
+        f.vm.onEvent(LogEvent.EventSaveRequested)
+        dispatcher.scheduler.runCurrent()
+
+        assertEquals(listOf(id), f.markers.updateEditableFieldsCalls)
+        assertEquals("after", f.markers.getById(id)?.text)
+        assertEquals(11, java.time.Instant.ofEpochMilli(f.markers.getById(id)!!.ts).atZone(zone).hour)
+        assertEquals("other", f.markers.getById(otherId)?.text)
+        assertNull(f.vm.uiState.value.eventDraft)
+    }
+
+    @Test
+    fun `event invalid future and failed writes keep draft for retry`() = runTest {
+        val f = fixture()
+        val id = f.markers.insert(Marker(ts = now - 60_000, text = "before"))
+        dispatcher.scheduler.runCurrent()
+        f.vm.onEvent(LogEvent.EventEditToggled(id))
+        f.vm.onEvent(LogEvent.EventTextChanged("changed"))
+        f.vm.onEvent(LogEvent.EventTimestampChanged("2026-08-03 13:00"))
+        f.vm.onEvent(LogEvent.EventSaveRequested)
+        assertNotNull(f.vm.uiState.value.eventDraft?.error)
+        assertTrue(f.markers.updateEditableFieldsCalls.isEmpty())
+
+        f.vm.onEvent(LogEvent.EventTimestampChanged("2026-08-03 11:00"))
+        f.markers.updateError = IllegalStateException("disk")
+        f.vm.onEvent(LogEvent.EventSaveRequested)
+        dispatcher.scheduler.runCurrent()
+        assertEquals("changed", f.vm.uiState.value.eventDraft?.text)
+        assertNotNull(f.vm.uiState.value.eventDraft?.error)
+        f.markers.updateError = null
+        f.vm.onEvent(LogEvent.EventSaveRequested)
+        dispatcher.scheduler.runCurrent()
+        assertEquals("changed", f.markers.getById(id)?.text)
+        assertNull(f.vm.uiState.value.eventDraft)
+    }
+
+    @Test
+    fun `event draft restores and missing row closes editor`() = runTest {
+        val handle = SavedStateHandle()
+        val f = fixture(handle)
+        val id = f.markers.insert(Marker(ts = now - 60_000, text = "before"))
+        dispatcher.scheduler.runCurrent()
+        f.vm.onEvent(LogEvent.EventEditToggled(id))
+        f.vm.onEvent(LogEvent.EventTextChanged("restored draft"))
+        val restored = LogViewModel(f.entries, f.sleeps, f.markers, handle, { zone }, { now })
+        assertEquals("restored draft", restored.uiState.value.eventDraft?.text)
+        f.markers.deleteById(id)
+        f.vm.onEvent(LogEvent.EventSaveRequested)
+        dispatcher.scheduler.runCurrent()
+        assertNull(f.vm.uiState.value.eventDraft)
+        assertEquals("That record no longer exists", f.vm.uiState.value.message)
+    }
+
+    @Test
+    fun `delete note clears only note after Save and keeps rating`() = runTest {
+        val f = fixture()
+        val id = f.entries.insert(Entry(ts = now - 60_000, value = 7, note = "private", chips = listOf("foggy")))
+        dispatcher.scheduler.runCurrent()
+        f.vm.onEvent(LogEvent.NoteToggled(id))
+        f.vm.onEvent(LogEvent.NoteDeleteRequested)
+        assertEquals("", f.vm.uiState.value.noteDraft?.text)
+        f.vm.onEvent(LogEvent.NoteSaved)
+        dispatcher.scheduler.runCurrent()
+        val saved = f.entries.observeRecent().first().single()
+        assertEquals(id, saved.id)
+        assertEquals(7, saved.value)
+        assertEquals(listOf("foggy"), saved.chips)
+        assertNull(saved.note)
     }
 
     @Test
@@ -108,6 +188,23 @@ class LogViewModelTest {
         assertNull(f.vm.uiState.value.editDraft?.error)
     }
 
+    // R-3: every Full Log edit gesture revalidates the timestamp before writing.
+    @Test
+    fun `future timestamp blocks rating and chip taps without a write`() = runTest {
+        val f = fixture()
+        val id = f.entries.insert(Entry(ts = now - 1_000, value = 4))
+        dispatcher.scheduler.runCurrent()
+        f.vm.onEvent(LogEvent.EditToggled(id))
+        f.vm.onEvent(LogEvent.EditTimestampTextChanged("2026-08-03 13:00"))
+        f.vm.onEvent(LogEvent.EditValueSelected(7))
+        f.vm.onEvent(LogEvent.EditChipToggled("foggy"))
+        dispatcher.scheduler.runCurrent()
+
+        assertTrue(f.entries.updateEditableFieldsCalls.isEmpty())
+        assertNotNull(f.vm.uiState.value.editDraft)
+        assertNotNull(f.vm.uiState.value.editDraft?.error)
+    }
+
     @Test
     fun `missing row during edit closes stale draft and reports it`() = runTest {
         val f = fixture()
@@ -153,6 +250,30 @@ class LogViewModelTest {
 
         assertEquals(LogNoteDraft(id, "keep this draft"), f.vm.uiState.value.noteDraft)
         assertEquals("Could not save that note. Please try again.", f.vm.uiState.value.message)
+    }
+
+    // R-1/R-3: Full Log note limits use Unicode code points and preserve invalid drafts.
+    @Test
+    fun `note accepts 4000 astral code points and rejects 4001 plus controls`() = runTest {
+        val f = fixture()
+        val id = f.entries.insert(Entry(ts = now - 1_000, value = 4))
+        dispatcher.scheduler.runCurrent()
+        f.vm.onEvent(LogEvent.NoteToggled(id))
+        f.vm.onEvent(LogEvent.NoteTextChanged("😀".repeat(4_000)))
+        f.vm.onEvent(LogEvent.NoteSaved)
+        dispatcher.scheduler.runCurrent()
+        assertEquals("😀".repeat(4_000), f.entries.observeRecent().first().single().note)
+
+        f.vm.onEvent(LogEvent.NoteToggled(id))
+        f.vm.onEvent(LogEvent.NoteTextChanged("😀".repeat(4_001)))
+        f.vm.onEvent(LogEvent.NoteSaved)
+        assertNotNull(f.vm.uiState.value.noteDraft)
+        assertNotNull(f.vm.uiState.value.noteDraft?.error)
+
+        f.vm.onEvent(LogEvent.NoteTextChanged("keep\uFEFFdraft\u0001"))
+        f.vm.onEvent(LogEvent.NoteSaved)
+        assertEquals("keep\uFEFFdraft\u0001", f.vm.uiState.value.noteDraft?.text)
+        assertTrue(f.entries.updateNoteCalls.size == 1)
     }
 
     @Test

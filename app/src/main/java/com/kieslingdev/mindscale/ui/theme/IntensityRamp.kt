@@ -4,16 +4,16 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 
 /**
- * The low anchor for the light theme: the design's own warm brown, `#6E5220` from `ramp()` at line
- * 890 of `MindScale v2.dc.html`.
+ * The high anchor for the light theme is the design's own warm brown, `#6E5220` from `ramp()` at
+ * line 890 of `MindScale v2.dc.html`.
  *
- * The high anchor is [LightGold], the theme's own non-text gold — the same colour as the armed pad
- * ring, the header rule and the gold day headers. One rule spans both themes: the ramp runs from a
- * dim warm brown into the gold this app already uses to mean "look here"
+ * The low anchor is [LightGold], the theme's own non-text gold — the same colour as the armed pad
+ * ring, the header rule and the gold day headers. R-10 keeps the exact endpoint colors while making
+ * higher light-mode intensity carry more visual weight against the page.
  * (`docs/specs/SPEC-insights-visual.md`, D-4).
  */
-private val LightRampLow = Color(0xFF6E5220) // the design's warm brown, 7.26:1 on card
-private val LightRampHigh = LightGold // 3.15:1 on card
+private val LightRampLow = LightGold // 3.15:1 on card
+private val LightRampHigh = Color(0xFF6E5220) // the design's warm brown, 7.26:1 on card
 
 /**
  * The dark anchors are a distinct pair, not the light ramp under a filter.
@@ -28,8 +28,9 @@ private val DarkRampLow = Color(0xFF856F46) // 3.74:1 on card
 private val DarkRampHigh = DarkGold // 8.04:1 on card
 
 /**
- * Returns a color representing symptom intensity [value] as a monotonically-increasing (in
- * perceived luminance/warmth) ramp from a dim warm anchor to the theme's own gold.
+ * Returns a color representing symptom intensity [value] as a ramp whose visual weight increases
+ * against the theme background, from the theme's own gold to a dim warm anchor in light mode and
+ * from a dim warm anchor to the theme's own gold in dark mode.
  *
  * [isDark] selects a distinct anchor pair for the dark theme (not merely the light ramp under a
  * filter).
@@ -51,11 +52,8 @@ private val DarkRampHigh = DarkGold // 8.04:1 on card
  * ## Why the light ramp runs the way it does
  *
  * The prototype's light ramp descends in relative luminance, from pale cream at 1 to dark brown at
- * 10. `IntensityRampTest` has asserted a monotonically non-decreasing light ramp since Phase 1, and
- * the visual-only rule forbids editing a pre-existing test. The adopted pair is the same two design
- * hexes in the other order, which separates its endpoints marginally further (2.31 against 2.24).
- * What it cannot recover is the direction: on a light page a rating of 1 carries more visual weight
- * than a rating of 10. That is recorded in D-4 rather than left in a diff.
+ * 10. R-10 adopts that direction so higher intensity carries more visual weight against a light
+ * background, while preserving the exact endpoint colors and `(v-1)/9` mapping.
  *
  * ## Invariant 14
  *

@@ -193,7 +193,8 @@ fun deriveInsights(
             clearDays = clear.clearDays,
             eligibleDays = clear.eligibleDays,
             peak = peakValues.maxOrNull(),
-            intensityHours = rangeAuc
+            intensityHours = rangeAuc,
+            medianPeak = peakValues.takeIf { it.isNotEmpty() }?.let(::medianInt)
         ),
         facts = facts,
         recentEpisodes = intersecting.sortedByDescending { it.onsetMillis }.take(8),

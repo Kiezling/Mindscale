@@ -13,6 +13,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.SavedStateHandle
@@ -78,6 +79,12 @@ class SettingsVisualTest {
                 MindScaleTheme { SettingsRoute(viewModel = viewModel, focus = focus) }
             }
         }
+        if (focus == SettingsFocus.TOP) {
+            composeTestRule.onNodeWithTag("settings_section_tracking_preferences").performClick()
+            scrollTo("settings_section_data_and_backups")
+            composeTestRule.onNodeWithTag("settings_section_data_and_backups").performClick()
+            composeTestRule.onNodeWithTag("settings_screen").performScrollToIndex(0)
+        }
     }
 
     private fun scrollTo(tag: String) {
@@ -124,7 +131,7 @@ class SettingsVisualTest {
     fun everySegmentedControlHasEqualWidthSegments() {
         setContent()
 
-        assertEqualWidths("Appearance", segmentBounds(listOf("Light", "Dark", "System"), "System"))
+        assertEqualWidths("Appearance", segmentBounds(listOf("Light", "Dark", "System"), "Light"))
         assertEqualWidths("Time format", segmentBounds(listOf("12-hour", "24-hour"), "12-hour"))
         assertEqualWidths(
             "An entry ends after",
@@ -140,7 +147,7 @@ class SettingsVisualTest {
     fun everySegmentedControlStaysEqualWidthAt200PercentFont() {
         setContent(fontScale = 2f)
 
-        assertEqualWidths("Appearance", segmentBounds(listOf("Light", "Dark", "System"), "System"))
+        assertEqualWidths("Appearance", segmentBounds(listOf("Light", "Dark", "System"), "Light"))
         assertEqualWidths("Time format", segmentBounds(listOf("12-hour", "24-hour"), "12-hour"))
     }
 
@@ -157,7 +164,7 @@ class SettingsVisualTest {
     fun aLongSegmentLabelWrapsRatherThanClippingAt200PercentFont() {
         setContent(fontScale = 2f)
 
-        val system = composeTestRule.onNodeWithContentDescription("System, selected")
+        val system = composeTestRule.onNodeWithContentDescription("System, not selected")
             .fetchSemanticsNode()
         val dark = composeTestRule.onNodeWithContentDescription("Dark, not selected")
             .fetchSemanticsNode()
@@ -183,7 +190,7 @@ class SettingsVisualTest {
         setContent()
 
         listOf(
-            "Light, not selected", "Dark, not selected", "System, selected",
+            "Light, selected", "Dark, not selected", "System, not selected",
             "12-hour, selected", "24-hour, not selected",
             "8h, not selected", "12h, not selected", "16h, selected", "24h, not selected"
         ).forEach { description ->
@@ -276,7 +283,5 @@ class SettingsVisualTest {
 
         scrollTo("save_anchors")
         composeTestRule.onNodeWithTag("save_anchors").assertHeightIsAtLeast(48.dp)
-        scrollTo("save_onset_words")
-        composeTestRule.onNodeWithTag("save_onset_words").assertHeightIsAtLeast(48.dp)
     }
 }

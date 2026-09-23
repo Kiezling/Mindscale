@@ -88,12 +88,13 @@ fun MsTextAction(
 fun MsWordmark(
     text: String,
     modifier: Modifier = Modifier,
-    color: Color = Color.Unspecified
+    color: Color = Color.Unspecified,
+    sizeScale: Float = 1f
 ) {
     MsUppercaseText(
         text = text,
         modifier = modifier,
-        style = MindScaleTextStyles.wordmark,
+        style = MindScaleTextStyles.wordmark.copy(fontSize = MindScaleTextStyles.wordmark.fontSize * sizeScale),
         color = if (color == Color.Unspecified) MaterialTheme.ms.inkPrimary else color
     )
 }

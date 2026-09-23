@@ -18,6 +18,7 @@ import java.util.Locale
 
 private const val MAX_REPORT_MARKERS = 6
 private const val MAX_REPORT_SCORES = 4
+private const val MAX_REPORT_RATINGS = 6
 
 private val ReportFilenameFormatter: DateTimeFormatter =
     DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss").withZone(ZoneOffset.UTC)
@@ -26,7 +27,27 @@ data class ClinicianReport(
     val text: String,
     val range: InsightRange,
     val generatedAt: Instant,
-    val zoneId: ZoneId
+    val zoneId: ZoneId,
+    val presentation: ReportPresentation
+)
+
+data class ReportMetric(val label: String, val value: String)
+data class ReportRating(val time: String, val value: Int)
+data class ReportPresentation(
+    val rangeText: String,
+    val name: String?,
+    val metrics: List<ReportMetric>,
+    val ratingCount: Int,
+    val ratingDays: Int,
+    val ratings: List<ReportRating>,
+    val events: List<String>,
+    val omittedEvents: Int,
+    val episodeDetail: String,
+    val onsetDetail: String,
+    val sleepDetail: String,
+    val scores: List<String>,
+    val omittedScores: Int,
+    val context: String
 )
 
 fun clinicianReportFilename(at: Instant): String =
@@ -100,109 +121,99 @@ fun buildClinicianReport(
         .sortedWith(compareByDescending<com.kieslingdev.mindscale.data.ExternalScore> { it.assessedEpochDay }
             .thenByDescending { it.id })
     val includedScores = scores.take(MAX_REPORT_SCORES)
-    val lineSeparator = "\n"
+    val recentRatings = entries.sortedWith(compareByDescending<com.kieslingdev.mindscale.data.Entry> { it.ts }.thenByDescending { it.id })
+        .take(MAX_REPORT_RATINGS)
+        .sortedWith(compareBy({ it.ts }, { it.id }))
+        .map { entry ->
+            ReportRating(
+                DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm", Locale.ROOT)
+                    .withZone(zoneId).format(Instant.ofEpochMilli(entry.ts)),
+                entry.value
+            )
+        }
+    val sleepCounts = insights.sleepCounts
+    val sleepDetail = if (!sleepCounts.isEligible) {
+        "No completed sleep periods had a recorded Wake in this window."
+    } else {
+        val nights = sleepCounts.categories.first { it.category == SleepCategory.NIGHT }.count
+        val naps = sleepCounts.categories.first { it.category == SleepCategory.NAP }.count
+        "${sleepCounts.completedCount} completed sleep ${"period".plural(sleepCounts.completedCount)}: " +
+            "$nights ${"night".plural(nights)} (>3 elapsed h), $naps ${"nap".plural(naps)} (≤3 elapsed h)."
+    } + (sleepIncompleteText(sleepCounts)?.let { " $it" } ?: "")
+    val presentation = ReportPresentation(
+        rangeText = "$startDate through $endDate · ${range.spokenLabel}",
+        name = source.profile.displayName.trim().takeIf(String::isNotEmpty)?.collapseWhitespace(),
+        metrics = listOf(
+            ReportMetric("Ratings", "${entries.size} on $ratingDays ${"day".plural(ratingDays)}"),
+            ReportMetric("Episodes", "${insights.summary.episodeCount} derived"),
+            ReportMetric("Clear days", "${insights.summary.clearDays}/${insights.summary.eligibleDays} eligible"),
+            ReportMetric("Peak", insights.summary.peak?.let { "$it/10" } ?: "—"),
+            ReportMetric("Median peak", insights.summary.medianPeak?.let { "$it/10" } ?: "—"),
+            ReportMetric("Typical length", insights.summary.typicalLengthMillis?.let { "${formatDuration(it)} awake" } ?: "—"),
+            ReportMetric("Logged burden", "${String.format(Locale.ROOT, "%.1f", insights.summary.intensityHours)} intensity-h")
+        ),
+        ratingCount = entries.size,
+        ratingDays = ratingDays,
+        ratings = recentRatings,
+        events = includedMarkers.map { marker ->
+            val date = Instant.ofEpochMilli(marker.ts).atZone(zoneId).toLocalDate()
+            "$date — ${marker.text.collapseWhitespace()}"
+        },
+        omittedEvents = markers.size - includedMarkers.size,
+        episodeDetail = "Derived spans use the ${source.settings.holdDuration.hours}-hour waking hold; endings may be recorded, held, or ongoing.",
+        onsetDetail = if (insights.onsetTimeCounts.isEligible) {
+            onsetTimeFourHourSentence(insights.onsetTimeCounts, source.settings.hourFormat)
+        } else {
+            "Fewer than 6 recorded starts; no time-of-day count shown."
+        },
+        sleepDetail = sleepDetail,
+        scores = includedScores.map { score ->
+            "${LocalDate.ofEpochDay(score.assessedEpochDay)} — ${score.instrument.visibleLabel} total ${score.total} (entered from a result obtained elsewhere)"
+        },
+        omittedScores = scores.size - includedScores.size,
+        context = "Gaps reflect when recording was possible. Ratings and event times are user entries; episode spans and intensity-hours are derived from ratings. Times use ${zoneId.id}."
+    )
 
     val text = buildString {
-        appendLine("MINDSCALE — USER-RECORDED CLINICIAN SUMMARY")
-        source.profile.displayName.trim().takeIf(String::isNotEmpty)?.let {
-            appendLine("Name: ${it.collapseWhitespace()}")
-        }
-        appendLine("Window: $startDate through $endDate · ${range.spokenLabel}")
-        appendLine("Generated: ${generatedAt} · current zone ${zoneId.id}")
+        appendLine("MINDSCALE — CLINICIAN SUMMARY")
+        presentation.name?.let { appendLine("Name: $it") }
+        appendLine("Window: ${presentation.rangeText}")
+        appendLine("Generated: $generatedAt")
         appendLine()
-        appendLine("MindScale stores and arranges user-recorded information. It does not diagnose,")
-        appendLine("interpret, administer questionnaires, or provide a clinical assessment.")
-        appendLine("Times reflect when recording was possible.")
+        appendLine("AT A GLANCE")
+        presentation.metrics.forEach { appendLine("${it.label}: ${it.value}") }
         appendLine()
-
         appendLine("RECORDED COURSE")
-        if (entries.isEmpty()) {
-            appendLine("No ratings were recorded in this window.")
-        } else {
-            appendLine("${entries.size} ${"rating".plural(entries.size)} were recorded on $ratingDays " +
-                "local calendar ${"day".plural(ratingDays)} in this window.")
-            appendLine("${insights.summary.episodeCount} derived ${"episode span".plural(insights.summary.episodeCount)} " +
-                "touched this window using the configured ${source.settings.holdDuration.hours}-hour waking hold.")
-            if (insights.summary.eligibleDays > 0) {
-                appendLine("${insights.summary.clearDays} of ${insights.summary.eligibleDays} eligible local days " +
-                    "had no derived intensity above 0.")
-            }
-            appendLine("Recorded intensity-hours: ${String.format(Locale.ROOT, "%.1f", insights.summary.intensityHours)} " +
-                "(recorded intensity multiplied by awake hours in this window).")
+        if (presentation.ratings.isEmpty()) appendLine("No ratings were recorded in this window.")
+        else {
+            appendLine("Latest ${presentation.ratings.size} of ${presentation.ratingCount} ratings (0–10):")
+            presentation.ratings.forEach { appendLine("${it.time} — ${it.value}/10") }
         }
         appendLine()
-
+        appendLine("EPISODES AND STARTS")
+        appendLine(presentation.episodeDetail)
+        appendLine(presentation.onsetDetail)
+        appendLine()
         appendLine("EVENTS MARKED")
-        if (markers.isEmpty()) {
-            appendLine("No events were marked in this window.")
-        } else {
-            includedMarkers.forEach { marker ->
-                val date = Instant.ofEpochMilli(marker.ts).atZone(zoneId).toLocalDate()
-                appendLine("$date — ${marker.text.collapseWhitespace()}")
-            }
-            val omitted = markers.size - includedMarkers.size
-            if (omitted > 0) appendLine("$omitted additional marked ${"event".plural(omitted)} not shown.")
-        }
+        if (presentation.events.isEmpty()) appendLine("No events were marked in this window.")
+        else presentation.events.forEach(::appendLine)
+        if (presentation.omittedEvents > 0) appendLine("${presentation.omittedEvents} additional marked ${"event".plural(presentation.omittedEvents)} not shown.")
         appendLine()
-
-        appendLine("EPISODE STRUCTURE")
-        if (insights.summary.episodeCount == 0) {
-            appendLine("No derived episode spans touched this window.")
-        } else {
-            insights.summary.typicalLengthMillis?.let {
-                appendLine("Middle closed derived episode length: ${formatDuration(it)} of waking time.")
-            } ?: appendLine("No closed derived episode length is available in this window.")
-            insights.summary.peak?.let {
-                appendLine("Highest recorded intensity in a derived episode: $it of 10.")
-            }
-            appendLine("An ending may be a recorded 0, the configured waking hold, or still ongoing.")
-        }
-        appendLine()
-
-        appendLine("TIME OF DAY")
-        if (insights.onsetTimeCounts.isEligible) {
-            appendLine(onsetTimeFourHourSentence(insights.onsetTimeCounts, source.settings.hourFormat))
-            appendLine("Start times use the device's current time zone and reflect when recording was possible.")
-            appendLine("They do not establish when symptoms began.")
-        } else {
-            appendLine("Fewer than 6 recorded starts are in this window, so no time-of-day count is shown.")
-        }
-        appendLine()
-
         appendLine("SLEEP")
-        val sleepCounts = insights.sleepCounts
-        if (!sleepCounts.isEligible) {
-            appendLine("No completed sleep periods had a recorded Wake in this window.")
-        } else {
-            val nights = sleepCounts.categories.first { it.category == SleepCategory.NIGHT }.count
-            val naps = sleepCounts.categories.first { it.category == SleepCategory.NAP }.count
-            appendLine("${sleepCounts.completedCount} completed sleep ${"period".plural(sleepCounts.completedCount)} " +
-                "had a recorded Wake in this window: $nights ${"night".plural(nights)} over 3 elapsed hours " +
-                "and $naps ${"nap".plural(naps)} of 3 elapsed hours or less.")
+        appendLine(presentation.sleepDetail)
+        if (presentation.scores.isNotEmpty()) {
+            appendLine()
+            appendLine("EXTERNALLY OBTAINED TOTALS")
+            presentation.scores.forEach(::appendLine)
+            if (presentation.omittedScores > 0) appendLine("${presentation.omittedScores} additional externally obtained ${"total".plural(presentation.omittedScores)} not shown.")
+            appendLine("MindScale did not administer or calculate these totals.")
         }
-        sleepIncompleteText(sleepCounts)?.let(::appendLine)
-        appendLine("These counts do not establish whether sleep affected later records or later records affected sleep.")
         appendLine()
+        appendLine(presentation.context)
+        append("This is a record summary, not a clinical assessment. Review the underlying records.")
+    }
 
-        appendLine("EXTERNALLY OBTAINED TOTALS")
-        if (scores.isEmpty()) {
-            appendLine("No externally obtained PHQ-8 or GAD-7 totals are stored in this window.")
-        } else {
-            includedScores.forEach { score ->
-                val date = LocalDate.ofEpochDay(score.assessedEpochDay)
-                appendLine("$date — ${score.instrument.visibleLabel} total ${score.total} — " +
-                    "entered by the user from a result obtained elsewhere.")
-            }
-            val omitted = scores.size - includedScores.size
-            if (omitted > 0) appendLine("$omitted additional externally obtained ${"total".plural(omitted)} not shown.")
-        }
-        appendLine("MindScale did not administer, calculate, or interpret PHQ-8 or GAD-7 totals.")
-        appendLine()
-        appendLine("Generated locally on this device. This text may contain sensitive health information.")
-        append("Review the underlying records before relying on this summary.")
-    }.replace("\n", lineSeparator)
-
-    return ClinicianReport(text, range, generatedAt, zoneId)
+    return ClinicianReport(text, range, generatedAt, zoneId, presentation)
 }
 
 private fun String.plural(count: Int): String = if (count == 1) this else "${this}s"

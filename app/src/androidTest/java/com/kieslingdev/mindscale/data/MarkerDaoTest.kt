@@ -68,4 +68,18 @@ class MarkerDaoTest {
         assertEquals(1, dao.deleteById(firstTie))
         assertEquals(0, dao.deleteById(firstTie))
     }
+
+    @Test
+    fun targetedEditPreservesMarkerIdAndChangesOnlyRequestedFields() = runBlocking {
+        val editedId = dao.insert(Marker(ts = 1_000L, text = "before"))
+        val otherId = dao.insert(Marker(ts = 1_500L, text = "other"))
+
+        assertEquals(Marker(editedId, 1_000L, "before"), dao.getById(editedId))
+        assertEquals(1, dao.updateEditableFields(editedId, 2_000L, "after"))
+        assertEquals(Marker(editedId, 2_000L, "after"), dao.getById(editedId))
+        assertEquals(Marker(otherId, 1_500L, "other"), dao.getById(otherId))
+        assertEquals(0, dao.updateEditableFields(Long.MAX_VALUE, 3_000L, "missing"))
+        assertEquals(2, dao.observeCount().first())
+        assertEquals(listOf(editedId, otherId), dao.observeBetween(null, null).first().map { it.id })
+    }
 }

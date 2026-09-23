@@ -57,9 +57,10 @@ class MsDimensionAuditTest {
          * entry dot; Log's numeral column and row indent; Breathing's 224 dp pacing circle.
          */
         val EXPECTED_DOCUMENTED = mapOf(
-            "InsightsScreen.kt" to 31,
+            "InsightsScreen.kt" to 28,
             "TrackScreen.kt" to 6,
-            "LogScreen.kt" to 2,
+            "LogScreen.kt" to 3,
+            "ReportScreen.kt" to 1,
             "BreathingScreen.kt" to 1
         )
 
