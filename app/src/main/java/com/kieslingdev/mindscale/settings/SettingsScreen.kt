@@ -1,5 +1,9 @@
 package com.kieslingdev.mindscale.settings
 
+import android.content.ActivityNotFoundException
+import android.content.Intent
+import android.net.Uri
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
@@ -163,6 +167,7 @@ fun SettingsScreen(
     modifier: Modifier = Modifier
 ) {
     val listState = rememberLazyListState()
+    val context = LocalContext.current
     var trackingExpanded by rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
     var dataExpanded by rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
     var privacyExpanded by rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
@@ -382,6 +387,27 @@ fun SettingsScreen(
                 PrivacyContent.HEADING,
                 modifier = Modifier.testTag("privacy_product_info")
             )
+        }
+        item(key = "privacy_policy_link") {
+            TextButton(
+                onClick = {
+                    try {
+                        context.startActivity(
+                            Intent(Intent.ACTION_VIEW, Uri.parse(PrivacyContent.PRIVACY_POLICY_URL))
+                        )
+                    } catch (_: ActivityNotFoundException) {
+                        Toast.makeText(context, "No browser is available", Toast.LENGTH_SHORT).show()
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("privacy_policy_link")
+            ) {
+                Text("Privacy policy")
+            }
+        }
+        item(key = "privacy_publisher_support") {
+            PrivacyParagraph(PrivacyContent.PUBLISHER_SUPPORT, "privacy_publisher_support")
         }
         item(key = "privacy_local_storage") {
             PrivacyParagraph(PrivacyContent.LOCAL_STORAGE, "privacy_local_storage")

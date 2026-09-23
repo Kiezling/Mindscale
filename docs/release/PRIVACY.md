@@ -1,5 +1,10 @@
 # MindScale privacy policy draft
 
+Superseded for publication on 23 September 2026 by `privacy/index.html`, live at
+https://kiezling.github.io/Mindscale/. The HTML includes support-message and website-hosting
+details and is the canonical published text. Historical draft below is retained as preparation
+evidence, not a separate active policy or an unresolved hosting gate.
+
 Draft for the public policy page required before a Google Play release. This is not a published
 URL.
 

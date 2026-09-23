@@ -3,12 +3,12 @@ package com.kieslingdev.mindscale.settings
 /**
  * Offline product and privacy information shown at the bottom of Settings.
  *
- * Keep this copy factual and aligned with the app's local-only implementation. It deliberately
- * contains no publisher address or hosted-policy URL: those are release gates, not values to
- * invent in the app.
+ * Keep this copy factual and aligned with the app's local-only implementation.
  */
 object PrivacyContent {
     const val HEADING = "Privacy and product information"
+    const val PRIVACY_POLICY_URL = "https://kiezling.github.io/Mindscale/"
+    const val PUBLISHER_SUPPORT = "Publisher: Kiesling Dev · Support: corykiesling@gmail.com"
     const val LOCAL_STORAGE =
         "MindScale stores your records, Profile information, safety plan, and preferences on " +
             "this device. It has no accounts, analytics, or app network connection. Android " +

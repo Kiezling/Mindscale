@@ -1,5 +1,86 @@
 # MindScale project state
 
+## GitHub current-source publication — 2026-09-23
+
+- Owner explicitly requests replacing old GitHub contents with the current project, authorizing
+  a scoped commit and push to `Kiezling/Mindscale` main. Live fetch showed remote main is an
+  ancestor of local HEAD: normal fast-forward publication can preserve existing history.
+- Include current app, tests, specs, docs, store graphics and public-policy source. Keep signing
+  material, build outputs, personal attachments, machine-specific hook registration and the
+  unrelated `.idea/misc.xml` edit local. The separate privacy Pages branch remains intact.
+- App diff still exactly matches the verified candidate patch. Latest applicable oracles remain
+  490 JVM + 2 focused API36 tests, lint 0 errors/27 warnings/2 hints, debug and release builds
+  passing; see `docs/reviews/2026-09-23-play-preparation.md`. No production source edits since.
+- Play submission continuation task `01a0cfe5-1ac3-7d30-b909-c57365e944b2` is active in this
+  checkout, temporarily Console-only while original task publishes source. It confirmed no
+  repository edits since handoff. After push verification it resumes sole ownership of local
+  release work. This GitHub request does not replace the authorized Play submission objective.
+
+## Google Play production preparation — active 2026-09-23
+
+- Current user objective: submit a **free public production release**. This supersedes the
+  historical private-APK-only restriction. User authorizes GitHub privacy hosting, explicitly
+  approved Play app-creation policy/signing/export declarations, and selected a new upload key.
+  User is working at the computer: use CLI/API/browser DOM/text only; no whole-screen viewing.
+- Checkout `S:\Android\AndroidProjects\MindScale`, branch `codex/release-readiness`, HEAD
+  base `21a91c8`; verified application baseline `a5a6a45`. Current-source commit/push is now
+  explicitly requested as recorded above. Preserve
+  unrelated `.idea/misc.xml`, `.codex/hooks.json`, `.codex-remote-attachments/`.
+- Governing spec: `docs/specs/SPEC-play-production.md`. Submission packet:
+  `docs/release/PLAY-SUBMISSION.md`. MindScale now exists in Kiesling Dev Console as a free app
+  with package `com.kieslingdev.mindscale`; not submitted/published. Console has saved public
+  privacy URL, health features (sleep, relaxation, mental/behavioral health), and unrestricted
+  app access. Account is personal; health-app organization eligibility remains unresolved.
+- Public policy is live and verified through browser text at `https://kiezling.github.io/Mindscale/`.
+  Deployed through GitHub API to isolated `codex/privacy-policy` root commit
+  `4d20b6806387b0f5a06a28dda6e647bb5fe30b02` (only index.html and .nojekyll), Pages enabled.
+  Main/application branches untouched. Local HTML source: `docs/release/privacy/index.html`.
+- New RSA4096 upload key created outside repo at
+  `C:\Users\mckie\.android\MindScale-release\mindscale-upload.p12`; alias `mindscale-upload`;
+  password in `upload-password.dpapi`, Windows current-user protected; folder ACL limited to
+  current user and SYSTEM. No password printed. Public cert SHA256
+  `12:53:52:97:39:7D:B2:1D:78:44:69:A3:C7:DC:C1:7B:F5:95:9F:19:19:02:44:84:C7:92:AE:16:ED:D7:FE:D2`.
+  Off-device backup is NOT complete. Google app-signing selection remains to be verified in Console.
+  Final signed candidate: `build/play-release/mindscale-1.0-1.aab`, SHA256
+  `4AED2619A8DC916F2AABB36145467B193BA4104A6A0A9F375F957EC3E98A7A66`; JAR signature verified.
+  Not uploaded. Preserve versionCode 1 until upload; afterward treat it as consumed.
+- Fresh baseline `gradlew.bat test lint assembleDebug bundleRelease --console=plain` passed:
+  490 JVM tests, lint 0 errors/26 warnings/2 hints; unsigned AAB SHA256
+  `C879F54B141113A8A59941A7ED5A4BCE2D3622D3479C0304401BF1ACFF02A3DB`.
+  Signature-entry count 0, native-library count 4; this is NOT an upload-ready candidate.
+  Log: ignored `build/review/play-submission/build.log`. Sandbox JDK/gh access requires normal
+  approved escalation; no toolchain change needed. No connected suite rerun yet.
+- Final changes passed `test lint assembleDebug bundleRelease connectedDebugAndroidTest` with
+  SettingsPrivacyTest class filter: 490 JVM + 2 API36 tests, no failures/errors/skips; lint
+  0 errors/27 warnings/2 hints (one new non-blocking Uri.parse style hint). Build log
+  `build/review/play-submission/final-build.log`; report `docs/reviews/2026-09-23-play-preparation.md`.
+  Four native libraries have 16KB ELF LOAD alignment; Play-generated APK ZIP/runtime validation
+  remains open. API26 image is absent; API26 runtime and spoken TalkBack still unverified.
+- Dirty task files: privacy link/contact and focused test; adaptive/legacy/monochrome launcher
+  artwork; PROJECT_STATE; release checklist/listing/privacy status; new spec, submission/signing
+  docs, review, public HTML, store PNGs and deterministic renderer. All three bounded workers
+  are finished; no Gradle/adb jobs remain. Compilation initially caught missing local Context;
+  fixed before passing run. Signing script needs `.Trim()` for protected-password file newline.
+- Pending choices: owner wants widest suitable age audience; recommends 18+ only if warranted.
+  Explained that Play requires age suitability and recommended 18+ initially; not yet a final
+  audience declaration. Initial countries proposal US/Canada, not explicitly confirmed.
+- Next: continue saved Console app dashboard (Chrome tab 476653335), finish remaining 5 setup
+  tasks: content rating, target audience, Data safety, category/contact, store listing. Privacy,
+  health, sign-in, ads, government and financial declarations saved. Select synthetic screenshots
+  from prior review assets or capture only the isolated Android emulator, never the desktop;
+  upload prepared graphics/AAB through documented file-upload API. Resolve age/countries and
+  personal-health-account eligibility, final Play validation/install and runtime/accessibility
+  gaps before claiming production submission. Preserve owner debug install:
+  different Play signing cannot replace it in place; no uninstall or personal data changes.
+- Continuation policy: owner explicitly requests efficient fresh-task continuation when helpful,
+  using this same saved project checkout directly so uncommitted changes remain present. All
+  workers are settled; safe milestone reached. Create one continuation with concise links, confirm
+  it starts on this checkout, then stop duplicate work here. Do not ask for submission permission
+  again: public/free submission is already authorized. New legal agreements still require
+  action-time confirmation; no account conversion, support message, key disclosure or data deletion
+  authorized. Price free and policy hosting/app-creation approvals are settled.
+
+
 ## Track polish committed and installed — 2026-09-23
 
 - User requests Sleep/Wake help, centered larger Recent Logs, smaller event button, bordered note input and centered toolbar, one Ended badge, closer italic safety link, and bottom JSON import/export shortcuts. Governing spec: `docs/specs/SPEC-track-polish-backup-2026-09-23.md`.

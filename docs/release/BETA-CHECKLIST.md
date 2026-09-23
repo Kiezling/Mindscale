@@ -1,5 +1,10 @@
 # MindScale beta and release checklist
 
+Current direction, 23 September 2026: the owner requests public Google Play production.
+See `PLAY-SUBMISSION.md` for the current submission packet; private-APK sequencing below is
+historical. The latest debug verification is `docs/reviews/2026-09-23-track-polish.md`, including
+the successful Pixel 10 installation. Remaining release checks are not implied complete.
+
 Prepared 17 September 2026 from R-8 and R-9. A checkbox marks a gate that is verified only when
 checked; unchecked items remain open and do not claim publication or production readiness.
 

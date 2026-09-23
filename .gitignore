@@ -19,6 +19,13 @@
 *.aab
 *.jks
 *.keystore
+*.p12
+*.pfx
+*.dpapi
+
+# Personal attachments and machine-specific Codex hook registration.
+/.codex-remote-attachments/
+/.codex/hooks.json
 
 # Local agent state and generated telemetry.
 .claude/logs/*

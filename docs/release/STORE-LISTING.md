@@ -17,9 +17,10 @@ Record your own day-to-day ratings and context privately on your device.
 
 ## Full description
 
-MindScale is a local, event-contingent symptom tracker for keeping a record you can review and
-discuss. Add a 0–10 rating, sleep and wake times, notes, context words, marked events, and your
-own safety plan. Optional paced breathing sessions are recorded as facts only.
+MindScale is a private symptom journal for keeping a record you can review and discuss.
+Record 0–10 ratings, sleep and wake times, notes, and marked events. Browse your history in
+the Full Log, review charts in Insights, and prepare a summary to discuss with a healthcare
+professional. You can also keep your own safety plan and use an optional paced-breathing tool.
 
 Your records stay on your device. MindScale has no account, analytics, advertising, or app network
 connection, and Android automatic backup is disabled. You control JSON and CSV exports and choose
