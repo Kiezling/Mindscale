@@ -2,6 +2,9 @@
 
 ## GitHub current-source publication — 2026-09-23
 
+- Published and verified application checkpoint `42b9479bc84f86533756aa782deb6778c0c87f09`
+  on GitHub `main`; it includes all current application, test, documentation and store-asset work.
+  This status follow-up is documentation-only. No force-push or history deletion was needed.
 - Owner explicitly requests replacing old GitHub contents with the current project, authorizing
   a scoped commit and push to `Kiezling/Mindscale` main. Live fetch showed remote main is an
   ancestor of local HEAD: normal fast-forward publication can preserve existing history.
@@ -12,9 +15,10 @@
   490 JVM + 2 focused API36 tests, lint 0 errors/27 warnings/2 hints, debug and release builds
   passing; see `docs/reviews/2026-09-23-play-preparation.md`. No production source edits since.
 - Play submission continuation task `01a0cfe5-1ac3-7d30-b909-c57365e944b2` is active in this
-  checkout, temporarily Console-only while original task publishes source. It confirmed no
-  repository edits since handoff. After push verification it resumes sole ownership of local
-  release work. This GitHub request does not replace the authorized Play submission objective.
+  checkout and resumes sole ownership of release work after the publication completion message.
+  It confirmed no repository edits during publication. This GitHub request does not replace the
+  authorized Play submission objective. Only unrelated `.idea/misc.xml` remains visibly dirty;
+  private attachments and machine-specific hooks are preserved locally and ignored.
 
 ## Google Play production preparation — active 2026-09-23
 
